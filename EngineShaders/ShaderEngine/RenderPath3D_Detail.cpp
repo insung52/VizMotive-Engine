@@ -664,6 +664,7 @@ namespace vz::renderer
 		}
 
 		frameCB.giboost_packed = math::pack_half2(giBoost, 0);
+		frameCB.dithering_method = ditheringMethod;
 
 		frameCB.options = 0;
 		if (isTemporalAAEnabled && !camera->IsSlicer())

@@ -101,12 +101,12 @@ inline void light_directional(in ShaderEntity light, in Surface surface, inout L
 				[branch]
 				if (is_saturated(shadow_uv))
 				{
-                    const half2 cascade_edgefactor = (half2) saturate(saturate(abs(shadow_pos.xy)) - 0.8) * 2.0; // fade will be on edge and inwards 10%
+                    const half2 cascade_edgefactor = (half2) saturate(saturate(abs(shadow_pos.xy)) - 0.6) * 2.0; // fade will be on edge and inwards 10%
 					const half cascade_fade = max(cascade_edgefactor.x, cascade_edgefactor.y);
 
 					// If we are on cascade edge threshold and not the last cascade, then fallback to a larger cascade:
 					[branch]
-					if (cascade_fade > 0 && dither(surface.pixel + GetTemporalAASampleRotation()) < cascade_fade)
+					if (cascade_fade > 0 && dither_method(surface.pixel + GetTemporalAASampleRotation(), GetFrame().dithering_method, GetFrame().frame_count) < cascade_fade)
 						continue;
 						
 					light_color *= shadow_2D(light, shadow_pos, shadow_uv.xy, cascade, surface.pixel);

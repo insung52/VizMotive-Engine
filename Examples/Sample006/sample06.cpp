@@ -459,6 +459,17 @@ int main(int, char **)
 					}
 				}
 
+				// Dithering Method Selection
+				static int dithering_method = 0;
+				const char* dithering_methods[] = { "Bayer Matrix", "Blue Noise", "Interleaved Gradient Noise", "Temporal Blue Noise", "Void-and-Cluster" };
+				if (ImGui::Combo("Dithering Method", &dithering_method, dithering_methods, IM_ARRAYSIZE(dithering_methods)))
+				{
+					// Send dithering method to config system
+					vzm::ParamMap<std::string> config_options;
+					config_options.SetParam("DITHERING_METHOD", dithering_method);
+					vzm::SetConfigure(config_options, "SHADER_ENGINE_SETTINGS");
+				}
+
 				static int detail_Icosahedron = 5;
 				if (ImGui::SliderInt("Icosahedron's detail", &detail_Icosahedron, 0, 10))
 				{

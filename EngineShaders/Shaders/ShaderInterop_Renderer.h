@@ -1198,7 +1198,7 @@ struct alignas(16) FrameCB
 
 	uint		capsuleshadow_fade_angle;
 	int			indirect_debugbufferindex;
-	uint		padding0;
+	uint		dithering_method;	// 0=Bayer, 1=BlueNoise, 2=IGN, 3=TemporalBlueNoise, 4=VoidCluster
 	uint		padding1;
 
 	float		blue_noise_phase;

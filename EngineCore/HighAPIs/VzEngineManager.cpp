@@ -449,6 +449,10 @@ namespace vzm
 				std::vector<float> default_dist = { 8, 80, 800 };
 				ses_section.Set("DEFAULT_CASCADE_DISTANCES", default_dist);
 			}
+			if (!ses_section.Has("DITHERING_METHOD"))
+			{
+				ses_section.Set("DITHERING_METHOD", 0); // Default to Bayer Matrix
+			}
 			configFile.Commit();
 		}
 

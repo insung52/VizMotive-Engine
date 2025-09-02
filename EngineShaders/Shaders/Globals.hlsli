@@ -1661,8 +1661,61 @@ inline half ditherMask8(in min16uint2 pixel)
     return BayerMatrix8[pixel.x % 8][pixel.y % 8];
 }
 
+// Interleaved Gradient Noise
+inline half dither_ign(in min16uint2 pixel)
+{
+    return frac(52.9829189 * frac(dot(float2(pixel), float2(0.06711056, 0.00583715))));
+}
+
+// Blue Noise (simplified random-like pattern)
+inline half dither_blue_noise(in min16uint2 pixel)
+{
+    // Simplified blue noise approximation using improved hash
+    uint2 p = pixel;
+    p = (p ^ 61u) ^ (p >> 16u);
+    p = p + (p << 3u);
+    p = p ^ (p >> 4u);
+    p = p * 0x27d4eb2du;
+    p = p ^ (p >> 15u);
+    return frac(float(p.x ^ p.y) * (1.0 / 4294967296.0));
+}
+
+// Temporal Blue Noise (frame-based rotation)
+inline half dither_temporal_blue_noise(in min16uint2 pixel, in uint frame)
+{
+    uint2 offset = uint2(frame * 23u, frame * 17u) % 64u;
+    return dither_blue_noise((pixel + offset) % 64u);
+}
+
+// Void-and-Cluster (improved distribution)
+inline half dither_void_cluster(in min16uint2 pixel)
+{
+    // Void-and-cluster approximation using multiple octaves
+    float2 p = float2(pixel);
+    float noise = 0.0;
+    noise += frac(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453) * 0.5;
+    noise += frac(sin(dot(p * 2.1, float2(269.5, 183.3))) * 43758.5453) * 0.25;
+    noise += frac(sin(dot(p * 4.7, float2(421.2, 371.9))) * 43758.5453) * 0.125;
+    return frac(noise);
+}
+
+// Dithering method selector
+inline half dither_method(in min16uint2 pixel, in uint method, in uint frame = 0)
+{
+    switch(method)
+    {
+        case 0: return ditherMask8(pixel);                           // Bayer Matrix
+        case 1: return dither_blue_noise(pixel);                     // Blue Noise
+        case 2: return dither_ign(pixel);                           // Interleaved Gradient Noise
+        case 3: return dither_temporal_blue_noise(pixel, frame);    // Temporal Blue Noise
+        case 4: return dither_void_cluster(pixel);                  // Void-and-Cluster
+        default: return ditherMask8(pixel);                         // Default to Bayer
+    }
+}
+
 inline half dither(in min16uint2 pixel)
 {
+    // Default method (Bayer Matrix)
     return ditherMask8(pixel);
 }
 

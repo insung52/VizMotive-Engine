@@ -43,3 +43,8 @@ namespace vz
 	extern "C" DX12_EXPORT bool LoadShaders();
 
 }
+
+namespace vz::renderer
+{
+	extern uint32_t ditheringMethod;
+}

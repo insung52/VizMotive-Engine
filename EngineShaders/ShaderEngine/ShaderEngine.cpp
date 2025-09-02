@@ -50,6 +50,8 @@ namespace vz::renderer
 
 	bool isDebugShapeEnabled = true;
 	bool isDebugShapeCleanStart = true;
+	
+	uint32_t ditheringMethod = 0; // 0=Bayer, 1=BlueNoise, 2=IGN, 3=TemporalBlueNoise, 4=VoidCluster
 }
 
 namespace vz::renderer 
@@ -615,6 +617,7 @@ namespace vz
 		renderer::isGaussianSplattingEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "GAUSSIAN_SPLATTING");
 		renderer::isTonemapping = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "TONEMAPPING");
 		renderer::isShadowsEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "SHADOW_ENABLED");
+		renderer::ditheringMethod = config::GetIntConfig("SHADER_ENGINE_SETTINGS", "DITHERING_METHOD");
 
 		renderer::isDebugLightCulling = config::GetBoolConfig("DEBUG_SETTINGS", "LIGHT_CULLING");
 		renderer::isDebugShapeEnabled = config::GetBoolConfig("DEBUG_SETTINGS", "DEBUG_SHAPE");
