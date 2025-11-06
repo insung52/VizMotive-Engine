@@ -2983,6 +2983,14 @@ namespace vz
 
 		inline static const ComponentType IntrinsicType = ComponentType::PROBE;
 	};
+
+	/*
+	struct CORE_EXPORT EmittedParticleComponent : ? 
+	{
+
+
+	}
+	*/
 }
 
 // component factory
@@ -3023,6 +3031,7 @@ namespace vz::compfactory
 	CORE_EXPORT ProbeComponent* GetProbeComponent(const Entity entity);
 	CORE_EXPORT AnimationComponent* GetAnimationComponent(const Entity entity);
 	CORE_EXPORT AnimationDataComponent* GetAnimationDataComponent(const Entity entity);
+	//CORE_EXPORT EmittedParticleComponent* GetEmittedParticleComponent(??);
 
 	CORE_EXPORT NameComponent* GetNameComponentByVUID(const VUID vuid);
 	CORE_EXPORT TransformComponent* GetTransformComponentByVUID(const VUID vuid);
