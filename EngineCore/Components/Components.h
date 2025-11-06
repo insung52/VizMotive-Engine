@@ -402,6 +402,7 @@ namespace vz
 		SLICER,
 		ENVIRONMENT,
 		PROBE,
+		EMITTED_PARTICLE,
 	};
 
 	struct CORE_EXPORT ComponentBase
@@ -2984,13 +2985,200 @@ namespace vz
 		inline static const ComponentType IntrinsicType = ComponentType::PROBE;
 	};
 
-	/*
-	struct CORE_EXPORT EmittedParticleComponent : ? 
+	struct CORE_EXPORT EmittedParticleComponent : ComponentBase
 	{
+	public:
+		// Shader type enum (serialized - order must not change)
+		enum class ShaderType : uint32_t
+		{
+			SOFT = 0,
+			SOFT_DISTORTION = 1,
+			SIMPLE = 2,
+			SOFT_LIGHTING = 3,
+			COUNT
+		};
 
+		// Flags for various particle behaviors
+		enum Flags : uint32_t
+		{
+			EMPTY               = 0,
+			DEBUG               = 1 << 0,
+			PAUSED              = 1 << 1,
+			SORTING             = 1 << 2,
+			DEPTH_COLLISION     = 1 << 3,
+			// SPH_FLUID           = 1 << 4,  // Advanced feature - excluded
+			// HAS_VOLUME          = 1 << 5,  // Advanced feature - excluded
+			FRAME_BLENDING      = 1 << 6,
+			COLLIDERS_DISABLED  = 1 << 7,
+			// USE_RAIN_BLOCKER    = 1 << 8,  // Advanced feature - excluded
+			// TAKE_COLOR_FROM_MESH = 1 << 9, // Advanced feature - excluded
+		};
 
-	}
-	*/
+	protected:
+		// Serialized attributes
+		uint32_t flags_ = EMPTY;
+		ShaderType shaderType_ = ShaderType::SOFT;
+		Entity meshID_ = INVALID_ENTITY;
+
+		// Particle emission and behavior
+		uint32_t maxParticles_ = 1000;
+		float emitCount_ = 0.0f;
+		float size_ = 1.0f;
+		float randomFactor_ = 1.0f;
+		float normalFactor_ = 1.0f;
+		float life_ = 1.0f;
+		float randomLife_ = 1.0f;
+		float scaleX_ = 1.0f;
+		float scaleY_ = 1.0f;
+		float rotation_ = 0.0f;
+		float motionBlurAmount_ = 0.0f;
+		float mass_ = 1.0f;
+		float randomColor_ = 0.0f;
+
+		// Velocity and physics
+		XMFLOAT3 velocity_ = XMFLOAT3(0, 0, 0);
+		XMFLOAT3 gravity_ = XMFLOAT3(0, 0, 0);
+		float drag_ = 1.0f;
+		float restitution_ = 0.98f;
+
+		// Timestep
+		float fixedTimestep_ = -1.0f; // -1: variable timestep; >=0: fixed timestep
+
+		// Opacity curve control
+		float opacityCurvePeakStart_ = 0.1f;
+		float opacityCurvePeakEnd_ = 0.5f;
+
+		// Sprite sheet properties
+		uint32_t framesX_ = 1;
+		uint32_t framesY_ = 1;
+		uint32_t frameCount_ = 1;
+		uint32_t frameStart_ = 0;
+		float frameRate_ = 0.0f; // frames per second
+
+		// SPH parameters (commented out - advanced feature)
+		/*
+		float sphH_ = 1.0f;      // smoothing radius
+		float sphK_ = 250.0f;    // pressure constant
+		float sphP0_ = 1.0f;     // reference density
+		float sphE_ = 0.018f;    // viscosity constant
+		*/
+
+	public:
+		EmittedParticleComponent(const Entity entity, const VUID vuid = 0)
+			: ComponentBase(ComponentType::EMITTED_PARTICLE, entity, vuid) {}
+		virtual ~EmittedParticleComponent() = default;
+
+		// Non-serialized attributes (updated during scene updates)
+		XMFLOAT3 center = XMFLOAT3(0, 0, 0);
+		uint32_t layerMask = ~0u;
+		XMFLOAT4X4 worldMatrix = math::IDENTITY_MATRIX;
+
+		// Flag getters
+		inline bool IsDebug() const { return flags_ & DEBUG; }
+		inline bool IsPaused() const { return flags_ & PAUSED; }
+		inline bool IsSorted() const { return flags_ & SORTING; }
+		inline bool IsDepthCollisionEnabled() const { return flags_ & DEPTH_COLLISION; }
+		inline bool IsFrameBlendingEnabled() const { return flags_ & FRAME_BLENDING; }
+		inline bool IsCollidersDisabled() const { return flags_ & COLLIDERS_DISABLED; }
+
+		// Flag setters
+		inline void SetDebug(bool value) {
+			if (value) { flags_ |= DEBUG; } else { flags_ &= ~DEBUG; }
+			timeStampSetter_ = TimerNow;
+		}
+		inline void SetPaused(bool value) {
+			if (value) { flags_ |= PAUSED; } else { flags_ &= ~PAUSED; }
+			timeStampSetter_ = TimerNow;
+		}
+		inline void SetSorted(bool value) {
+			if (value) { flags_ |= SORTING; } else { flags_ &= ~SORTING; }
+			timeStampSetter_ = TimerNow;
+		}
+		inline void SetDepthCollisionEnabled(bool value) {
+			if (value) { flags_ |= DEPTH_COLLISION; } else { flags_ &= ~DEPTH_COLLISION; }
+			timeStampSetter_ = TimerNow;
+		}
+		inline void SetFrameBlendingEnabled(bool value) {
+			if (value) { flags_ |= FRAME_BLENDING; } else { flags_ &= ~FRAME_BLENDING; }
+			timeStampSetter_ = TimerNow;
+		}
+		inline void SetCollidersDisabled(bool value) {
+			if (value) { flags_ |= COLLIDERS_DISABLED; } else { flags_ &= ~COLLIDERS_DISABLED; }
+			timeStampSetter_ = TimerNow;
+		}
+
+		// Property getters
+		inline ShaderType GetShaderType() const { return shaderType_; }
+		inline Entity GetMeshID() const { return meshID_; }
+		inline uint32_t GetMaxParticles() const { return maxParticles_; }
+		inline float GetEmitCount() const { return emitCount_; }
+		inline float GetSize() const { return size_; }
+		inline float GetRandomFactor() const { return randomFactor_; }
+		inline float GetNormalFactor() const { return normalFactor_; }
+		inline float GetLife() const { return life_; }
+		inline float GetRandomLife() const { return randomLife_; }
+		inline float GetScaleX() const { return scaleX_; }
+		inline float GetScaleY() const { return scaleY_; }
+		inline float GetRotation() const { return rotation_; }
+		inline float GetMotionBlurAmount() const { return motionBlurAmount_; }
+		inline float GetMass() const { return mass_; }
+		inline float GetRandomColor() const { return randomColor_; }
+		inline XMFLOAT3 GetVelocity() const { return velocity_; }
+		inline XMFLOAT3 GetGravity() const { return gravity_; }
+		inline float GetDrag() const { return drag_; }
+		inline float GetRestitution() const { return restitution_; }
+		inline float GetFixedTimestep() const { return fixedTimestep_; }
+		inline float GetOpacityCurvePeakStart() const { return opacityCurvePeakStart_; }
+		inline float GetOpacityCurvePeakEnd() const { return opacityCurvePeakEnd_; }
+		inline uint32_t GetFramesX() const { return framesX_; }
+		inline uint32_t GetFramesY() const { return framesY_; }
+		inline uint32_t GetFrameCount() const { return frameCount_; }
+		inline uint32_t GetFrameStart() const { return frameStart_; }
+		inline float GetFrameRate() const { return frameRate_; }
+
+		// Property setters
+		inline void SetShaderType(ShaderType type) { shaderType_ = type; timeStampSetter_ = TimerNow; }
+		inline void SetMeshID(Entity id) { meshID_ = id; timeStampSetter_ = TimerNow; }
+		inline void SetMaxParticles(uint32_t count) { maxParticles_ = count; timeStampSetter_ = TimerNow; }
+		inline void SetEmitCount(float count) { emitCount_ = count; timeStampSetter_ = TimerNow; }
+		inline void SetSize(float size) { size_ = size; timeStampSetter_ = TimerNow; }
+		inline void SetRandomFactor(float factor) { randomFactor_ = factor; timeStampSetter_ = TimerNow; }
+		inline void SetNormalFactor(float factor) { normalFactor_ = factor; timeStampSetter_ = TimerNow; }
+		inline void SetLife(float life) { life_ = life; timeStampSetter_ = TimerNow; }
+		inline void SetRandomLife(float randomLife) { randomLife_ = randomLife; timeStampSetter_ = TimerNow; }
+		inline void SetScaleX(float scale) { scaleX_ = scale; timeStampSetter_ = TimerNow; }
+		inline void SetScaleY(float scale) { scaleY_ = scale; timeStampSetter_ = TimerNow; }
+		inline void SetRotation(float rotation) { rotation_ = rotation; timeStampSetter_ = TimerNow; }
+		inline void SetMotionBlurAmount(float amount) { motionBlurAmount_ = amount; timeStampSetter_ = TimerNow; }
+		inline void SetMass(float mass) { mass_ = mass; timeStampSetter_ = TimerNow; }
+		inline void SetRandomColor(float randomColor) { randomColor_ = randomColor; timeStampSetter_ = TimerNow; }
+		inline void SetVelocity(const XMFLOAT3& velocity) { velocity_ = velocity; timeStampSetter_ = TimerNow; }
+		inline void SetGravity(const XMFLOAT3& gravity) { gravity_ = gravity; timeStampSetter_ = TimerNow; }
+		inline void SetDrag(float drag) { drag_ = drag; timeStampSetter_ = TimerNow; }
+		inline void SetRestitution(float restitution) { restitution_ = restitution; timeStampSetter_ = TimerNow; }
+		inline void SetFixedTimestep(float timestep) { fixedTimestep_ = timestep; timeStampSetter_ = TimerNow; }
+		inline void SetOpacityCurve(float peakStart, float peakEnd) {
+			opacityCurvePeakStart_ = peakStart;
+			opacityCurvePeakEnd_ = peakEnd;
+			timeStampSetter_ = TimerNow;
+		}
+		inline void SetFramesX(uint32_t frames) { framesX_ = frames; timeStampSetter_ = TimerNow; }
+		inline void SetFramesY(uint32_t frames) { framesY_ = frames; timeStampSetter_ = TimerNow; }
+		inline void SetFrameCount(uint32_t count) { frameCount_ = count; timeStampSetter_ = TimerNow; }
+		inline void SetFrameStart(uint32_t start) { frameStart_ = start; timeStampSetter_ = TimerNow; }
+		inline void SetFrameRate(float rate) { frameRate_ = rate; timeStampSetter_ = TimerNow; }
+
+		// Utility methods
+		void Burst(int num);
+		void Burst(int num, const XMFLOAT3& position);
+		void Restart();
+
+		size_t GetMemorySizeInBytes() const;
+
+		void Serialize(vz::Archive& archive, const uint64_t version) override;
+
+		inline static const ComponentType IntrinsicType = ComponentType::EMITTED_PARTICLE;
+	};
 }
 
 // component factory
@@ -3031,7 +3219,7 @@ namespace vz::compfactory
 	CORE_EXPORT ProbeComponent* GetProbeComponent(const Entity entity);
 	CORE_EXPORT AnimationComponent* GetAnimationComponent(const Entity entity);
 	CORE_EXPORT AnimationDataComponent* GetAnimationDataComponent(const Entity entity);
-	//CORE_EXPORT EmittedParticleComponent* GetEmittedParticleComponent(??);
+	CORE_EXPORT EmittedParticleComponent* GetEmittedParticleComponent(const Entity entity);
 
 	CORE_EXPORT NameComponent* GetNameComponentByVUID(const VUID vuid);
 	CORE_EXPORT TransformComponent* GetTransformComponentByVUID(const VUID vuid);
@@ -3049,6 +3237,7 @@ namespace vz::compfactory
 	CORE_EXPORT ProbeComponent* GetProbeComponentByVUID(const VUID vuid);
 	CORE_EXPORT AnimationComponent* GetAnimationComponentByVUID(const VUID vuid);
 	CORE_EXPORT AnimationDataComponent* GetAnimationDataComponentByVUID(const VUID vuid);
+	CORE_EXPORT EmittedParticleComponent* GetEmittedParticleComponentByVUID(const VUID vuid);
 
 	CORE_EXPORT bool ContainNameComponent(const Entity entity);
 	CORE_EXPORT bool ContainTransformComponent(const Entity entity);
@@ -3069,6 +3258,7 @@ namespace vz::compfactory
 	CORE_EXPORT bool ContainProbeComponent(const Entity entity);
 	CORE_EXPORT bool ContainAnimationComponent(const Entity entity);
 	CORE_EXPORT bool ContainAnimationDataComponent(const Entity entity);
+	CORE_EXPORT bool ContainEmittedParticleComponent(const Entity entity);
 
 	CORE_EXPORT size_t GetComponents(const Entity entity, std::vector<ComponentBase*>& components);
 	CORE_EXPORT size_t GetEntitiesByName(const std::string& name, std::vector<Entity>& entities); // when there is a name component

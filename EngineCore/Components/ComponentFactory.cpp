@@ -38,6 +38,7 @@ namespace vz::compfactory
 
 	ComponentManager<GEnvironmentComponent>& environmentManager = componentLibrary.Register<GEnvironmentComponent>("Environment");
 	ComponentManager<GProbeComponent>& probeManager = componentLibrary.Register<GProbeComponent>("Probe");
+	ComponentManager<GEmittedParticleComponent>& emitterManager = componentLibrary.Register<GEmittedParticleComponent>("EmittedParticle");
 
 	ComponentBase* GetComponentByVUID(const VUID vuid)
 	{
@@ -62,6 +63,7 @@ namespace vz::compfactory
 		case ComponentType::SLICER: return slicerManager.GetComponentByVUID(vuid);
 		case ComponentType::ANIMATIONDATA: return animationdataManager.GetComponentByVUID(vuid);
 		case ComponentType::ANIMATION: return animationManager.GetComponentByVUID(vuid);
+		case ComponentType::EMITTED_PARTICLE: return emitterManager.GetComponentByVUID(vuid);
 		default: assert(0);
 		}
 		return nullptr;
@@ -305,6 +307,10 @@ namespace vz::compfactory
 	{
 		RETURN_GET_COMP(AnimationDataComponent, animationdataManager, entity);
 	}
+	EmittedParticleComponent* GetEmittedParticleComponent(const Entity entity)
+	{
+		RETURN_GET_COMP(EmittedParticleComponent, emitterManager, entity);
+	}
 
 	NameComponent* GetNameComponentByVUID(const VUID vuid)
 	{
@@ -369,6 +375,10 @@ namespace vz::compfactory
 	AnimationDataComponent* GetAnimationDataComponentByVUID(const VUID vuid)
 	{
 		return GetAnimationDataComponent(GetEntityByVUID(vuid));
+	}
+	EmittedParticleComponent* GetEmittedParticleComponentByVUID(const VUID vuid)
+	{
+		return GetEmittedParticleComponent(GetEntityByVUID(vuid));
 	}
 
 	bool ContainNameComponent(const Entity entity)
@@ -446,6 +456,10 @@ namespace vz::compfactory
 	bool ContainAnimationDataComponent(const Entity entity)
 	{
 		return animationdataManager.Contains(entity);
+	}
+	bool ContainEmittedParticleComponent(const Entity entity)
+	{
+		return emitterManager.Contains(entity);
 	}
 
 	size_t GetComponents(const Entity entity, std::vector<ComponentBase*>& components)
