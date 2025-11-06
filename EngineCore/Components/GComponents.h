@@ -684,11 +684,81 @@ namespace vz
 		bool ResetResources(const std::string& resName) override;
 	};
 
-	//Gpu 처리(상속)
-	/*
 	struct CORE_EXPORT GEmittedParticleComponent : EmittedParticleComponent
 	{
+		GEmittedParticleComponent() : EmittedParticleComponent(0u, 0u) {};
+		GEmittedParticleComponent(const Entity entity, const VUID vuid = 0) : EmittedParticleComponent(entity, vuid) {}
+		virtual ~GEmittedParticleComponent() = default;
 
-	}
-	*/
+	private:
+		// GPU Resources (ENCAPSULATED)
+		graphics::GPUBuffer particleBuffer_;
+		graphics::GPUBuffer aliveList_[2];           // Double buffering for alive particles
+		graphics::GPUBuffer deadList_;               // Dead particle indices for reuse
+		graphics::GPUBuffer counterBuffer_;          // Atomic counters for emit/simulate
+		graphics::GPUBuffer indirectBuffers_;        // For DrawIndexedInstancedIndirect
+		graphics::GPUBuffer constantBuffer_;         // Per-particle system constants
+		graphics::GPUBuffer distanceBuffer_;         // For sorting particles by depth
+
+		// SPH buffers (advanced feature - commented out)
+		/*
+		graphics::GPUBuffer sphGridCells_;
+		graphics::GPUBuffer sphParticleCells_;
+		graphics::GPUBuffer densityBuffer_;
+		*/
+
+		// Raytracing resources (advanced feature - commented out for now)
+		/*
+		graphics::GPUBuffer primitiveBuffer_;
+		graphics::RaytracingAccelerationStructure BLAS_;
+		*/
+
+		graphics::Texture opacityCurveTexture_;
+
+		// Runtime state (non-serialized)
+		float emit_ = 0.0f;
+		int burst_ = 0;
+		float dt_ = 0.0f;
+		uint32_t activeFrames_ = 0;
+		bool gpuResourcesCreated_ = false;
+
+	public:
+		// GPU resource management
+		bool CreateGPUResources();
+		void DestroyGPUResources();
+		bool HasValidGPUResources() const { return gpuResourcesCreated_; }
+
+		// CPU update (called per frame before GPU update)
+		void UpdateCPU(const TransformComponent& transform, float dt);
+
+		// Particle emission control
+		void Burst(int num);
+		void Burst(int num, const XMFLOAT3& position);
+		void Restart();
+
+		// Check if particle system is inactive (no particles alive)
+		bool IsInactive() const { return activeFrames_ == 0; }
+
+		// GPU buffer getters (for shader engine access)
+		const graphics::GPUBuffer& GetParticleBuffer() const { return particleBuffer_; }
+		const graphics::GPUBuffer& GetAliveList(uint32_t index) const { return aliveList_[index & 1]; }
+		const graphics::GPUBuffer& GetDeadList() const { return deadList_; }
+		const graphics::GPUBuffer& GetCounterBuffer() const { return counterBuffer_; }
+		const graphics::GPUBuffer& GetIndirectBuffers() const { return indirectBuffers_; }
+		const graphics::GPUBuffer& GetConstantBuffer() const { return constantBuffer_; }
+		const graphics::GPUBuffer& GetDistanceBuffer() const { return distanceBuffer_; }
+		const graphics::Texture& GetOpacityCurveTexture() const { return opacityCurveTexture_; }
+
+		// Mutable versions for shader engine to bind
+		graphics::GPUBuffer& GetParticleBuffer() { return particleBuffer_; }
+		graphics::GPUBuffer& GetAliveList(uint32_t index) { return aliveList_[index & 1]; }
+		graphics::GPUBuffer& GetDeadList() { return deadList_; }
+		graphics::GPUBuffer& GetCounterBuffer() { return counterBuffer_; }
+		graphics::GPUBuffer& GetIndirectBuffers() { return indirectBuffers_; }
+		graphics::GPUBuffer& GetConstantBuffer() { return constantBuffer_; }
+		graphics::GPUBuffer& GetDistanceBuffer() { return distanceBuffer_; }
+		graphics::Texture& GetOpacityCurveTexture() { return opacityCurveTexture_; }
+
+		bool ResetResources(const std::string& resName) override;
+	};
 }
