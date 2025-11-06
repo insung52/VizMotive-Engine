@@ -113,7 +113,7 @@ namespace vz
 		void UpdateAssociatedTextures() override;
 		uint32_t GetFilterMaskFlags() const;
 	};
-
+	
 	struct CORE_EXPORT GGeometryComponent : GeometryComponent
 	{
 		GGeometryComponent(const Entity entity, const VUID vuid = 0) : GeometryComponent(entity, vuid) {}
@@ -683,4 +683,12 @@ namespace vz
 
 		bool ResetResources(const std::string& resName) override;
 	};
+
+	//Gpu 처리(상속)
+	/*
+	struct CORE_EXPORT GEmittedParticleComponent : EmittedParticleComponent
+	{
+
+	}
+	*/
 }
