@@ -40,6 +40,7 @@ namespace vz::renderer
 
 		std::vector<GLightComponent*> lightComponents; // cached (non enclosing for jobsystem)
 		std::vector<GProbeComponent*> probeComponents; // cached (non enclosing for jobsystem)
+		std::vector<GEmittedParticleComponent*> emitterComponents; // cached (non enclosing for jobsystem)
 
 		std::vector<geometrics::AABB> aabbRenderables;
 		std::vector<geometrics::AABB> aabbLights;
