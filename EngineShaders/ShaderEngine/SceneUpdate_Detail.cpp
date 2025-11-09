@@ -825,6 +825,30 @@ namespace vz
 
 			});
 	}
+	void GSceneDetails::RunParticleUpdateSystem(jobsystem::context& ctx)
+	{
+		// Update particle emitters
+		if (emitterComponents.empty())
+			return;
+
+		jobsystem::Execute(ctx, [this](jobsystem::JobArgs args) {
+			for (size_t i = 0; i < emitterComponents.size(); ++i)
+			{
+				GEmittedParticleComponent* emitter = emitterComponents[i];
+				if (!emitter)
+					continue;
+
+				Entity entity = emitter->GetEntity();
+				TransformComponent* transform = compfactory::GetTransformComponent(entity);
+				if (!transform)
+					continue;
+
+				// Update CPU-side particle data
+				emitter->UpdateCPU(*transform, dt);
+			}
+		});
+	}
+
 	void GSceneDetails::RunProbeUpdateSystem(jobsystem::context& ctx)
 	{
 		if (deltaTime == 0)
@@ -903,6 +927,10 @@ namespace vz
 		spriteFontComponents = scene_->GetRenderableSpritefontComponents();
 		matrixRenderables = scene_->GetRenderableWorldMatrices();
 		matrixRenderablesPrev = scene_->GetRenderableWorldMatricesPrev();
+
+		// Populate emitter components (until Scene provides GetEmittedParticleComponents)
+		// For now, emitterComponents will be populated as emitters are created/accessed
+		emitterComponents.clear();
 
 		aabbRenderables = scene_->GetRenderableAABBs();
 		aabbLights = scene_->GetLightAABBs();
@@ -1190,8 +1218,7 @@ namespace vz
 
 		RunRenderableUpdateSystem(ctx);
 		RunProbeUpdateSystem(ctx);
-
-		//RunParticleUpdateSystem(ctx); .. future feature
+		RunParticleUpdateSystem(ctx);
 
 		jobsystem::Wait(ctx); // dependencies
 

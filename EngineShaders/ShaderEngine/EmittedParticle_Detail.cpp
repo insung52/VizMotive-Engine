@@ -12,11 +12,19 @@ namespace vz::renderer
 		Shader kickoffUpdateCS;
 		Shader finishUpdateCS;
 
+		// Render shaders
+		Shader particleVS;
+		Shader particlePS;
+
 		// Pipeline State Objects
 		PipelineState emitPSO;
 		PipelineState simulatePSO;
 		PipelineState kickoffUpdatePSO;
 		PipelineState finishUpdatePSO;
+		PipelineState particleRenderPSO;
+
+		// Index buffer for quad (6 indices: 2 triangles)
+		GPUBuffer particleIndexBuffer;
 
 		bool initialized = false;
 
@@ -104,6 +112,86 @@ namespace vz::renderer
 				if (!success)
 				{
 					backlog::post("Failed to create finish update PSO", backlog::LogLevel::Error);
+				}
+			}
+
+			// Load particle vertex shader
+			{
+				particleVS = {};
+				if (!shader::LoadShader(ShaderStage::VS, particleVS, "emittedparticle_VS.hlsl"))
+				{
+					backlog::post("Failed to load emittedparticle_VS.hlsl", backlog::LogLevel::Error);
+				}
+			}
+
+			// Load particle pixel shader
+			{
+				particlePS = {};
+				if (!shader::LoadShader(ShaderStage::PS, particlePS, "emittedparticle_simple_PS.hlsl"))
+				{
+					backlog::post("Failed to load emittedparticle_simple_PS.hlsl", backlog::LogLevel::Error);
+				}
+			}
+
+			// Create particle render PSO
+			{
+				PipelineStateDesc desc = {};
+				desc.vs = &particleVS;
+				desc.ps = &particlePS;
+
+				// Blend state for alpha blending
+				desc.bs = {};
+				desc.bs.render_target[0].blend_enable = true;
+				desc.bs.render_target[0].src_blend = Blend::SRC_ALPHA;
+				desc.bs.render_target[0].dest_blend = Blend::INV_SRC_ALPHA;
+				desc.bs.render_target[0].blend_op = BlendOp::ADD;
+				desc.bs.render_target[0].src_blend_alpha = Blend::ONE;
+				desc.bs.render_target[0].dest_blend_alpha = Blend::INV_SRC_ALPHA;
+				desc.bs.render_target[0].blend_op_alpha = BlendOp::ADD;
+				desc.bs.render_target[0].render_target_write_mask = ColorWrite::ENABLE_ALL;
+				desc.bs.alpha_to_coverage_enable = false;
+				desc.bs.independent_blend_enable = false;
+
+				// Depth state (read-only depth, no writes)
+				desc.dss = {};
+				desc.dss.depth_enable = true;
+				desc.dss.depth_write_mask = DepthWriteMask::ZERO;
+				desc.dss.depth_func = ComparisonFunc::GREATER;
+
+				// Rasterizer state (no culling for billboards)
+				desc.rs = {};
+				desc.rs.fill_mode = FillMode::SOLID;
+				desc.rs.cull_mode = CullMode::NONE;
+				desc.rs.front_counter_clockwise = false;
+				desc.rs.depth_bias = 0;
+				desc.rs.depth_bias_clamp = 0;
+				desc.rs.slope_scaled_depth_bias = 0;
+				desc.rs.depth_clip_enable = true;
+				desc.rs.multisample_enable = false;
+				desc.rs.antialiased_line_enable = false;
+
+				// Primitive topology
+				desc.pt = PrimitiveTopology::TRIANGLELIST;
+
+				bool success = device->CreatePipelineState(&desc, &particleRenderPSO);
+				if (!success)
+				{
+					backlog::post("Failed to create particle render PSO", backlog::LogLevel::Error);
+				}
+			}
+
+			// Create index buffer for quads (6 indices per quad: 2 triangles)
+			{
+				uint16_t indices[6] = { 0, 1, 2, 2, 1, 3 };
+				GPUBufferDesc desc = {};
+				desc.size = sizeof(indices);
+				desc.bind_flags = BindFlag::INDEX_BUFFER;
+				desc.format = Format::R16_UINT;
+
+				bool success = device->CreateBuffer(&desc, indices, &particleIndexBuffer);
+				if (!success)
+				{
+					backlog::post("Failed to create particle index buffer", backlog::LogLevel::Error);
 				}
 			}
 
@@ -435,6 +523,50 @@ namespace vz::renderer
 
 		// Unbind resources
 		device->UnbindUAVs(0, arraysize(uavs), cmd);
+		device->UnbindResources(0, arraysize(srvs), cmd);
+
+		device->EventEnd(cmd);
+	}
+
+	void GRenderPath3DDetails::DrawParticles(
+		const GEmittedParticleComponent& emitter,
+		CommandList cmd
+	)
+	{
+		if (!particlesystem::particleRenderPSO.IsValid())
+			return;
+
+		if (!emitter.HasValidGPUResources())
+			return;
+
+		device->EventBegin("Draw Particles", cmd);
+
+		// Bind particle buffers as SRVs
+		const GPUResource* srvs[] = {
+			&emitter.GetOpacityCurveTexture(),      // t0: opacity curve
+			&emitter.GetParticleBuffer(),            // t1: particle buffer (will be bound as structured buffer)
+			&emitter.GetAliveList(1),                // t2: alive list (NEW - after simulation)
+		};
+		device->BindResources(srvs, 0, 1, cmd); // Bind opacity curve to t0
+
+		// Need to bind structured buffers explicitly
+		// t0: particle buffer, t1: alive list
+		const GPUResource* structuredBuffers[] = {
+			&emitter.GetParticleBuffer(),
+			&emitter.GetAliveList(1),
+		};
+		device->BindResources(structuredBuffers, 0, arraysize(structuredBuffers), cmd);
+
+		// Bind index buffer
+		device->BindIndexBuffer(&particlesystem::particleIndexBuffer, IndexBufferFormat::UINT16, 0, cmd);
+
+		// Bind pipeline state
+		device->BindPipelineState(&particlesystem::particleRenderPSO, cmd);
+
+		// Draw using indirect args (prepared in finish update shader)
+		device->DrawIndexedInstancedIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DRAWPARTICLES, cmd);
+
+		// Unbind resources
 		device->UnbindResources(0, arraysize(srvs), cmd);
 
 		device->EventEnd(cmd);
