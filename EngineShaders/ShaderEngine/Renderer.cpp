@@ -866,7 +866,19 @@ namespace vz::renderer
 		}
 
 		//DrawSoftParticles(visMain, false, cmd);
-		
+
+		// Draw Emitted Particles
+		device->EventBegin("Emitted Particles", cmd);
+		for (size_t i = 0; i < scene_Gdetails->emitterComponents.size(); ++i)
+		{
+			const GEmittedParticleComponent* emitter = scene_Gdetails->emitterComponents[i];
+			if (emitter && emitter->HasValidGPUResources())
+			{
+				DrawParticles(*emitter, cmd);
+			}
+		}
+		device->EventEnd(cmd);
+
 		DrawSpritesAndFonts(*camera, false, cmd);
 
 		if (renderer::isLensFlareEnabled)
@@ -1509,6 +1521,16 @@ namespace vz::renderer
 			if (renderer::isDDGIEnabled)
 			{
 				Update_DDGI(cmd);
+			}
+
+			// Particle System GPU Update
+			for (size_t i = 0; i < scene_Gdetails->emitterComponents.size(); ++i)
+			{
+				GEmittedParticleComponent* emitter = scene_Gdetails->emitterComponents[i];
+				if (emitter && emitter->HasValidGPUResources())
+				{
+					UpdateParticleSystem(*emitter, (uint32_t)i, cmd);
+				}
 			}
 
 			});
