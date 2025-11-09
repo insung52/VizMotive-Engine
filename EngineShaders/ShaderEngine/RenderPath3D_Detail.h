@@ -653,6 +653,12 @@ namespace vz::renderer
 			CommandList cmd
 		);
 
+		void SimulateParticles(
+			GEmittedParticleComponent& emitter,
+			uint32_t instanceIndex,
+			CommandList cmd
+		);
+
 		// rendering process that includes render-pipelines and compute shaders
 		void RenderMeshes(const Visibility& vis, const RenderQueue& renderQueue, RENDERPASS renderPass, uint32_t filterMask, CommandList cmd, uint32_t flags = 0, uint32_t camera_count = 1);
 		void RenderTransparents(CommandList cmd);
