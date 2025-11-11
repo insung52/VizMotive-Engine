@@ -57,7 +57,7 @@ PSInput main(VSInput input)
 		float lifeLerp = 1.0f - particle.life / particle.maxLife;
 		output.lifePercent = lifeLerp;
 		particleSize = lerp(particle.sizeBeginEnd.x, particle.sizeBeginEnd.y, lifeLerp);
-        particleColor = float4(1.0f, 0.0f, 0.0f, 1.0f);
+        particleColor = unpack_rgba(particle.color);
     }
 	else
 	{
