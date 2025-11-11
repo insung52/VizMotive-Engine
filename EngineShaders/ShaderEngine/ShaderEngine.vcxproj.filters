@@ -68,6 +68,7 @@
     <ClCompile Include="SceneUpdate_Detail.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
+    <ClCompile Include="EmittedParticle_Detail.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Utility\dxcapi.h">

@@ -227,6 +227,7 @@
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\volumetricLightPS_Spot.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\voxelPS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)VS\ddgi_debugVS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)VS\emittedparticle_VS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)VS\envMapVS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)VS\envMapVS_sky.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)VS\fontVS.hlsl" />
