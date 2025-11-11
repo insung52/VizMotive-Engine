@@ -844,7 +844,7 @@ namespace vz
 					continue;
 
 				// Update CPU-side particle data
-				emitter->UpdateCPU(*transform, dt);
+				emitter->UpdateCPU(*transform, deltaTime);
 			}
 		});
 	}
@@ -928,9 +928,8 @@ namespace vz
 		matrixRenderables = scene_->GetRenderableWorldMatrices();
 		matrixRenderablesPrev = scene_->GetRenderableWorldMatricesPrev();
 
-		// Populate emitter components (until Scene provides GetEmittedParticleComponents)
-		// For now, emitterComponents will be populated as emitters are created/accessed
-		emitterComponents.clear();
+		// Populate emitter components from Scene
+		emitterComponents = scene_->GetEmittedParticleComponents();
 
 		aabbRenderables = scene_->GetRenderableAABBs();
 		aabbLights = scene_->GetLightAABBs();

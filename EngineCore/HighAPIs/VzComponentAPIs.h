@@ -188,6 +188,7 @@ namespace vzm
 		ACTOR_GSPLAT,
 		ACTOR_SPRITE,
 		ACTOR_SPRITEFONT,
+		ACTOR_PARTICLE,
 
 		// resources
 		GEOMETRY,

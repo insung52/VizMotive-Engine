@@ -731,4 +731,34 @@ namespace vzm
 		GET_RENDERABLE_COMP(renderable, INVALID_VID);
 		return renderable->GetMaterial(0);
 	}
+
+	void VzActorParticle::Burst(int num)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter)
+		{
+			emitter->Burst(num);
+			UpdateTimeStamp();
+		}
+	}
+
+	void VzActorParticle::Burst(int num, const vfloat3& position)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter)
+		{
+			emitter->Burst(num, XMFLOAT3(position.x, position.y, position.z));
+			UpdateTimeStamp();
+		}
+	}
+
+	void VzActorParticle::Restart()
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter)
+		{
+			emitter->Restart();
+			UpdateTimeStamp();
+		}
+	}
 }

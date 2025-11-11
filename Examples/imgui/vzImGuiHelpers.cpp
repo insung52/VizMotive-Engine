@@ -30,6 +30,7 @@ namespace vzimgui
 			case vzm::COMPONENT_TYPE::CAMERA: comp_name = "[C] " + comp_name; break;
 			case vzm::COMPONENT_TYPE::SLICER: comp_name = "[S] " + comp_name; break;
 			case vzm::COMPONENT_TYPE::LIGHT: comp_name = "[L] " + comp_name; break;
+			case vzm::COMPONENT_TYPE::ACTOR_PARTICLE: comp_name = "[A-P] " + comp_name; break;
 			default: assert(0);
 			}
 		}

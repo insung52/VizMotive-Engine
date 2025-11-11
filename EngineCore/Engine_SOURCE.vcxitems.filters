@@ -444,6 +444,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)Components\Scene.cpp">
       <Filter>Components %28CORE_EXPORT%29\Private</Filter>
     </ClCompile>
+    <ClCompile Include="$(MSBuildThisFileDirectory)Components\EmittedParticleComponent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)Utils\DirectXMath\DirectXMathMatrix.inl">

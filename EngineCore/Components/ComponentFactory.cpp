@@ -219,6 +219,12 @@ namespace vz::compfactory
 		AnimationDataComponent* comp = &animationdataManager.Create(entity_update);
 		return comp;
 	}
+	EmittedParticleComponent* CreateEmittedParticleComponent(const Entity entity)
+	{
+		ENTITY_UPDATE(entity_update);
+		EmittedParticleComponent* comp = &emitterManager.Create(entity_update);
+		return comp;
+	}
 
 #define RETURN_GET_COMP(COMP_TYPE, COMP_MNG, ENTITY) COMP_TYPE* comp = COMP_MNG.GetComponent(entity); return comp;
 	NameComponent* GetNameComponent(const Entity entity)

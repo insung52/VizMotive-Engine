@@ -69,6 +69,7 @@ namespace vz
 		std::unordered_map<Entity, uint32_t> lookupLights;
 		std::unordered_map<Entity, uint32_t> lookupProbes;
 		std::unordered_map<Entity, uint32_t> lookupCameras;
+		std::unordered_map<Entity, uint32_t> lookupEmitters;
 		std::unordered_map<Entity, uint32_t> lookupChildren;
 		std::unordered_map<Entity, uint32_t> lookupAnimations;
 
@@ -109,6 +110,7 @@ namespace vz
 		std::vector<GProbeComponent*> probeComponents;
 		std::vector<CameraComponent*> cameraComponents;
 		std::vector<ColliderComponent*> colliderComponents;
+		std::vector<GEmittedParticleComponent*> emitterComponents;
 
 		// CPU/GPU Colliders:
 		std::vector<uint8_t> colliderDeinterleavedData;
@@ -145,6 +147,7 @@ namespace vz
 		const std::vector<GLightComponent*>& GetLightComponents() const override { return lightComponents; }
 		const std::vector<GProbeComponent*>& GetProbeComponents() const override { return probeComponents; }
 		const std::vector<CameraComponent*>& GetCameraComponents() const override { return cameraComponents; }
+		const std::vector<GEmittedParticleComponent*>& GetEmittedParticleComponents() const override { return emitterComponents; }
 
 		const uint32_t GetGeometryPrimitivesAllocatorSize() const override { return geometryAllocator.load(); }
 		const uint32_t GetRenderableResLookupAllocatorSize() const override { return instanceResLookupAllocator.load(); }
@@ -450,6 +453,33 @@ namespace vz
 
 				probe->renderDirty = TimeDurationCount(probe->GetTimeStamp(), recentUpdateTime_) > 0;
 				isContentChanged_ |= probe->renderDirty;
+
+				});
+		}
+		void RunEmitterUpdateSystem(jobsystem::context& ctx)
+		{
+			uint32_t num_emitters = (uint32_t)emitters_.size();
+			emitterComponents.resize(num_emitters);
+			jobsystem::Dispatch(ctx, num_emitters, SMALL_SUBTASK_GROUPSIZE, [&](jobsystem::JobArgs args) {
+
+				Entity entity = emitters_[args.jobIndex];
+				TransformComponent* transform = compfactory::GetTransformComponent(entity);
+				if (!transform)
+					return;
+
+				transform->UpdateWorldMatrix();
+
+				GEmittedParticleComponent* emitter = (GEmittedParticleComponent*)compfactory::GetEmittedParticleComponent(entity);
+				if (!emitter)
+					return;
+
+				assert(emitter);
+				emitterComponents[args.jobIndex] = emitter;
+
+				// Update emitter with transform
+				emitter->UpdateCPU(*transform, dt_);
+
+				isContentChanged_ |= TimeDurationCount(emitter->GetTimeStamp(), recentUpdateTime_) > 0;
 
 				});
 		}
@@ -969,6 +999,7 @@ namespace vz
 			RunRenderableUpdateSystem(ctx);
 			RunLightUpdateSystem(ctx);
 			RunProbeUpdateSystem(ctx);
+			RunEmitterUpdateSystem(ctx);
 			RunGeometryUpdateSystem(ctx);
 			RunMaterialUpdateSystem(ctx);
 			jobsystem::Wait(ctx); // dependencies
@@ -1120,6 +1151,7 @@ namespace vz
 		DOWNCAST->materialComponents.clear();
 		DOWNCAST->cameraComponents.clear();
 		DOWNCAST->lightComponents.clear();
+		DOWNCAST->emitterComponents.clear();
 	}
 
 	void Scene::AddEntity(const Entity entity)
@@ -1181,6 +1213,7 @@ namespace vz
 		std::unordered_map<Entity, uint32_t>& lookupLights = DOWNCAST->lookupLights;
 		std::unordered_map<Entity, uint32_t>& lookupProbes = DOWNCAST->lookupProbes;
 		std::unordered_map<Entity, uint32_t>& lookupCameras = DOWNCAST->lookupCameras;
+		std::unordered_map<Entity, uint32_t>& lookupEmitters = DOWNCAST->lookupEmitters;
 		std::unordered_map<Entity, uint32_t>& lookupChildren = DOWNCAST->lookupChildren;
 
 		if (compfactory::ContainRenderableComponent(entity))
@@ -1188,6 +1221,13 @@ namespace vz
 			assert(lookupRenderables.count(entity) == 0);
 			lookupRenderables[entity] = renderables_.size();
 			renderables_.push_back(entity);
+		}
+		else if (compfactory::ContainEmittedParticleComponent(entity))
+		{
+			// Emitters are tracked separately for rendering
+			assert(lookupEmitters.count(entity) == 0);
+			lookupEmitters[entity] = emitters_.size();
+			emitters_.push_back(entity);
 		}
 		else if (compfactory::ContainLightComponent(entity))
 		{
