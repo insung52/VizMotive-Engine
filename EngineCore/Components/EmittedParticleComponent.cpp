@@ -336,6 +336,17 @@ namespace vz
 		return true;
 	}
 
+	GEmittedParticleComponent::~GEmittedParticleComponent()
+	{
+		// Wait for GPU to finish using resources before destruction
+		graphics::GraphicsDevice* device = graphics::GetDevice();
+		if (device && gpuResourcesCreated_)
+		{
+			device->WaitForGPU();
+		}
+		DestroyGPUResources();
+	}
+
 	void GEmittedParticleComponent::DestroyGPUResources()
 	{
 		particleBuffer_ = {};
