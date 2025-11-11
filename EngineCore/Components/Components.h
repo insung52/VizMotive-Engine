@@ -73,6 +73,7 @@ namespace vz
 	struct GMaterialComponent;
 	struct GLightComponent;
 	struct GProbeComponent;
+	struct GEmittedParticleComponent;
 
 	class WaitForBool {
 	private:
@@ -163,6 +164,7 @@ namespace vz
 		std::vector<Entity> lights_;
 		std::vector<Entity> probes_;
 		std::vector<Entity> cameras_;
+		std::vector<Entity> emitters_;
 		std::vector<Entity> animations_;
 
 		Entity environment_ = INVALID_ENTITY;
@@ -360,6 +362,7 @@ namespace vz
 		virtual const std::vector<GLightComponent*>& GetLightComponents() const = 0;
 		virtual const std::vector<GProbeComponent*>& GetProbeComponents() const = 0;
 		virtual const std::vector<CameraComponent*>& GetCameraComponents() const = 0;
+		virtual const std::vector<GEmittedParticleComponent*>& GetEmittedParticleComponents() const = 0;
 
 		virtual const uint32_t GetGeometryPrimitivesAllocatorSize() const = 0;
 		virtual const uint32_t GetRenderableResLookupAllocatorSize() const = 0;
@@ -3022,11 +3025,11 @@ namespace vz
 
 		// Particle emission and behavior
 		uint32_t maxParticles_ = 1000;
-		float emitCount_ = 0.0f;
+		float emitCount_ = 10.0f;
 		float size_ = 1.0f;
 		float randomFactor_ = 1.0f;
 		float normalFactor_ = 1.0f;
-		float life_ = 1.0f;
+		float life_ = 3.0f;
 		float randomLife_ = 1.0f;
 		float scaleX_ = 1.0f;
 		float scaleY_ = 1.0f;
@@ -3036,8 +3039,8 @@ namespace vz
 		float randomColor_ = 0.0f;
 
 		// Velocity and physics
-		XMFLOAT3 velocity_ = XMFLOAT3(0, 0, 0);
-		XMFLOAT3 gravity_ = XMFLOAT3(0, 0, 0);
+		XMFLOAT3 velocity_ = XMFLOAT3(0, 1, 0);
+		XMFLOAT3 gravity_ = XMFLOAT3(0, -9.8f, 0);
 		float drag_ = 1.0f;
 		float restitution_ = 0.98f;
 

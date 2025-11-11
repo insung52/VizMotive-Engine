@@ -24,6 +24,7 @@ namespace vz
 		ProbeComponent* CreateProbeComponent(const Entity entity);
 		AnimationComponent* CreateAnimationComponent(const Entity entity);
 		AnimationDataComponent* CreateAnimationDataComponent(const Entity entity);
+		EmittedParticleComponent* CreateEmittedParticleComponent(const Entity entity);
 
 		size_t FreeResource(const std::string& resName);
 

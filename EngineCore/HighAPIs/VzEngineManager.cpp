@@ -223,6 +223,7 @@ namespace vzm
 		case COMPONENT_TYPE::ACTOR_GSPLAT:
 		case COMPONENT_TYPE::ACTOR_SPRITE:
 		case COMPONENT_TYPE::ACTOR_SPRITEFONT:
+		case COMPONENT_TYPE::ACTOR_PARTICLE:
 		case COMPONENT_TYPE::LIGHT:
 		case COMPONENT_TYPE::CAMERA:
 		case COMPONENT_TYPE::SLICER:
@@ -285,6 +286,13 @@ namespace vzm
 			compfactory::CreateSpriteFontComponent(entity);
 			{
 				auto it = vzcompmanager::actors.emplace(vid, std::make_unique<VzActorSpriteFont>(vid, "vzm::NewActorSpriteFont"));
+				hlcomp = (VzSceneObject*)it.first->second.get();
+			}
+			break;
+		case COMPONENT_TYPE::ACTOR_PARTICLE:
+			compfactory::CreateEmittedParticleComponent(entity);
+			{
+				auto it = vzcompmanager::actors.emplace(vid, std::make_unique<VzActorParticle>(vid, "vzm::NewActorParticle"));
 				hlcomp = (VzSceneObject*)it.first->second.get();
 			}
 			break;
@@ -746,6 +754,10 @@ namespace vzm
 	VzActorSpriteFont* NewActorSpriteFont(const std::string& name, const VID parentVid)
 	{
 		return (VzActorSpriteFont*)newSceneComponent(COMPONENT_TYPE::ACTOR_SPRITEFONT, name, parentVid);
+	}
+	VzActorParticle* NewActorParticle(const std::string& name, const VID parentVid)
+	{
+		return (VzActorParticle*)newSceneComponent(COMPONENT_TYPE::ACTOR_PARTICLE, name, parentVid);
 	}
 	VzLight* NewLight(const std::string& name, const VID parentVid)
 	{
