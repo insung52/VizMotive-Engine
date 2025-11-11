@@ -688,7 +688,7 @@ namespace vz
 	{
 		GEmittedParticleComponent() : EmittedParticleComponent(0u, 0u) {};
 		GEmittedParticleComponent(const Entity entity, const VUID vuid = 0) : EmittedParticleComponent(entity, vuid) {}
-		virtual ~GEmittedParticleComponent() = default;
+		virtual ~GEmittedParticleComponent();
 
 	private:
 		// GPU Resources (ENCAPSULATED)
