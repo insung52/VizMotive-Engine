@@ -200,6 +200,7 @@
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\cubeMapPS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\ddgi_debugPS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\debugPS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)PS\emittedparticle_simple_PS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\envMapPS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\envMapPS_sky_dynamic.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\envMapPS_sky_static.hlsl" />

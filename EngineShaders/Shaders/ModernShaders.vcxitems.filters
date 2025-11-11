@@ -793,5 +793,8 @@
     <FxCompile Include="$(MSBuildThisFileDirectory)VS\emittedparticle_VS.hlsl">
       <Filter>Raster-Pipeline Shaders\VS</Filter>
     </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)PS\emittedparticle_simple_PS.hlsl">
+      <Filter>Raster-Pipeline Shaders\PS</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
