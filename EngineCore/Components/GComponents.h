@@ -739,6 +739,9 @@ namespace vz
 		// Check if particle system is inactive (no particles alive)
 		bool IsInactive() const { return activeFrames_ == 0; }
 
+		// Get pending emission count (for shader engine access)
+		float GetPendingEmitCount() const { return emit_; }
+
 		// GPU buffer getters (for shader engine access)
 		const graphics::GPUBuffer& GetParticleBuffer() const { return particleBuffer_; }
 		const graphics::GPUBuffer& GetAliveList(uint32_t index) const { return aliveList_[index & 1]; }

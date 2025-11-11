@@ -17,7 +17,10 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	// Prepare dispatch arguments for simulation
 	// Each thread group processes THREADCOUNT_SIMULATION particles
 	uint dispatchX = (aliveCount + THREADCOUNT_SIMULATION - 1) / THREADCOUNT_SIMULATION;
-	indirectBuffers.Store3(ARGUMENTBUFFER_OFFSET_DISPATCHSIMULATION, uint3(dispatchX, 1, 1));
+	uint offset = ARGUMENTBUFFER_OFFSET_DISPATCHSIMULATION;
+	indirectBuffers.Store(offset + 0, dispatchX);
+	indirectBuffers.Store(offset + 4, 1);
+	indirectBuffers.Store(offset + 8, 1);
 
 	// Copy alive count after simulation to current alive count
 	counterBuffer.Store(PARTICLECOUNTER_OFFSET_ALIVECOUNT, aliveCount);
