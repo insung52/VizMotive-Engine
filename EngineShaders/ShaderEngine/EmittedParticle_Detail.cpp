@@ -30,8 +30,10 @@ namespace vz::renderer
 
 		void Initialize()
 		{
-			if (initialized)
-				return;
+			// REMOVED early return to always reload shaders
+			// This ensures shader edits take effect immediately
+			// if (initialized)
+			// 	return;
 
 			GraphicsDevice* device = GetDevice();
 
@@ -150,6 +152,8 @@ namespace vz::renderer
 			}
 
 			// Create index buffer for quads (6 indices per quad: 2 triangles)
+			// Only create once
+			if (!initialized)
 			{
 				uint16_t indices[6] = { 0, 1, 2, 2, 1, 3 };
 				GPUBufferDesc desc = {};
@@ -165,7 +169,7 @@ namespace vz::renderer
 			}
 
 			initialized = true;
-			backlog::post("Particle system shaders initialized", backlog::LogLevel::Info);
+			backlog::post("Particle system shaders initialized/reloaded", backlog::LogLevel::Info);
 		}
 	}
 
@@ -177,12 +181,9 @@ namespace vz::renderer
 	{
 		backlog::post("[PARTICLE UPDATE] === UpdateParticleSystem START === instance: " + std::to_string(instanceIndex), backlog::LogLevel::Info);
 
-		// Initialize shaders if not already done
-		if (!particlesystem::initialized)
-		{
-			backlog::post("[PARTICLE UPDATE] Initializing particle system shaders", backlog::LogLevel::Info);
-			particlesystem::Initialize();
-		}
+		// ALWAYS call Initialize to reload shaders if they changed
+		// Initialize() will only create the index buffer once
+		particlesystem::Initialize();
 
 		// Check if GPU resources are valid
 		if (!emitter.HasValidGPUResources())

@@ -17,6 +17,6 @@ Texture2D<float4> particleTexture : register(t1);
 
 float4 main(PSInput input) : SV_TARGET
 {
-	// DEBUG: Just return the input color, no discard
+	// Return input color from VS
 	return input.color;
 }

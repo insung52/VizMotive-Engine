@@ -48,6 +48,8 @@ PSInput main(VSInput input)
 	float3 particlePos;
 	float particleSize;
 
+	float4 particleColor;
+
 	if (particle.life > 0.0f && particle.maxLife > 0.0f)
 	{
 		// Particle is alive, use real data
@@ -55,15 +57,15 @@ PSInput main(VSInput input)
 		float lifeLerp = 1.0f - particle.life / particle.maxLife;
 		output.lifePercent = lifeLerp;
 		particleSize = lerp(particle.sizeBeginEnd.x, particle.sizeBeginEnd.y, lifeLerp);
-		//output.color = unpack_rgba(particle.color); // TEMP: commented out for testing
-	}
+        particleColor = float4(1.0f, 0.0f, 0.0f, 1.0f);
+    }
 	else
 	{
 		// Particle not initialized or dead - move it far away so it's not visible
 		particlePos = float3(0.0f, -10000.0f, 0.0f); // Far below
 		particleSize = 0.0f; // Zero size
 		output.lifePercent = 0.0f;
-		output.color = float4(0.0f, 0.0f, 0.0f, 0.0f); // Transparent
+		particleColor = float4(0.0f, 0.0f, 0.0f, 0.0f); // Transparent
 	}
 
 	// Get billboard corner position
@@ -77,13 +79,10 @@ PSInput main(VSInput input)
 	// Scale billboard
 	quadPos *= particleSize;
 
-	// Billboard facing camera - DEBUG: visualize camera axes
+	// Billboard facing camera
 	// Use inverse view matrix columns for world-space camera axes
-	float3 cameraRight = float3(GetCamera().inv_view._11, GetCamera().inv_view._21, GetCamera().inv_view._31);
-	float3 cameraUp = float3(GetCamera().inv_view._12, GetCamera().inv_view._22, GetCamera().inv_view._32);
-
-	// DEBUG: Output camera right vector as color to see if it changes
-	output.color = float4(1.0f,0.0f,0.0f, 1.0f);
+	float3 cameraRight = float3(GetCamera().inverse_view._11, GetCamera().inverse_view._21, GetCamera().inverse_view._31);
+	float3 cameraUp = float3(GetCamera().inverse_view._12, GetCamera().inverse_view._22, GetCamera().inverse_view._32);
 
 	// Transform quad to world space (billboarding)
 	float3 worldPos = particlePos;
@@ -96,7 +95,8 @@ PSInput main(VSInput input)
 	// Sprite sheet UV (simple for now, using single frame)
 	output.uv = uv;
 
-	// Color already set above
+	// Set color at the end (after all other processing)
+	output.color = particleColor;
 
 	return output;
 }
