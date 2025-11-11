@@ -135,10 +135,17 @@ namespace vz::renderer
 				desc.rs = &rasterizerState;
 				desc.pt = PrimitiveTopology::TRIANGLELIST;
 
+				backlog::post("[PARTICLE INIT] Creating particle render PSO...", backlog::LogLevel::Info);
+				backlog::post("[PARTICLE INIT] VS valid: " + std::to_string(particleVS.IsValid()) + ", PS valid: " + std::to_string(particlePS.IsValid()), backlog::LogLevel::Info);
+
 				bool success = device->CreatePipelineState(&desc, &particleRenderPSO);
 				if (!success)
 				{
 					backlog::post("Failed to create particle render PSO", backlog::LogLevel::Error);
+				}
+				else
+				{
+					backlog::post("[PARTICLE INIT] Particle render PSO created successfully, IsValid: " + std::to_string(particleRenderPSO.IsValid()), backlog::LogLevel::Info);
 				}
 			}
 
@@ -168,18 +175,23 @@ namespace vz::renderer
 		CommandList cmd
 	)
 	{
+		backlog::post("[PARTICLE UPDATE] === UpdateParticleSystem START === instance: " + std::to_string(instanceIndex), backlog::LogLevel::Info);
+
 		// Initialize shaders if not already done
 		if (!particlesystem::initialized)
 		{
+			backlog::post("[PARTICLE UPDATE] Initializing particle system shaders", backlog::LogLevel::Info);
 			particlesystem::Initialize();
 		}
 
 		// Check if GPU resources are valid
 		if (!emitter.HasValidGPUResources())
 		{
+			backlog::post("[PARTICLE UPDATE] GPU resources not valid, creating...", backlog::LogLevel::Info);
 			// Try to create resources
 			if (!emitter.CreateGPUResources())
 			{
+				backlog::post("[PARTICLE UPDATE] Failed to create GPU resources!", backlog::LogLevel::Error);
 				return; // Failed to create resources
 			}
 		}
@@ -189,6 +201,7 @@ namespace vz::renderer
 
 		// Kickoff update: prepare counters and indirect args
 		{
+			backlog::post("[PARTICLE UPDATE] Kickoff update shader", backlog::LogLevel::Info);
 			device->EventBegin("Kickoff Update", cmd);
 
 			const GPUResource* uavs[] = {
@@ -233,6 +246,7 @@ namespace vz::renderer
 
 		// Finish update: prepare draw arguments
 		{
+			backlog::post("[PARTICLE UPDATE] Finish update shader", backlog::LogLevel::Info);
 			device->EventBegin("Finish Update", cmd);
 
 			const GPUResource* srvs[] = {
@@ -253,6 +267,14 @@ namespace vz::renderer
 
 		// TODO: Sort particles (Phase 7)
 
+		// Note: Counter readback would require async GPU->CPU copy which is complex
+		// For now, we rely on indirect draw arguments being prepared correctly
+		// If particles don't render, check:
+		// 1. emit shader creates particles (aliveCount_afterSimulation > 0)
+		// 2. finishUpdate prepares correct draw args
+		// 3. DrawIndexedInstancedIndirect uses correct offset
+
+		backlog::post("[PARTICLE UPDATE] === UpdateParticleSystem END ===", backlog::LogLevel::Info);
 		device->EventEnd(cmd);
 		profiler::EndRange(prof_range);
 	}
@@ -263,22 +285,42 @@ namespace vz::renderer
 		CommandList cmd
 	)
 	{
-		if (!particlesystem::emitPSO.IsValid())
+		// Note: In VizMotive, compute shaders are bound directly without PSO
+		if (!particlesystem::emitCS.IsValid())
+		{
+			backlog::post("[PARTICLE EMIT] emitCS shader is not valid", backlog::LogLevel::Warn);
 			return;
+		}
 
 		device->EventBegin("Emit Particles", cmd);
 
+		// Process any pending burst emissions immediately
+		backlog::post("[PARTICLE EMIT] Before ProcessPendingBurst, emit: " + std::to_string(emitter.GetPendingEmitCount()), backlog::LogLevel::Info);
+		emitter.ProcessPendingBurst();
+		backlog::post("[PARTICLE EMIT] After ProcessPendingBurst, emit: " + std::to_string(emitter.GetPendingEmitCount()), backlog::LogLevel::Info);
+
 		// Calculate number of particles to emit this frame
 		// This is accumulated in UpdateCPU
-		uint32_t emitCount = (uint32_t)emitter.GetEmitCount();
+		float pendingEmit = emitter.GetPendingEmitCount();
+		uint32_t emitCount = (uint32_t)pendingEmit;
+
+		backlog::post("[PARTICLE EMIT] pendingEmit: " + std::to_string(pendingEmit) + ", emitCount: " + std::to_string(emitCount), backlog::LogLevel::Info);
+
 		if (emitCount == 0)
 		{
+			backlog::post("[PARTICLE EMIT] emitCount is 0, skipping emission", backlog::LogLevel::Info);
 			device->EventEnd(cmd);
 			return;
 		}
 
 		// Clamp to max particles
+		uint32_t originalEmitCount = emitCount;
 		emitCount = std::min(emitCount, emitter.GetMaxParticles());
+
+		if (originalEmitCount != emitCount)
+		{
+			backlog::post("[PARTICLE EMIT] Clamped emitCount from " + std::to_string(originalEmitCount) + " to " + std::to_string(emitCount), backlog::LogLevel::Info);
+		}
 
 		// Create emit location structure
 		EmitLocation emitLocation = {};
@@ -381,7 +423,15 @@ namespace vz::renderer
 		device->BindComputeShader(&particlesystem::emitCS, cmd);
 
 		uint32_t threadGroups = (emitCount + THREADCOUNT_EMISSION - 1) / THREADCOUNT_EMISSION;
+		backlog::post("[PARTICLE EMIT] Dispatching emit shader: emitCount=" + std::to_string(emitCount) +
+					  ", threadGroups=" + std::to_string(threadGroups) +
+					  ", maxParticles=" + std::to_string(emitter.GetMaxParticles()), backlog::LogLevel::Info);
 		device->Dispatch(threadGroups, 1, 1, cmd);
+
+		// Reset emit counter, keeping the fractional part for next frame
+		float remainingFraction = pendingEmit - (float)emitCount;
+		emitter.ResetPendingEmitCount(remainingFraction);
+		backlog::post("[PARTICLE EMIT] Reset emit count, remaining fraction: " + std::to_string(remainingFraction), backlog::LogLevel::Info);
 
 		device->EventEnd(cmd);
 	}
@@ -392,9 +442,14 @@ namespace vz::renderer
 		CommandList cmd
 	)
 	{
-		if (!particlesystem::simulatePSO.IsValid())
+		// Note: In VizMotive, compute shaders are bound directly without PSO
+		if (!particlesystem::simulateCS.IsValid())
+		{
+			backlog::post("[PARTICLE SIMULATE] simulateCS shader is not valid", backlog::LogLevel::Warn);
 			return;
+		}
 
+		backlog::post("[PARTICLE SIMULATE] Starting simulation for instance " + std::to_string(instanceIndex), backlog::LogLevel::Info);
 		device->EventBegin("Simulate Particles", cmd);
 
 		// Update constant buffer (same as emit, but may need different values)
@@ -467,6 +522,7 @@ namespace vz::renderer
 		device->BindComputeShader(&particlesystem::simulateCS, cmd);
 
 		// Dispatch indirectly based on alive count
+		backlog::post("[PARTICLE SIMULATE] Dispatching simulate shader (indirect)", backlog::LogLevel::Info);
 		device->DispatchIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DISPATCHSIMULATION, cmd);
 
 		device->EventEnd(cmd);
@@ -478,28 +534,28 @@ namespace vz::renderer
 	)
 	{
 		if (!particlesystem::particleRenderPSO.IsValid())
+		{
+			backlog::post("[PARTICLE DRAW] particleRenderPSO is not valid", backlog::LogLevel::Warn);
 			return;
+		}
 
 		if (!emitter.HasValidGPUResources())
+		{
+			backlog::post("[PARTICLE DRAW] GPU resources are not valid", backlog::LogLevel::Warn);
 			return;
+		}
 
+		backlog::post("[PARTICLE DRAW] Drawing particles (indirect)", backlog::LogLevel::Info);
 		device->EventBegin("Draw Particles", cmd);
 
-		// Bind particle buffers as SRVs
+		// Bind resources
+		// t0: opacity curve, t1: particle buffer, t2: alive list
 		const GPUResource* srvs[] = {
 			&emitter.GetOpacityCurveTexture(),      // t0: opacity curve
-			&emitter.GetParticleBuffer(),            // t1: particle buffer (will be bound as structured buffer)
+			&emitter.GetParticleBuffer(),            // t1: particle buffer
 			&emitter.GetAliveList(1),                // t2: alive list (NEW - after simulation)
 		};
-		device->BindResources(srvs, 0, 1, cmd); // Bind opacity curve to t0
-
-		// Need to bind structured buffers explicitly
-		// t0: particle buffer, t1: alive list
-		const GPUResource* structuredBuffers[] = {
-			&emitter.GetParticleBuffer(),
-			&emitter.GetAliveList(1),
-		};
-		device->BindResources(structuredBuffers, 0, arraysize(structuredBuffers), cmd);
+		device->BindResources(srvs, 0, arraysize(srvs), cmd);
 
 		// Bind index buffer
 		device->BindIndexBuffer(&particlesystem::particleIndexBuffer, IndexBufferFormat::UINT16, 0, cmd);
@@ -507,8 +563,15 @@ namespace vz::renderer
 		// Bind pipeline state
 		device->BindPipelineState(&particlesystem::particleRenderPSO, cmd);
 
+		backlog::post("[PARTICLE DRAW] Bound resources and PSO, issuing draw indirect", backlog::LogLevel::Info);
+
+		// TEMP DEBUG: Draw maxParticles to see all potentially alive particles
+		uint32_t maxParticles = emitter.GetMaxParticles();
+		device->DrawIndexedInstanced(6, maxParticles, 0, 0, 0, cmd);
+		backlog::post("[PARTICLE DRAW DEBUG] Drew " + std::to_string(maxParticles) + " particles directly (bypassing indirect)", backlog::LogLevel::Warn);
+
 		// Draw using indirect args (prepared in finish update shader)
-		device->DrawIndexedInstancedIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DRAWPARTICLES, cmd);
+		//device->DrawIndexedInstancedIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DRAWPARTICLES, cmd);
 
 		device->EventEnd(cmd);
 	}

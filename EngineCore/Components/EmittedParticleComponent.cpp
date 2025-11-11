@@ -130,7 +130,16 @@ namespace vz
 			desc.stride = sizeof(Particle);
 			desc.format = graphics::Format::UNKNOWN;
 
-			bool success = device->CreateBuffer(&desc, nullptr, &particleBuffer_);
+			// Initialize all particles with life = 0 (dead)
+			std::vector<Particle> initParticles(maxCount);
+			for (uint32_t i = 0; i < maxCount; ++i)
+			{
+				initParticles[i] = {}; // Zero-initialize
+				initParticles[i].life = 0.0f;
+				initParticles[i].maxLife = 0.0f;
+			}
+
+			bool success = device->CreateBuffer(&desc, initParticles.data(), &particleBuffer_);
 			if (!success)
 			{
 				backlog::post("GEmittedParticleComponent::CreateGPUResources - Failed to create particle buffer", backlog::LogLevel::Error);
@@ -357,6 +366,12 @@ namespace vz
 			CreateGPUResources();
 		}
 
+		// Log current burst state at start of update
+		if (burst_ > 0)
+		{
+			backlog::post("[PARTICLE UpdateCPU START] burst_: " + std::to_string(burst_) + ", emit_: " + std::to_string(emit_), backlog::LogLevel::Info);
+		}
+
 		// Accumulate delta time
 		dt_ += dt;
 
@@ -395,6 +410,7 @@ namespace vz
 	void GEmittedParticleComponent::Burst(int num)
 	{
 		burst_ += num;
+		backlog::post("[PARTICLE BURST] Burst called with " + std::to_string(num) + ", total burst_: " + std::to_string(burst_), backlog::LogLevel::Info);
 	}
 
 	void GEmittedParticleComponent::Burst(int num, const XMFLOAT3& position)

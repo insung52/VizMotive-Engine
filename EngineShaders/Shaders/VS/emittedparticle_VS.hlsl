@@ -18,8 +18,8 @@ struct PSInput
 	float lifePercent : LIFEPERC;
 };
 
-StructuredBuffer<Particle> particleBuffer : register(t0);
-StructuredBuffer<uint> aliveList : register(t1);
+StructuredBuffer<Particle> particleBuffer : register(t1);
+StructuredBuffer<uint> aliveList : register(t2);
 
 // Billboard vertices (local space)
 static const float3 BILLBOARD[4] = {
@@ -40,46 +40,53 @@ PSInput main(VSInput input)
 {
 	PSInput output;
 
-	// Get particle index from alive list
-	uint particleIndex = aliveList[input.instanceID];
-
-	// Load particle data
+	// Read particle data from buffer (using instanceID directly, not aliveList yet)
+	uint particleIndex = input.instanceID;
 	Particle particle = particleBuffer[particleIndex];
 
-	// Calculate life percentage
-	float lifeLerp = 1.0f - particle.life / particle.maxLife;
-	output.lifePercent = lifeLerp;
+	// Check if particle is alive (has valid life)
+	float3 particlePos;
+	float particleSize;
 
-	// Interpolate size over lifetime
-	float particleSize = lerp(particle.sizeBeginEnd.x, particle.sizeBeginEnd.y, lifeLerp);
+	if (particle.life > 0.0f && particle.maxLife > 0.0f)
+	{
+		// Particle is alive, use real data
+		particlePos = particle.position;
+		float lifeLerp = 1.0f - particle.life / particle.maxLife;
+		output.lifePercent = lifeLerp;
+		particleSize = lerp(particle.sizeBeginEnd.x, particle.sizeBeginEnd.y, lifeLerp);
+		//output.color = unpack_rgba(particle.color); // TEMP: commented out for testing
+	}
+	else
+	{
+		// Particle not initialized or dead - move it far away so it's not visible
+		particlePos = float3(0.0f, -10000.0f, 0.0f); // Far below
+		particleSize = 0.0f; // Zero size
+		output.lifePercent = 0.0f;
+		output.color = float4(0.0f, 0.0f, 0.0f, 0.0f); // Transparent
+	}
 
 	// Get billboard corner position
 	uint vertexIndex = input.vertexID % 4;
 	float3 quadPos = BILLBOARD[vertexIndex];
 	float2 uv = UVS[vertexIndex];
 
-	// Unpack rotation
-	uint packed = particle.rotation_rotationVelocity;
-	float rotation = (float((packed >> 16) & 0xFFFF) / 65535.0f) * 2.0f * 3.14159265f - 3.14159265f;
-
-	// Rotate billboard
-	float2x2 rot = float2x2(
-		cos(rotation), -sin(rotation),
-		sin(rotation), cos(rotation)
-	);
-	quadPos.xy = mul(quadPos.xy, rot);
+	// No rotation for debug
+	// quadPos.xy already set
 
 	// Scale billboard
 	quadPos *= particleSize;
 
-	// Billboard facing camera
-	// Get view matrix from camera
-	float3 cameraRight = float3(GetCamera().view._11, GetCamera().view._21, GetCamera().view._31);
-	float3 cameraUp = float3(GetCamera().view._12, GetCamera().view._22, GetCamera().view._32);
-	float3 cameraForward = float3(GetCamera().view._13, GetCamera().view._23, GetCamera().view._33);
+	// Billboard facing camera - DEBUG: visualize camera axes
+	// Use inverse view matrix columns for world-space camera axes
+	float3 cameraRight = float3(GetCamera().inv_view._11, GetCamera().inv_view._21, GetCamera().inv_view._31);
+	float3 cameraUp = float3(GetCamera().inv_view._12, GetCamera().inv_view._22, GetCamera().inv_view._32);
+
+	// DEBUG: Output camera right vector as color to see if it changes
+	output.color = float4(1.0f,0.0f,0.0f, 1.0f);
 
 	// Transform quad to world space (billboarding)
-	float3 worldPos = particle.position;
+	float3 worldPos = particlePos;
 	worldPos += cameraRight * quadPos.x;
 	worldPos += cameraUp * quadPos.y;
 
@@ -89,8 +96,7 @@ PSInput main(VSInput input)
 	// Sprite sheet UV (simple for now, using single frame)
 	output.uv = uv;
 
-	// Unpack particle color
-	output.color = unpack_rgba(particle.color);
+	// Color already set above
 
 	return output;
 }
