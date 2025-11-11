@@ -350,6 +350,13 @@ namespace vz
 		// Update center position
 		center = XMFLOAT3(worldMatrix._41, worldMatrix._42, worldMatrix._43);
 
+		// Create GPU resources if not yet created
+		if (!HasValidGPUResources())
+		{
+			backlog::post("[PARTICLE] Creating GPU resources...", backlog::LogLevel::Info);
+			CreateGPUResources();
+		}
+
 		// Accumulate delta time
 		dt_ += dt;
 
@@ -370,6 +377,7 @@ namespace vz
 		// Handle burst emission
 		if (burst_ > 0)
 		{
+			backlog::post("[PARTICLE] Burst emission: " + std::to_string(burst_) + " particles", backlog::LogLevel::Info);
 			emit_ += (float)burst_;
 			burst_ = 0;
 		}
@@ -380,6 +388,7 @@ namespace vz
 		if (emit_ > 0.0f)
 		{
 			activeFrames_ = 1;
+			backlog::post("[PARTICLE] UpdateCPU - emit_: " + std::to_string(emit_) + ", dt: " + std::to_string(dt), backlog::LogLevel::Info);
 		}
 	}
 

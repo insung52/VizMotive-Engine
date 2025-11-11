@@ -423,6 +423,13 @@ namespace vz::shader
 
 			std::string sourcedir = shadersourcepath;
 			vz::helper::MakePathAbsolute(sourcedir);
+
+			// Add base shader directory for common includes like Globals.hlsli
+			std::string basedir = SHADERSOURCEPATH;
+			vz::helper::MakePathAbsolute(basedir);
+			input.include_directories.push_back(basedir);
+
+			// Add stage-specific directory (e.g., CS/, VS/, PS/)
 			input.include_directories.push_back(sourcedir);
 			input.include_directories.push_back(sourcedir + vz::helper::GetDirectoryFromPath(filename));
 			input.shadersourcefilename = vz::helper::ReplaceExtension(sourcedir + filename, "hlsl");
