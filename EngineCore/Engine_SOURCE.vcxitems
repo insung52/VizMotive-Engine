@@ -103,6 +103,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)Components\SlicerComponent.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Components\SpriteComponent.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Components\TextureComponent.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)Components\EmittedParticleComponent.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)Components\GeometryComponent.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)HighAPIs\VzActor.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)HighAPIs\VzAnimation.cpp" />

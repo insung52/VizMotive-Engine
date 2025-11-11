@@ -252,5 +252,13 @@ namespace vzm
 
 	struct API_EXPORT VzActorParticle : VzActor
 	{
+		VzActorParticle(const VID vid, const std::string& originFrom)
+			: VzActor(vid, originFrom, COMPONENT_TYPE::ACTOR_PARTICLE) {}
+		virtual ~VzActorParticle() = default;
+
+		// Particle emission control
+		void Burst(int num);
+		void Burst(int num, const vfloat3& position);
+		void Restart();
 	};
 }

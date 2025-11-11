@@ -47,6 +47,7 @@ namespace vzm
 	API_EXPORT VzActorVolume* NewActorVolume(const std::string& name, const MaterialVID vidMat = 0u, const VID parentVid = 0u);
 	API_EXPORT VzActorSprite* NewActorSprite(const std::string& name, const VID parentVid = 0u);
 	API_EXPORT VzActorSpriteFont* NewActorSpriteFont(const std::string& name, const VID parentVid = 0u);
+	API_EXPORT VzActorParticle* NewActorParticle(const std::string& name, const VID parentVid = 0u);
 	API_EXPORT VzLight* NewLight(const std::string& name, const VID parentVid = 0u);
 
 	// Create new resource component (GEOMETRY, MATERIAL, TEXTURE, VOLUME) NOT INCLUDE HIERARCHY and TRANSFORMS

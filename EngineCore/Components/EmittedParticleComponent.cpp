@@ -109,7 +109,7 @@ namespace vz
 		const uint32_t maxCount = GetMaxParticles();
 		if (maxCount == 0)
 		{
-			backlog::post("GEmittedParticleComponent::CreateGPUResources - maxParticles is 0", backlog::LogLevel::Warning);
+			backlog::post("GEmittedParticleComponent::CreateGPUResources - maxParticles is 0", backlog::LogLevel::Warn);
 			return false;
 		}
 
@@ -146,7 +146,6 @@ namespace vz
 			desc.size = maxCount * sizeof(uint32_t);
 			desc.bind_flags = graphics::BindFlag::SHADER_RESOURCE | graphics::BindFlag::UNORDERED_ACCESS;
 			desc.misc_flags = graphics::ResourceMiscFlag::BUFFER_RAW;
-			desc.format = graphics::Format::R32_TYPELESS;
 
 			bool success = device->CreateBuffer(&desc, nullptr, &aliveList_[i]);
 			if (!success)
@@ -155,7 +154,8 @@ namespace vz
 				DestroyGPUResources();
 				return false;
 			}
-			device->SetName(&aliveList_[i], std::string("EmittedParticle_AliveList_") + std::to_string(i));
+			std::string name = std::string("EmittedParticle_AliveList_") + std::to_string(i);
+			device->SetName(&aliveList_[i], name.c_str());
 		}
 
 		// Create dead list buffer
@@ -164,7 +164,6 @@ namespace vz
 			desc.size = maxCount * sizeof(uint32_t);
 			desc.bind_flags = graphics::BindFlag::SHADER_RESOURCE | graphics::BindFlag::UNORDERED_ACCESS;
 			desc.misc_flags = graphics::ResourceMiscFlag::BUFFER_RAW;
-			desc.format = graphics::Format::R32_TYPELESS;
 
 			// Initialize with all particle indices (all particles start as dead)
 			std::vector<uint32_t> indices(maxCount);
@@ -189,7 +188,6 @@ namespace vz
 			desc.size = sizeof(ParticleCounters); // From ShaderInterop
 			desc.bind_flags = graphics::BindFlag::SHADER_RESOURCE | graphics::BindFlag::UNORDERED_ACCESS;
 			desc.misc_flags = graphics::ResourceMiscFlag::BUFFER_RAW;
-			desc.format = graphics::Format::R32_TYPELESS;
 
 			// Initialize counters
 			ParticleCounters counters = {};
@@ -220,7 +218,6 @@ namespace vz
 			desc.size = indirectArgsSize;
 			desc.bind_flags = graphics::BindFlag::UNORDERED_ACCESS;
 			desc.misc_flags = graphics::ResourceMiscFlag::BUFFER_RAW | graphics::ResourceMiscFlag::INDIRECT_ARGS;
-			desc.format = graphics::Format::R32_TYPELESS;
 
 			bool success = device->CreateBuffer(&desc, nullptr, &indirectBuffers_);
 			if (!success)
@@ -237,8 +234,7 @@ namespace vz
 			graphics::GPUBufferDesc desc = {};
 			desc.size = sizeof(EmittedParticleCB); // From ShaderInterop
 			desc.bind_flags = graphics::BindFlag::CONSTANT_BUFFER;
-			desc.usage = graphics::Usage::DYNAMIC;
-			desc.cpu_access_flags = graphics::CPUAccessFlags::CPU_ACCESS_WRITE;
+			desc.usage = graphics::Usage::UPLOAD;
 
 			bool success = device->CreateBuffer(&desc, nullptr, &constantBuffer_);
 			if (!success)
@@ -256,7 +252,6 @@ namespace vz
 			desc.size = maxCount * sizeof(float);
 			desc.bind_flags = graphics::BindFlag::SHADER_RESOURCE | graphics::BindFlag::UNORDERED_ACCESS;
 			desc.misc_flags = graphics::ResourceMiscFlag::BUFFER_RAW;
-			desc.format = graphics::Format::R32_TYPELESS;
 
 			bool success = device->CreateBuffer(&desc, nullptr, &distanceBuffer_);
 			if (!success)

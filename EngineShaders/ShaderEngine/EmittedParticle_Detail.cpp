@@ -71,49 +71,9 @@ namespace vz::renderer
 				}
 			}
 
-			// Create emit PSO
-			{
-				PipelineStateDesc desc = {};
-				desc.cs = &emitCS;
-				bool success = device->CreatePipelineState(&desc, &emitPSO);
-				if (!success)
-				{
-					backlog::post("Failed to create emit PSO", backlog::LogLevel::Error);
-				}
-			}
-
-			// Create simulate PSO
-			{
-				PipelineStateDesc desc = {};
-				desc.cs = &simulateCS;
-				bool success = device->CreatePipelineState(&desc, &simulatePSO);
-				if (!success)
-				{
-					backlog::post("Failed to create simulate PSO", backlog::LogLevel::Error);
-				}
-			}
-
-			// Create kickoff update PSO
-			{
-				PipelineStateDesc desc = {};
-				desc.cs = &kickoffUpdateCS;
-				bool success = device->CreatePipelineState(&desc, &kickoffUpdatePSO);
-				if (!success)
-				{
-					backlog::post("Failed to create kickoff update PSO", backlog::LogLevel::Error);
-				}
-			}
-
-			// Create finish update PSO
-			{
-				PipelineStateDesc desc = {};
-				desc.cs = &finishUpdateCS;
-				bool success = device->CreatePipelineState(&desc, &finishUpdatePSO);
-				if (!success)
-				{
-					backlog::post("Failed to create finish update PSO", backlog::LogLevel::Error);
-				}
-			}
+			// Note: In VizMotive, compute shaders don't need PSOs
+			// They are bound directly with BindComputeShader()
+			// These PSO variables are kept for consistency but not used
 
 			// Load particle vertex shader
 			{
@@ -135,42 +95,44 @@ namespace vz::renderer
 
 			// Create particle render PSO
 			{
+				// Create blend state for alpha blending
+				static BlendState blendState;
+				blendState.render_target[0].blend_enable = true;
+				blendState.render_target[0].src_blend = Blend::SRC_ALPHA;
+				blendState.render_target[0].dest_blend = Blend::INV_SRC_ALPHA;
+				blendState.render_target[0].blend_op = BlendOp::ADD;
+				blendState.render_target[0].src_blend_alpha = Blend::ONE;
+				blendState.render_target[0].dest_blend_alpha = Blend::INV_SRC_ALPHA;
+				blendState.render_target[0].blend_op_alpha = BlendOp::ADD;
+				blendState.render_target[0].render_target_write_mask = ColorWrite::ENABLE_ALL;
+				blendState.alpha_to_coverage_enable = false;
+				blendState.independent_blend_enable = false;
+
+				// Create depth state (read-only depth, no writes)
+				static DepthStencilState depthState;
+				depthState.depth_enable = true;
+				depthState.depth_write_mask = DepthWriteMask::ZERO;
+				depthState.depth_func = ComparisonFunc::GREATER;
+
+				// Create rasterizer state (no culling for billboards)
+				static RasterizerState rasterizerState;
+				rasterizerState.fill_mode = FillMode::SOLID;
+				rasterizerState.cull_mode = CullMode::NONE;
+				rasterizerState.front_counter_clockwise = false;
+				rasterizerState.depth_bias = 0;
+				rasterizerState.depth_bias_clamp = 0;
+				rasterizerState.slope_scaled_depth_bias = 0;
+				rasterizerState.depth_clip_enable = true;
+				rasterizerState.multisample_enable = false;
+				rasterizerState.antialiased_line_enable = false;
+
+				// Create pipeline state
 				PipelineStateDesc desc = {};
 				desc.vs = &particleVS;
 				desc.ps = &particlePS;
-
-				// Blend state for alpha blending
-				desc.bs = {};
-				desc.bs.render_target[0].blend_enable = true;
-				desc.bs.render_target[0].src_blend = Blend::SRC_ALPHA;
-				desc.bs.render_target[0].dest_blend = Blend::INV_SRC_ALPHA;
-				desc.bs.render_target[0].blend_op = BlendOp::ADD;
-				desc.bs.render_target[0].src_blend_alpha = Blend::ONE;
-				desc.bs.render_target[0].dest_blend_alpha = Blend::INV_SRC_ALPHA;
-				desc.bs.render_target[0].blend_op_alpha = BlendOp::ADD;
-				desc.bs.render_target[0].render_target_write_mask = ColorWrite::ENABLE_ALL;
-				desc.bs.alpha_to_coverage_enable = false;
-				desc.bs.independent_blend_enable = false;
-
-				// Depth state (read-only depth, no writes)
-				desc.dss = {};
-				desc.dss.depth_enable = true;
-				desc.dss.depth_write_mask = DepthWriteMask::ZERO;
-				desc.dss.depth_func = ComparisonFunc::GREATER;
-
-				// Rasterizer state (no culling for billboards)
-				desc.rs = {};
-				desc.rs.fill_mode = FillMode::SOLID;
-				desc.rs.cull_mode = CullMode::NONE;
-				desc.rs.front_counter_clockwise = false;
-				desc.rs.depth_bias = 0;
-				desc.rs.depth_bias_clamp = 0;
-				desc.rs.slope_scaled_depth_bias = 0;
-				desc.rs.depth_clip_enable = true;
-				desc.rs.multisample_enable = false;
-				desc.rs.antialiased_line_enable = false;
-
-				// Primitive topology
+				desc.bs = &blendState;
+				desc.dss = &depthState;
+				desc.rs = &rasterizerState;
 				desc.pt = PrimitiveTopology::TRIANGLELIST;
 
 				bool success = device->CreatePipelineState(&desc, &particleRenderPSO);
@@ -236,10 +198,7 @@ namespace vz::renderer
 			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
 
 			device->BindComputeShader(&particlesystem::kickoffUpdateCS, cmd);
-			device->BindPipelineState(&particlesystem::kickoffUpdatePSO, cmd);
 			device->Dispatch(1, 1, 1, cmd);
-
-			device->UnbindUAVs(0, arraysize(uavs), cmd);
 
 			// Barrier to ensure kickoff is complete
 			GPUBarrier barriers[] = {
@@ -287,11 +246,7 @@ namespace vz::renderer
 			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
 
 			device->BindComputeShader(&particlesystem::finishUpdateCS, cmd);
-			device->BindPipelineState(&particlesystem::finishUpdatePSO, cmd);
 			device->Dispatch(1, 1, 1, cmd);
-
-			device->UnbindUAVs(0, arraysize(uavs), cmd);
-			device->UnbindResources(0, arraysize(srvs), cmd);
 
 			device->EventEnd(cmd);
 		}
@@ -344,8 +299,7 @@ namespace vz::renderer
 			desc.bind_flags = BindFlag::SHADER_RESOURCE;
 			desc.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
 			desc.stride = sizeof(EmitLocation);
-			desc.usage = Usage::DYNAMIC;
-			desc.cpu_access_flags = CPUAccessFlags::CPU_ACCESS_WRITE;
+			desc.usage = Usage::UPLOAD;
 
 			bool success = device->CreateBuffer(&desc, nullptr, &emitBuffer);
 			if (!success)
@@ -425,14 +379,9 @@ namespace vz::renderer
 
 		// Dispatch compute shader
 		device->BindComputeShader(&particlesystem::emitCS, cmd);
-		device->BindPipelineState(&particlesystem::emitPSO, cmd);
 
 		uint32_t threadGroups = (emitCount + THREADCOUNT_EMISSION - 1) / THREADCOUNT_EMISSION;
 		device->Dispatch(threadGroups, 1, 1, cmd);
-
-		// Unbind resources
-		device->UnbindUAVs(0, arraysize(uavs), cmd);
-		device->UnbindResources(0, arraysize(srvs), cmd);
 
 		device->EventEnd(cmd);
 	}
@@ -516,14 +465,9 @@ namespace vz::renderer
 		// Dispatch compute shader using indirect args
 		// Note: We prepared the dispatch args in kickoff update shader
 		device->BindComputeShader(&particlesystem::simulateCS, cmd);
-		device->BindPipelineState(&particlesystem::simulatePSO, cmd);
 
 		// Dispatch indirectly based on alive count
 		device->DispatchIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DISPATCHSIMULATION, cmd);
-
-		// Unbind resources
-		device->UnbindUAVs(0, arraysize(uavs), cmd);
-		device->UnbindResources(0, arraysize(srvs), cmd);
 
 		device->EventEnd(cmd);
 	}
@@ -565,9 +509,6 @@ namespace vz::renderer
 
 		// Draw using indirect args (prepared in finish update shader)
 		device->DrawIndexedInstancedIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DRAWPARTICLES, cmd);
-
-		// Unbind resources
-		device->UnbindResources(0, arraysize(srvs), cmd);
 
 		device->EventEnd(cmd);
 	}
