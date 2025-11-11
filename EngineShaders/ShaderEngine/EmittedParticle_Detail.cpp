@@ -30,10 +30,8 @@ namespace vz::renderer
 
 		void Initialize()
 		{
-			// REMOVED early return to always reload shaders
-			// This ensures shader edits take effect immediately
-			// if (initialized)
-			// 	return;
+			if (initialized)
+				return;
 
 			GraphicsDevice* device = GetDevice();
 
@@ -172,8 +170,7 @@ namespace vz::renderer
 		CommandList cmd
 	)
 	{
-		// ALWAYS call Initialize to reload shaders if they changed
-		// Initialize() will only create the index buffer once
+		// Initialize particle system shaders (only once)
 		particlesystem::Initialize();
 
 		// Check if GPU resources are valid
