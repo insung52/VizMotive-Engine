@@ -24,7 +24,11 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	args[3] = 0;              // BaseVertexLocation
 	args[4] = 0;              // StartInstanceLocation
 
-	// Write draw arguments
-	indirectBuffers.Store5(ARGUMENTBUFFER_OFFSET_DRAWPARTICLES,
-		args[0], args[1], args[2], args[3], args[4]);
+	// Write draw arguments (using individual Store calls since Store5 may not be available)
+	uint offset = ARGUMENTBUFFER_OFFSET_DRAWPARTICLES;
+	indirectBuffers.Store(offset + 0, args[0]);
+	indirectBuffers.Store(offset + 4, args[1]);
+	indirectBuffers.Store(offset + 8, args[2]);
+	indirectBuffers.Store(offset + 12, args[3]);
+	indirectBuffers.Store(offset + 16, args[4]);
 }
