@@ -362,14 +362,7 @@ namespace vz
 		// Create GPU resources if not yet created
 		if (!HasValidGPUResources())
 		{
-			backlog::post("[PARTICLE] Creating GPU resources...", backlog::LogLevel::Info);
 			CreateGPUResources();
-		}
-
-		// Log current burst state at start of update
-		if (burst_ > 0)
-		{
-			backlog::post("[PARTICLE UpdateCPU START] burst_: " + std::to_string(burst_) + ", emit_: " + std::to_string(emit_), backlog::LogLevel::Info);
 		}
 
 		// Accumulate delta time
@@ -392,7 +385,6 @@ namespace vz
 		// Handle burst emission
 		if (burst_ > 0)
 		{
-			backlog::post("[PARTICLE] Burst emission: " + std::to_string(burst_) + " particles", backlog::LogLevel::Info);
 			emit_ += (float)burst_;
 			burst_ = 0;
 		}
@@ -403,14 +395,12 @@ namespace vz
 		if (emit_ > 0.0f)
 		{
 			activeFrames_ = 1;
-			backlog::post("[PARTICLE] UpdateCPU - emit_: " + std::to_string(emit_) + ", dt: " + std::to_string(dt), backlog::LogLevel::Info);
 		}
 	}
 
 	void GEmittedParticleComponent::Burst(int num)
 	{
 		burst_ += num;
-		backlog::post("[PARTICLE BURST] Burst called with " + std::to_string(num) + ", total burst_: " + std::to_string(burst_), backlog::LogLevel::Info);
 	}
 
 	void GEmittedParticleComponent::Burst(int num, const XMFLOAT3& position)
