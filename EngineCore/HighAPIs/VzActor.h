@@ -260,5 +260,23 @@ namespace vzm
 		void Burst(int num);
 		void Burst(int num, const vfloat3& position);
 		void Restart();
+
+		// Particle property setters
+		void SetParticleSize(float size);
+		void SetParticleScaleX(float scale);
+		void SetParticleScaleY(float scale);
+		void SetParticleVelocity(const vfloat3& velocity);
+		void SetParticleRandomFactor(float factor);
+		void SetParticleGravity(const vfloat3& gravity);
+		void SetParticleDrag(float drag);
+		void SetParticleMass(float mass);
+		void SetParticleLife(float life);
+		void SetParticleRandomLife(float randomLife);
+		void SetParticleEmitCount(float count);
+		void SetParticleMaxCount(uint32_t maxCount);
+		void SetParticleRandomColor(float randomColor);
+		void SetParticleRotation(float rotation);
+		void SetParticleOpacityCurve(float peakStart, float peakEnd);
+		void SetParticleSorted(bool sorted);
 	};
 }
