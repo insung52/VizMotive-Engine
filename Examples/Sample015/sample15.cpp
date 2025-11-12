@@ -255,7 +255,20 @@ int main(int, char**)
 		particleEmitter->SetVisibleLayerMask(0xF, true);
 		scene->AppendChild(particleEmitter);
 		particleEmitter->Burst(100);
+		particleEmitter->SetParticleSize(0.1f);
+		particleEmitter->SetParticleRandomColor(0.5f);  // 30% 랜덤 색상 변화
+		//particleEmitter->SetParticleVelocity({ 0.f, 3.0f, 0.f });
+		//particleEmitter->SetParticleGravity({ 0.f, -9.8f, 0.f });
 
+		//particleEmitter->SetParticleLife(0.001f);  // 4초 동안 살아있음
+		// 랜덤 수명 범위
+		//particleEmitter->SetParticleRandomLife(0.0001f);  // ±2초 범위로 랜덤
+		// 실제 수명 = life ± randomLife
+		// 예: 4.0 ± 2.0 = 2.0초 ~ 6.0초 사이 랜덤
+		// 투명도 커브 설정
+		//particleEmitter->SetParticleOpacityCurve(0.1f, 0.9f);
+		// 첫 번째 값: 페이드 인 완료 시점 (0.1 = 수명의 10% 지점)
+		// 두 번째 값: 페이드 아웃 시작 시점 (0.9 = 수명의 90% 지점)
 	}
 	//renderer->SetLayerMask(0xF);
 	camera->SetVisibleLayerMask(0xF);

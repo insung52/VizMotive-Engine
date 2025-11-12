@@ -761,4 +761,100 @@ namespace vzm
 			UpdateTimeStamp();
 		}
 	}
+
+	void VzActorParticle::SetParticleSize(float size)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetSize(size); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleScaleX(float scale)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetScaleX(scale); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleScaleY(float scale)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetScaleY(scale); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleVelocity(const vfloat3& velocity)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetVelocity(XMFLOAT3(velocity.x, velocity.y, velocity.z)); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleRandomFactor(float factor)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetRandomFactor(factor); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleGravity(const vfloat3& gravity)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetGravity(XMFLOAT3(gravity.x, gravity.y, gravity.z)); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleDrag(float drag)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetDrag(drag); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleMass(float mass)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetMass(mass); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleLife(float life)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetLife(life); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleRandomLife(float randomLife)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetRandomLife(randomLife); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleEmitCount(float count)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetEmitCount(count); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleMaxCount(uint32_t maxCount)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetMaxParticles(maxCount); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleRandomColor(float randomColor)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetRandomColor(randomColor); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleRotation(float rotation)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetRotation(rotation); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleOpacityCurve(float peakStart, float peakEnd)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetOpacityCurve(peakStart, peakEnd); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleSorted(bool sorted)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetSorted(sorted); UpdateTimeStamp(); }
+	}
 }
