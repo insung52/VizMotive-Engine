@@ -343,7 +343,7 @@ namespace vz::renderer
 			cb.xParticleSize = emitter.GetSize();
 			cb.xParticleScaling = emitter.GetScaleX(); // Use ScaleX as overall scaling
 			cb.xParticleRotation = emitter.GetRotation();
-			cb.xParticleRandomFactor = emitter.GetRandomFactor();
+			cb.xParticleRandomPositionOffset = emitter.GetRandomPositionOffset();
 
 			cb.xParticleNormalFactor = emitter.GetNormalFactor();
 			cb.xParticleLifeSpan = emitter.GetLife();
@@ -352,6 +352,8 @@ namespace vz::renderer
 
 			cb.xParticleMotionBlurAmount = emitter.GetMotionBlurAmount();
 			cb.xParticleRandomColorFactor = emitter.GetRandomColor();
+			cb.xParticleRandomVelocity = emitter.GetRandomVelocity();
+			cb.xParticleRandomSize = emitter.GetRandomSize();
 			cb.xEmitterOptions = 0;
 			if (emitter.IsFrameBlendingEnabled())
 				cb.xEmitterOptions |= EMITTER_OPTION_BIT_FRAME_BLENDING_ENABLED;
@@ -377,8 +379,8 @@ namespace vz::renderer
 
 			cb.xOpacityCurvePeakStart = emitter.GetOpacityCurvePeakStart();
 			cb.xOpacityCurvePeakEnd = emitter.GetOpacityCurvePeakEnd();
-			cb.xPadding0 = 0.0f;
-			cb.xPadding1 = 0.0f;
+			cb.xParticleRandomRotation = emitter.GetRandomRotation();
+			cb.xParticleRandomRotationVelocity = emitter.GetRandomRotationVelocity();
 
 			// DEBUG: Print CB values (only once)
 			static bool debugOnceCB = false;
@@ -458,7 +460,7 @@ namespace vz::renderer
 			cb.xParticleSize = emitter.GetSize();
 			cb.xParticleScaling = emitter.GetScaleX();
 			cb.xParticleRotation = emitter.GetRotation();
-			cb.xParticleRandomFactor = emitter.GetRandomFactor();
+			cb.xParticleRandomPositionOffset = emitter.GetRandomPositionOffset();
 
 			cb.xParticleNormalFactor = emitter.GetNormalFactor();
 			cb.xParticleLifeSpan = emitter.GetLife();
@@ -467,6 +469,8 @@ namespace vz::renderer
 
 			cb.xParticleMotionBlurAmount = emitter.GetMotionBlurAmount();
 			cb.xParticleRandomColorFactor = emitter.GetRandomColor();
+			cb.xParticleRandomVelocity = emitter.GetRandomVelocity();
+			cb.xParticleRandomSize = emitter.GetRandomSize();
 			cb.xEmitterOptions = 0;
 			if (emitter.IsFrameBlendingEnabled())
 				cb.xEmitterOptions |= EMITTER_OPTION_BIT_FRAME_BLENDING_ENABLED;
@@ -492,8 +496,8 @@ namespace vz::renderer
 
 			cb.xOpacityCurvePeakStart = emitter.GetOpacityCurvePeakStart();
 			cb.xOpacityCurvePeakEnd = emitter.GetOpacityCurvePeakEnd();
-			cb.xPadding0 = 0.0f;
-			cb.xPadding1 = 0.0f;
+			cb.xParticleRandomRotation = emitter.GetRandomRotation();
+			cb.xParticleRandomRotationVelocity = emitter.GetRandomRotationVelocity();
 
 			// Update the constant buffer
 			device->UpdateBuffer(&emitter.GetConstantBuffer(), &cb, cmd, sizeof(EmittedParticleCB));
@@ -541,6 +545,9 @@ namespace vz::renderer
 
 		// Bind pipeline state
 		device->BindPipelineState(&particlesystem::particleRenderPSO, cmd);
+
+		// Bind constant buffer (needed for opacity curve parameters in PS)
+		device->BindConstantBuffer(&emitter.GetConstantBuffer(), CB_GETBINDSLOT(EmittedParticleCB), cmd);
 
 		// Bind resources
 		// t0: particle buffer, t1: alive list

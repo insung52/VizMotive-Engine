@@ -786,10 +786,34 @@ namespace vzm
 		if (emitter) { emitter->SetVelocity(XMFLOAT3(velocity.x, velocity.y, velocity.z)); UpdateTimeStamp(); }
 	}
 
-	void VzActorParticle::SetParticleRandomFactor(float factor)
+	void VzActorParticle::SetParticleRandomPositionOffset(float offset)
 	{
 		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
-		if (emitter) { emitter->SetRandomFactor(factor); UpdateTimeStamp(); }
+		if (emitter) { emitter->SetRandomPositionOffset(offset); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleRandomVelocity(float randomVelocity)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetRandomVelocity(randomVelocity); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleRandomSize(float randomSize)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetRandomSize(randomSize); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleRandomRotation(float randomRotation)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetRandomRotation(randomRotation); UpdateTimeStamp(); }
+	}
+
+	void VzActorParticle::SetParticleRandomRotationVelocity(float randomRotationVelocity)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetRandomRotationVelocity(randomRotationVelocity); UpdateTimeStamp(); }
 	}
 
 	void VzActorParticle::SetParticleGravity(const vfloat3& gravity)
