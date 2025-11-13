@@ -53,25 +53,25 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID)
 	float3 emitPos = float3(0, 0, 0);
 	float3 nor = float3(0, 1, 0); // Default up direction
 
-	// Add some randomness to emission position
-	emitPos += (rand3(seed, 100) - 0.5f) * xParticleRandomFactor;
+	// Add randomness to emission position
+	emitPos += (rand3(seed, 100) - 0.5f) * xParticleRandomPositionOffset;
 
 	// Transform to world space
 	float3 worldPos = mul(worldMatrix, float4(emitPos, 1)).xyz;
 
-	// Calculate velocity
+	// Calculate velocity with randomness
 	float3 velocity = xParticleVelocity;
-	velocity += (nor + (rand3(seed, 200) - 0.5f) * xParticleRandomFactor) * xParticleNormalFactor;
+	velocity += (nor + (rand3(seed, 200) - 0.5f) * xParticleRandomVelocity) * xParticleNormalFactor;
 
 	// Calculate particle size with randomness
-	float particleStartingSize = xParticleSize + xParticleSize * (rand(seed, 300) - 0.5f) * xParticleRandomFactor;
+	float particleStartingSize = xParticleSize + xParticleSize * (rand(seed, 300) - 0.5f) * xParticleRandomSize;
 
 	// Calculate life with randomness
 	float maxLife = xParticleLifeSpan + xParticleLifeSpan * (rand(seed, 400) - 0.5f) * xParticleLifeSpanRandomness;
 
 	// Calculate rotation with randomness
-	float rotation = (rand(seed, 500) - 0.5f) * xParticleRandomFactor * 3.14159265f * 2.0f;
-	float rotationVelocity = xParticleRotation * (rand(seed, 600) - 0.5f) * (1.0f + xParticleRandomFactor);
+	float rotation = (rand(seed, 500) - 0.5f) * xParticleRandomRotation;
+	float rotationVelocity = xParticleRotation * (rand(seed, 600) - 0.5f) * xParticleRandomRotationVelocity;
 
 	// Pack rotation (simple pack - in real implementation should use half-float pack)
 	uint rotation_packed = uint((rotation + 3.14159265f) / (2.0f * 3.14159265f) * 65535.0f);

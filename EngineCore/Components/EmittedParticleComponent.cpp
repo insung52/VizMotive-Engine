@@ -41,7 +41,7 @@ namespace vz
 			archive >> maxParticles_;
 			archive >> emitCount_;
 			archive >> size_;
-			archive >> randomFactor_;
+			archive >> randomPositionOffset_;
 			archive >> normalFactor_;
 			archive >> life_;
 			archive >> randomLife_;
@@ -51,6 +51,10 @@ namespace vz
 			archive >> motionBlurAmount_;
 			archive >> mass_;
 			archive >> randomColor_;
+			archive >> randomVelocity_;
+			archive >> randomSize_;
+			archive >> randomRotation_;
+			archive >> randomRotationVelocity_;
 			archive >> velocity_;
 			archive >> gravity_;
 			archive >> drag_;
@@ -72,7 +76,7 @@ namespace vz
 			archive << maxParticles_;
 			archive << emitCount_;
 			archive << size_;
-			archive << randomFactor_;
+			archive << randomPositionOffset_;
 			archive << normalFactor_;
 			archive << life_;
 			archive << randomLife_;
@@ -82,6 +86,10 @@ namespace vz
 			archive << motionBlurAmount_;
 			archive << mass_;
 			archive << randomColor_;
+			archive << randomVelocity_;
+			archive << randomSize_;
+			archive << randomRotation_;
+			archive << randomRotationVelocity_;
 			archive << velocity_;
 			archive << gravity_;
 			archive << drag_;

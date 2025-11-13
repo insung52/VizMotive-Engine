@@ -3027,7 +3027,7 @@ namespace vz
 		uint32_t maxParticles_ = 1000;
 		float emitCount_ = 10.0f;
 		float size_ = 1.0f;
-		float randomFactor_ = 1.0f;
+		float randomPositionOffset_ = 1.0f;  // Random position offset range
 		float normalFactor_ = 1.0f;
 		float life_ = 3.0f;
 		float randomLife_ = 1.0f;
@@ -3037,6 +3037,10 @@ namespace vz
 		float motionBlurAmount_ = 0.0f;
 		float mass_ = 1.0f;
 		float randomColor_ = 0.0f;
+		float randomVelocity_ = 1.0f;       // Random velocity multiplier
+		float randomSize_ = 1.0f;           // Random size multiplier
+		float randomRotation_ = 1.0f;       // Random rotation range (radians)
+		float randomRotationVelocity_ = 1.0f; // Random rotation velocity multiplier
 
 		// Velocity and physics
 		XMFLOAT3 velocity_ = XMFLOAT3(0, 1, 0);
@@ -3116,7 +3120,7 @@ namespace vz
 		inline uint32_t GetMaxParticles() const { return maxParticles_; }
 		inline float GetEmitCount() const { return emitCount_; }
 		inline float GetSize() const { return size_; }
-		inline float GetRandomFactor() const { return randomFactor_; }
+		inline float GetRandomPositionOffset() const { return randomPositionOffset_; }
 		inline float GetNormalFactor() const { return normalFactor_; }
 		inline float GetLife() const { return life_; }
 		inline float GetRandomLife() const { return randomLife_; }
@@ -3126,6 +3130,10 @@ namespace vz
 		inline float GetMotionBlurAmount() const { return motionBlurAmount_; }
 		inline float GetMass() const { return mass_; }
 		inline float GetRandomColor() const { return randomColor_; }
+		inline float GetRandomVelocity() const { return randomVelocity_; }
+		inline float GetRandomSize() const { return randomSize_; }
+		inline float GetRandomRotation() const { return randomRotation_; }
+		inline float GetRandomRotationVelocity() const { return randomRotationVelocity_; }
 		inline XMFLOAT3 GetVelocity() const { return velocity_; }
 		inline XMFLOAT3 GetGravity() const { return gravity_; }
 		inline float GetDrag() const { return drag_; }
@@ -3145,7 +3153,7 @@ namespace vz
 		inline void SetMaxParticles(uint32_t count) { maxParticles_ = count; timeStampSetter_ = TimerNow; }
 		inline void SetEmitCount(float count) { emitCount_ = count; timeStampSetter_ = TimerNow; }
 		inline void SetSize(float size) { size_ = size; timeStampSetter_ = TimerNow; }
-		inline void SetRandomFactor(float factor) { randomFactor_ = factor; timeStampSetter_ = TimerNow; }
+		inline void SetRandomPositionOffset(float offset) { randomPositionOffset_ = offset; timeStampSetter_ = TimerNow; }
 		inline void SetNormalFactor(float factor) { normalFactor_ = factor; timeStampSetter_ = TimerNow; }
 		inline void SetLife(float life) { life_ = life; timeStampSetter_ = TimerNow; }
 		inline void SetRandomLife(float randomLife) { randomLife_ = randomLife; timeStampSetter_ = TimerNow; }
@@ -3155,6 +3163,10 @@ namespace vz
 		inline void SetMotionBlurAmount(float amount) { motionBlurAmount_ = amount; timeStampSetter_ = TimerNow; }
 		inline void SetMass(float mass) { mass_ = mass; timeStampSetter_ = TimerNow; }
 		inline void SetRandomColor(float randomColor) { randomColor_ = randomColor; timeStampSetter_ = TimerNow; }
+		inline void SetRandomVelocity(float randomVelocity) { randomVelocity_ = randomVelocity; timeStampSetter_ = TimerNow; }
+		inline void SetRandomSize(float randomSize) { randomSize_ = randomSize; timeStampSetter_ = TimerNow; }
+		inline void SetRandomRotation(float randomRotation) { randomRotation_ = randomRotation; timeStampSetter_ = TimerNow; }
+		inline void SetRandomRotationVelocity(float randomRotationVelocity) { randomRotationVelocity_ = randomRotationVelocity; timeStampSetter_ = TimerNow; }
 		inline void SetVelocity(const XMFLOAT3& velocity) { velocity_ = velocity; timeStampSetter_ = TimerNow; }
 		inline void SetGravity(const XMFLOAT3& gravity) { gravity_ = gravity; timeStampSetter_ = TimerNow; }
 		inline void SetDrag(float drag) { drag_ = drag; timeStampSetter_ = TimerNow; }

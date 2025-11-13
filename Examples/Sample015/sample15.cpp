@@ -249,8 +249,8 @@ int main(int, char**)
 			light->AppendChild(axis_light);
 		}
 
-		// Create a particle emitter
-		VzActorParticle* particleEmitter = vzm::NewActorParticle("Particle Emitter");
+		// Create a particle emitter (static for UI access)
+		static VzActorParticle* particleEmitter = vzm::NewActorParticle("Particle Emitter");
 		particleEmitter->SetPosition({ 0.f, 1.f, 0.f });
 		particleEmitter->SetVisibleLayerMask(0xF, true);
 		scene->AppendChild(particleEmitter);
@@ -258,7 +258,11 @@ int main(int, char**)
 		particleEmitter->SetParticleSize(0.1f);
 		particleEmitter->SetParticleRandomColor(0.5f);  // 랜덤 색상 변화
 		particleEmitter->SetParticleEmitCount(10.0f);
-		particleEmitter->SetParticleRandomFactor(1.0f);  // 랜덤 오프셋 설정
+		particleEmitter->SetParticleRandomPositionOffset(1.0f);  // 랜덤 위치 오프셋
+		particleEmitter->SetParticleRandomVelocity(1.0f);        // 랜덤 속도
+		particleEmitter->SetParticleRandomSize(1.0f);            // 랜덤 크기
+		particleEmitter->SetParticleRandomRotation(1.0f);        // 랜덤 회전
+		particleEmitter->SetParticleRandomRotationVelocity(1.0f); // 랜덤 회전 속도
 		particleEmitter->SetParticleLife(2.0f);          // life 수명
 		particleEmitter->SetParticleRandomLife(0.5f);    // 랜덤 범위 증가
 		particleEmitter->SetParticleVelocity({ 0.f, -0.3f, 0.f });  // 속도 증가
@@ -747,6 +751,116 @@ int main(int, char**)
 					ImGui::Text(performance_info.c_str());
 					ImGui::Separator();
 					ImGui::Text(memory_info.c_str());
+				}
+
+				ImGui::Separator();
+				vzimgui::IGTextTitle("----- Particle System -----");
+				{
+					static VzActorParticle* particleEmitter = nullptr;
+					if (!particleEmitter)
+					{
+						std::vector<VzBaseComp*> components;
+						if (GetComponentsByName("Particle Emitter", components) > 0)
+						{
+							particleEmitter = (VzActorParticle*)components[0];
+						}
+					}
+
+					if (particleEmitter)
+					{
+						static float particle_size = 0.1f;
+						if (ImGui::SliderFloat("Size", &particle_size, 0.01f, 1.0f))
+						{
+							particleEmitter->SetParticleSize(particle_size);
+						}
+
+						static float emit_count = 10.0f;
+						if (ImGui::SliderFloat("Emit Count", &emit_count, 1.0f, 100.0f))
+						{
+							particleEmitter->SetParticleEmitCount(emit_count);
+						}
+
+						static float particle_life = 2.0f;
+						if (ImGui::SliderFloat("Life", &particle_life, 0.1f, 10.0f))
+						{
+							particleEmitter->SetParticleLife(particle_life);
+						}
+
+						static float random_life = 0.5f;
+						if (ImGui::SliderFloat("Random Life", &random_life, 0.0f, 1.0f))
+						{
+							particleEmitter->SetParticleRandomLife(random_life);
+						}
+
+						static float random_position_offset = 1.0f;
+						if (ImGui::SliderFloat("Random Position Offset", &random_position_offset, 0.0f, 10.0f))
+						{
+							particleEmitter->SetParticleRandomPositionOffset(random_position_offset);
+						}
+
+						static float random_velocity = 1.0f;
+						if (ImGui::SliderFloat("Random Velocity", &random_velocity, 0.0f, 5.0f))
+						{
+							particleEmitter->SetParticleRandomVelocity(random_velocity);
+						}
+
+						static float random_size = 1.0f;
+						if (ImGui::SliderFloat("Random Size", &random_size, 0.0f, 2.0f))
+						{
+							particleEmitter->SetParticleRandomSize(random_size);
+						}
+
+						static float random_rotation = 1.0f;
+						if (ImGui::SliderFloat("Random Rotation", &random_rotation, 0.0f, 6.28f))
+						{
+							particleEmitter->SetParticleRandomRotation(random_rotation);
+						}
+
+						static float random_rotation_velocity = 1.0f;
+						if (ImGui::SliderFloat("Random Rotation Velocity", &random_rotation_velocity, 0.0f, 5.0f))
+						{
+							particleEmitter->SetParticleRandomRotationVelocity(random_rotation_velocity);
+						}
+
+						static float random_color = 0.5f;
+						if (ImGui::SliderFloat("Random Color", &random_color, 0.0f, 1.0f))
+						{
+							particleEmitter->SetParticleRandomColor(random_color);
+						}
+
+						static float velocity[3] = { 0.0f, -0.3f, 0.0f };
+						if (ImGui::SliderFloat3("Velocity", velocity, -5.0f, 5.0f))
+						{
+							particleEmitter->SetParticleVelocity({ velocity[0], velocity[1], velocity[2] });
+						}
+
+						static float gravity[3] = { 0.0f, 0.0f, 0.0f };
+						if (ImGui::SliderFloat3("Gravity", gravity, -10.0f, 10.0f))
+						{
+							particleEmitter->SetParticleGravity({ gravity[0], gravity[1], gravity[2] });
+						}
+
+						static float drag = 0.99f;
+						if (ImGui::SliderFloat("Drag", &drag, 0.0f, 1.0f))
+						{
+							particleEmitter->SetParticleDrag(drag);
+						}
+
+						static float opacity_peak_start = 0.8f;
+						static float opacity_peak_end = 0.9f;
+						bool opacity_changed = false;
+						opacity_changed |= ImGui::SliderFloat("Fade In End", &opacity_peak_start, 0.0f, 1.0f);
+						opacity_changed |= ImGui::SliderFloat("Fade Out Start", &opacity_peak_end, 0.0f, 1.0f);
+						if (opacity_changed)
+						{
+							particleEmitter->SetParticleOpacityCurve(opacity_peak_start, opacity_peak_end);
+						}
+
+						if (ImGui::Button("Burst 100"))
+						{
+							particleEmitter->Burst(100);
+						}
+					}
 				}
 
 				ImGui::Separator();
