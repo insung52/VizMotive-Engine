@@ -260,9 +260,13 @@ int main(int, char**)
 		//particleEmitter->SetParticleVelocity({ 0.f, 3.0f, 0.f });
 		//particleEmitter->SetParticleGravity({ 0.f, -9.8f, 0.f });
 
-		//particleEmitter->SetParticleLife(0.001f);  // 4초 동안 살아있음
-		// 랜덤 수명 범위
-		//particleEmitter->SetParticleRandomLife(0.0001f);  // ±2초 범위로 랜덤
+		particleEmitter->SetParticleLife(2.0f);          // 0.1초 → 2초로 증가
+		particleEmitter->SetParticleRandomLife(0.5f);    // 랜덤 범위 증가
+		particleEmitter->SetParticleVelocity({ 0.f, 3.0f, 0.f });  // 속도 증가
+		particleEmitter->SetParticleGravity({ 0.f, -9.8f, 0.f });
+		particleEmitter->SetParticleDrag(0.98f);         // 공기 저항 추가 (매 프레임 2% 감속)
+		particleEmitter->SetParticleMass(1.0f);
+
 		// 실제 수명 = life ± randomLife
 		// 예: 4.0 ± 2.0 = 2.0초 ~ 6.0초 사이 랜덤
 		// 투명도 커브 설정
