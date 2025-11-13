@@ -24,12 +24,22 @@ void main(uint3 DTid : SV_DispatchThreadID, uint Gid : SV_GroupIndex)
 	if (DTid.x >= aliveCount)
 		return;
 
-	// Get timestep (fixed or variable)
-	const float dt = xEmitterFixedTimestep >= 0.0f ? xEmitterFixedTimestep : GetDeltaTime();
-
 	// Load particle
 	uint particleIndex = aliveBuffer_CURRENT[DTid.x];
 	Particle particle = particleBuffer[particleIndex];
+
+	// Get timestep (fixed or variable)
+	float dt = xEmitterFixedTimestep;
+	if (dt < 0.0f)
+	{
+		// Use frame delta time if fixed timestep is not set
+		dt = GetFrame().delta_time;
+		// Fallback to 60 FPS if delta_time is invalid (0 or very large)
+		if (dt <= 0.0f || dt > 0.1f)
+		{
+			//dt = 1.0f / 60.0f;
+		}
+	}
 
 	// Update life
 	particle.life -= dt;
@@ -37,6 +47,10 @@ void main(uint3 DTid : SV_DispatchThreadID, uint Gid : SV_GroupIndex)
 	// Calculate life lerp for size and opacity
 	const float lifeLerp = 1.0f - particle.life / particle.maxLife;
 	const float particleSize = lerp(particle.sizeBeginEnd.x, particle.sizeBeginEnd.y, lifeLerp);
+
+	// Calculate color based on life
+	float4 particleColor = unpack_rgba(particle.color);
+	particle.color = pack_rgba(particleColor);
 
 	// Sample opacity curve
 	const float lifeOpa = opacityCurveTex.SampleLevel(sampler_linear_clamp, lifeLerp, 0);
@@ -83,9 +97,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint Gid : SV_GroupIndex)
 		// TODO: Add depth buffer collision detection
 		// if (xEmitterOptions & EMITTER_OPTION_BIT_DEPTH_COLLISION) { ... }
 
-		// Write back simulated particle
-		particleBuffer[particleIndex] = particle;
-
 		// Add to new alive list (push)
 		uint newAliveIndex;
 		counterBuffer.InterlockedAdd(PARTICLECOUNTER_OFFSET_ALIVECOUNT_AFTERSIMULATION, 1, newAliveIndex);
@@ -99,4 +110,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint Gid : SV_GroupIndex)
 		counterBuffer.InterlockedAdd(PARTICLECOUNTER_OFFSET_DEADCOUNT, 1, deadIndex);
 		deadBuffer[deadIndex] = particleIndex;
 	}
+
+	// Write back simulated particle (ALWAYS, whether alive or dead, so color/life updates are visible)
+	particleBuffer[particleIndex] = particle;
 }

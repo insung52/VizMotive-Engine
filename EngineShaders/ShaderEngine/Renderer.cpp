@@ -1371,7 +1371,18 @@ namespace vz::renderer
 		}
 
 		scene_Gdetails = (GSceneDetails*)scene->GetGSceneHandle();
+
+		// Set scene effect update flag BEFORE UpdateProcess
+		// This flag controls whether scene effects (particles, animations, etc.) should update
 		scene_Gdetails->isSceneEffectUpdateEnabled = false;
+		if (scene_Gdetails->cameraMain == nullptr)
+		{
+			scene_Gdetails->cameraMain = (GCameraComponent*)camera;
+		}
+		if (scene_Gdetails->cameraMain == camera && dt != 0)
+		{
+			scene_Gdetails->isSceneEffectUpdateEnabled = true;
+		}
 
 		// color space check
 		// if swapChain is invalid, rtRenderFinal_ is supposed to be valid!
@@ -1409,15 +1420,6 @@ namespace vz::renderer
 		else
 		{
 			vzlog_assert(camera->GetComponentType() == ComponentType::CAMERA, "RenderProcess requires CAMERA component!!");
-
-			if (scene_Gdetails->cameraMain == nullptr)
-			{
-				scene_Gdetails->cameraMain = (GCameraComponent*)camera;
-			}
-			if (scene_Gdetails->cameraMain == camera && dt != 0)
-			{
-				scene_Gdetails->isSceneEffectUpdateEnabled = true;
-			}
 
 			RenderProcess();
 		}
