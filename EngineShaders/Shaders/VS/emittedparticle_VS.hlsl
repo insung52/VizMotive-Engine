@@ -18,8 +18,8 @@ struct PSInput
 	float lifePercent : LIFEPERC;
 };
 
-StructuredBuffer<Particle> particleBuffer : register(t1);
-StructuredBuffer<uint> aliveList : register(t2);
+StructuredBuffer<Particle> particleBuffer : register(t0);
+StructuredBuffer<uint> aliveList : register(t1);
 
 // Billboard vertices (local space)
 static const float3 BILLBOARD[4] = {
