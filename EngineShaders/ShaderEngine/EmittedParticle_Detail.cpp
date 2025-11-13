@@ -375,6 +375,11 @@ namespace vz::renderer
 			cb.xParticleVelocity = float3(velocity.x, velocity.y, velocity.z);
 			cb.xParticleDrag = emitter.GetDrag();
 
+			cb.xOpacityCurvePeakStart = emitter.GetOpacityCurvePeakStart();
+			cb.xOpacityCurvePeakEnd = emitter.GetOpacityCurvePeakEnd();
+			cb.xPadding0 = 0.0f;
+			cb.xPadding1 = 0.0f;
+
 			// DEBUG: Print CB values (only once)
 			static bool debugOnceCB = false;
 			if (!debugOnceCB)
@@ -485,6 +490,11 @@ namespace vz::renderer
 			cb.xParticleVelocity = float3(velocity.x, velocity.y, velocity.z);
 			cb.xParticleDrag = emitter.GetDrag();
 
+			cb.xOpacityCurvePeakStart = emitter.GetOpacityCurvePeakStart();
+			cb.xOpacityCurvePeakEnd = emitter.GetOpacityCurvePeakEnd();
+			cb.xPadding0 = 0.0f;
+			cb.xPadding1 = 0.0f;
+
 			// Update the constant buffer
 			device->UpdateBuffer(&emitter.GetConstantBuffer(), &cb, cmd, sizeof(EmittedParticleCB));
 		}
@@ -492,12 +502,7 @@ namespace vz::renderer
 		// Bind constant buffer
 		device->BindConstantBuffer(&emitter.GetConstantBuffer(), CB_GETBINDSLOT(EmittedParticleCB), cmd);
 
-		// Bind resources
-		const GPUResource* srvs[] = {
-			&emitter.GetOpacityCurveTexture(), // t0: opacity curve texture
-		};
-		device->BindResources(srvs, 0, arraysize(srvs), cmd);
-
+		// Bind UAVs (no SRVs needed - opacity calculated in shader using CB)
 		const GPUResource* uavs[] = {
 			&emitter.GetParticleBuffer(),                          // u0: particle buffer
 			&emitter.GetAliveList(0),                              // u1: alive list CURRENT (read from, always index 0)
@@ -534,20 +539,19 @@ namespace vz::renderer
 
 		device->EventBegin("Draw Particles", cmd);
 
+		// Bind pipeline state
+		device->BindPipelineState(&particlesystem::particleRenderPSO, cmd);
+
 		// Bind resources
-		// t0: opacity curve, t1: particle buffer, t2: alive list
+		// t0: particle buffer, t1: alive list
 		const GPUResource* srvs[] = {
-			&emitter.GetOpacityCurveTexture(),                       // t0: opacity curve
-			&emitter.GetParticleBuffer(),                            // t1: particle buffer
-			&emitter.GetAliveList(1),                                // t2: alive list NEW (Simulate wrote to this, always index 1)
+			&emitter.GetParticleBuffer(),                            // t0: particle buffer
+			&emitter.GetAliveList(1),                                // t1: alive list NEW (Simulate wrote to this, always index 1)
 		};
 		device->BindResources(srvs, 0, arraysize(srvs), cmd);
 
 		// Bind index buffer
 		device->BindIndexBuffer(&particlesystem::particleIndexBuffer, IndexBufferFormat::UINT16, 0, cmd);
-
-		// Bind pipeline state
-		device->BindPipelineState(&particlesystem::particleRenderPSO, cmd);
 
 		// Draw using indirect args (prepared in finish update shader)
 		device->DrawIndexedInstancedIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DRAWPARTICLES, cmd);

@@ -81,6 +81,11 @@ CBUFFER(EmittedParticleCB, CBSLOT_OTHER_EMITTEDPARTICLE)
 	float3		xParticleVelocity;              // Initial velocity
 	float		xParticleDrag;                  // Drag coefficient
 
+	float		xOpacityCurvePeakStart;         // Opacity curve fade-in end point (0~1)
+	float		xOpacityCurvePeakEnd;           // Opacity curve fade-out start point (0~1)
+	float		xPadding0;                      // Padding
+	float		xPadding1;                      // Padding
+
 	// SPH fluid simulation parameters (advanced feature - commented out)
 	/*
 	float		xSPH_h;                         // smoothing radius

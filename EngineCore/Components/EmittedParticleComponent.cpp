@@ -272,64 +272,8 @@ namespace vz
 			device->SetName(&distanceBuffer_, "EmittedParticle_DistanceBuffer");
 		}
 
-		// Create opacity curve texture
-		{
-			const uint32_t curveResolution = 256;
-			std::vector<uint8_t> curveData(curveResolution);
-
-			// Generate opacity curve based on peak start/end parameters
-			float peakStart = GetOpacityCurvePeakStart();
-			float peakEnd = GetOpacityCurvePeakEnd();
-
-			for (uint32_t i = 0; i < curveResolution; ++i)
-			{
-				float t = (float)i / (float)(curveResolution - 1);
-				float opacity = 0.0f;
-
-				if (t < peakStart)
-				{
-					// Fade in
-					opacity = t / peakStart;
-				}
-				else if (t < peakEnd)
-				{
-					// Peak
-					opacity = 1.0f;
-				}
-				else
-				{
-					// Fade out
-					opacity = 1.0f - (t - peakEnd) / (1.0f - peakEnd);
-				}
-
-				curveData[i] = (uint8_t)(opacity * 255.0f);
-			}
-
-			graphics::TextureDesc desc = {};
-			desc.width = curveResolution;
-			desc.height = 1;
-			desc.depth = 1;
-			desc.array_size = 1;
-			desc.format = graphics::Format::R8_UNORM;
-			desc.bind_flags = graphics::BindFlag::SHADER_RESOURCE;
-			desc.mip_levels = 1;
-			desc.sample_count = 1;
-			desc.usage = graphics::Usage::DEFAULT;
-			desc.misc_flags = graphics::ResourceMiscFlag::NONE;
-
-			graphics::SubresourceData initData = {};
-			initData.data_ptr = curveData.data();
-			initData.row_pitch = curveResolution;
-
-			bool success = device->CreateTexture(&desc, &initData, &opacityCurveTexture_);
-			if (!success)
-			{
-				backlog::post("GEmittedParticleComponent::CreateGPUResources - Failed to create opacity curve texture", backlog::LogLevel::Error);
-				DestroyGPUResources();
-				return false;
-			}
-			device->SetName(&opacityCurveTexture_, "EmittedParticle_OpacityCurveTexture");
-		}
+		// Opacity curve is now calculated in pixel shader using CB parameters
+		// No need for opacity curve texture anymore
 
 		gpuResourcesCreated_ = true;
 		backlog::post("GEmittedParticleComponent::CreateGPUResources - Successfully created GPU resources for " + std::to_string(maxCount) + " particles", backlog::LogLevel::Info);
@@ -357,7 +301,7 @@ namespace vz
 		indirectBuffers_ = {};
 		constantBuffer_ = {};
 		distanceBuffer_ = {};
-		opacityCurveTexture_ = {};
+		// opacityCurveTexture_ removed - no longer used
 
 		gpuResourcesCreated_ = false;
 	}

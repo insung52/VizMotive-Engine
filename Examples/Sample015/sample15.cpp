@@ -254,16 +254,17 @@ int main(int, char**)
 		particleEmitter->SetPosition({ 0.f, 1.f, 0.f });
 		particleEmitter->SetVisibleLayerMask(0xF, true);
 		scene->AppendChild(particleEmitter);
-		particleEmitter->Burst(100);
+		//particleEmitter->Burst(100);
 		particleEmitter->SetParticleSize(0.1f);
 		particleEmitter->SetParticleRandomColor(0.5f);  // 30% 랜덤 색상 변화
 		//particleEmitter->SetParticleVelocity({ 0.f, 3.0f, 0.f });
 		//particleEmitter->SetParticleGravity({ 0.f, -9.8f, 0.f });
-
+		particleEmitter->SetParticleEmitCount(10.0f);
+		particleEmitter->SetParticleRandomFactor(1.0f);  // 랜덤 오프셋 설정
 		particleEmitter->SetParticleLife(2.0f);          // 0.1초 → 2초로 증가
 		particleEmitter->SetParticleRandomLife(0.5f);    // 랜덤 범위 증가
-		particleEmitter->SetParticleVelocity({ 0.f, 3.0f, 0.f });  // 속도 증가
-		particleEmitter->SetParticleGravity({ 0.f, -9.8f, 0.f });
+		particleEmitter->SetParticleVelocity({ 0.f, -1.0f, 0.f });  // 속도 증가
+		particleEmitter->SetParticleGravity({ 0.f, 0.f, 0.f });
 		particleEmitter->SetParticleDrag(0.98f);         // 공기 저항 추가 (매 프레임 2% 감속)
 		particleEmitter->SetParticleMass(1.0f);
 
