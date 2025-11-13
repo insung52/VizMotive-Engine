@@ -141,6 +141,10 @@
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\dvrCS_woKB.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\dvrCS_xray_woKB.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\dvrCS_slicer_nothickness.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\emittedparticle_emit_CS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\emittedparticle_finishUpdate_CS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\emittedparticle_kickoffUpdate_CS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\emittedparticle_simulate_CS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\filterEnvMapCS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\generateMIPChain2DCS_float4.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\generateMIPChain2DCS_unorm4.hlsl" />

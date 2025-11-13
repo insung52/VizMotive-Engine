@@ -186,7 +186,18 @@ namespace vz::renderer
 		device->EventBegin("ParticleSystem Update", cmd);
 		auto prof_range = profiler::BeginRangeGPU("ParticleSystem", &cmd);
 
-		// Kickoff update: prepare counters and indirect args
+		// Emit new particles FIRST (before kickoff)
+		EmitParticles(emitter, instanceIndex, cmd);
+
+		// Barrier after emit
+		{
+			GPUBarrier barriers[] = {
+				GPUBarrier::Memory(),
+			};
+			device->Barrier(barriers, arraysize(barriers), cmd);
+		}
+
+		// Kickoff update: prepare counters and indirect args AFTER emit
 		{
 			device->EventBegin("Kickoff Update", cmd);
 
@@ -206,17 +217,6 @@ namespace vz::renderer
 			device->Barrier(barriers, arraysize(barriers), cmd);
 
 			device->EventEnd(cmd);
-		}
-
-		// Emit new particles
-		EmitParticles(emitter, instanceIndex, cmd);
-
-		// Barrier between emit and simulate
-		{
-			GPUBarrier barriers[] = {
-				GPUBarrier::Memory(),
-			};
-			device->Barrier(barriers, arraysize(barriers), cmd);
 		}
 
 		// Simulate particles
@@ -258,6 +258,11 @@ namespace vz::renderer
 		// 1. emit shader creates particles (aliveCount_afterSimulation > 0)
 		// 2. finishUpdate prepares correct draw args
 		// 3. DrawIndexedInstancedIndirect uses correct offset
+
+		// Swap buffer indices for next frame
+		// This ensures that next frame's Emit writes to the buffer that Simulate didn't write to this frame
+		// and next frame's Simulate reads from the buffer that contains updated particles
+		emitter.SwapBuffers();
 
 		device->EventEnd(cmd);
 		profiler::EndRange(prof_range);
@@ -370,6 +375,24 @@ namespace vz::renderer
 			cb.xParticleVelocity = float3(velocity.x, velocity.y, velocity.z);
 			cb.xParticleDrag = emitter.GetDrag();
 
+			// DEBUG: Print CB values (only once)
+			static bool debugOnceCB = false;
+			if (!debugOnceCB)
+			{
+				backlog::post("[PARTICLE DEBUG] CB Values:", backlog::LogLevel::Info);
+				backlog::post("  Life: " + std::to_string(cb.xParticleLifeSpan), backlog::LogLevel::Info);
+				backlog::post("  RandomLife: " + std::to_string(cb.xParticleLifeSpanRandomness), backlog::LogLevel::Info);
+				backlog::post("  Mass: " + std::to_string(cb.xParticleMass), backlog::LogLevel::Info);
+				backlog::post("  Velocity: (" + std::to_string(velocity.x) + ", " +
+							  std::to_string(velocity.y) + ", " +
+							  std::to_string(velocity.z) + ")", backlog::LogLevel::Info);
+				backlog::post("  Gravity: (" + std::to_string(gravity.x) + ", " +
+							  std::to_string(gravity.y) + ", " +
+							  std::to_string(gravity.z) + ")", backlog::LogLevel::Info);
+				backlog::post("  Drag: " + std::to_string(cb.xParticleDrag), backlog::LogLevel::Info);
+				debugOnceCB = true;
+			}
+
 			// Update the constant buffer
 			device->UpdateBuffer(&emitter.GetConstantBuffer(), &cb, cmd, sizeof(EmittedParticleCB));
 		}
@@ -384,10 +407,10 @@ namespace vz::renderer
 		device->BindResources(srvs, 0, arraysize(srvs), cmd);
 
 		const GPUResource* uavs[] = {
-			&emitter.GetParticleBuffer(),           // u0: particle buffer
-			&emitter.GetAliveList(1),               // u1: alive list NEW
-			&emitter.GetDeadList(),                 // u2: dead list
-			&emitter.GetCounterBuffer(),            // u3: counter buffer
+			&emitter.GetParticleBuffer(),                        // u0: particle buffer
+			&emitter.GetAliveList(0),                            // u1: alive list CURRENT (Emit writes here, always index 0)
+			&emitter.GetDeadList(),                              // u2: dead list
+			&emitter.GetCounterBuffer(),                         // u3: counter buffer
 		};
 		device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
 
@@ -413,6 +436,7 @@ namespace vz::renderer
 		// Note: In VizMotive, compute shaders are bound directly without PSO
 		if (!particlesystem::simulateCS.IsValid())
 		{
+			backlog::post("[PARTICLE DEBUG] SimulateParticles: simulateCS is INVALID!", backlog::LogLevel::Error);
 			return;
 		}
 
@@ -475,11 +499,11 @@ namespace vz::renderer
 		device->BindResources(srvs, 0, arraysize(srvs), cmd);
 
 		const GPUResource* uavs[] = {
-			&emitter.GetParticleBuffer(),           // u0: particle buffer
-			&emitter.GetAliveList(0),               // u1: alive list CURRENT
-			&emitter.GetAliveList(1),               // u2: alive list NEW
-			&emitter.GetDeadList(),                 // u3: dead list
-			&emitter.GetCounterBuffer(),            // u4: counter buffer
+			&emitter.GetParticleBuffer(),                          // u0: particle buffer
+			&emitter.GetAliveList(0),                              // u1: alive list CURRENT (read from, always index 0)
+			&emitter.GetAliveList(1),                              // u2: alive list NEW (write to, always index 1)
+			&emitter.GetDeadList(),                                // u3: dead list
+			&emitter.GetCounterBuffer(),                           // u4: counter buffer
 		};
 		device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
 
@@ -513,9 +537,9 @@ namespace vz::renderer
 		// Bind resources
 		// t0: opacity curve, t1: particle buffer, t2: alive list
 		const GPUResource* srvs[] = {
-			&emitter.GetOpacityCurveTexture(),      // t0: opacity curve
-			&emitter.GetParticleBuffer(),            // t1: particle buffer
-			&emitter.GetAliveList(1),                // t2: alive list (NEW - after simulation)
+			&emitter.GetOpacityCurveTexture(),                       // t0: opacity curve
+			&emitter.GetParticleBuffer(),                            // t1: particle buffer
+			&emitter.GetAliveList(1),                                // t2: alive list NEW (Simulate wrote to this, always index 1)
 		};
 		device->BindResources(srvs, 0, arraysize(srvs), cmd);
 
@@ -525,12 +549,8 @@ namespace vz::renderer
 		// Bind pipeline state
 		device->BindPipelineState(&particlesystem::particleRenderPSO, cmd);
 
-		// TEMP DEBUG: Draw maxParticles to see all potentially alive particles
-		uint32_t maxParticles = emitter.GetMaxParticles();
-		device->DrawIndexedInstanced(6, maxParticles, 0, 0, 0, cmd);
-
 		// Draw using indirect args (prepared in finish update shader)
-		//device->DrawIndexedInstancedIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DRAWPARTICLES, cmd);
+		device->DrawIndexedInstancedIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DRAWPARTICLES, cmd);
 
 		device->EventEnd(cmd);
 	}

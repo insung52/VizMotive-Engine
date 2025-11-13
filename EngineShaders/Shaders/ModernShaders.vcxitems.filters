@@ -82,6 +82,9 @@
     <Filter Include="Compute Shaders\DDGI">
       <UniqueIdentifier>{96cf097e-c5d8-4256-90dc-3642b00e7877}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Compute Shaders\Particle">
+      <UniqueIdentifier>{e2cad3f9-e6e9-4b3a-b533-cc658268dc58}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)compile.bat">
@@ -795,6 +798,18 @@
     </FxCompile>
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\emittedparticle_simple_PS.hlsl">
       <Filter>Raster-Pipeline Shaders\PS</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\emittedparticle_emit_CS.hlsl">
+      <Filter>Compute Shaders\Particle</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\emittedparticle_finishUpdate_CS.hlsl">
+      <Filter>Compute Shaders\Particle</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\emittedparticle_kickoffUpdate_CS.hlsl">
+      <Filter>Compute Shaders\Particle</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\emittedparticle_simulate_CS.hlsl">
+      <Filter>Compute Shaders\Particle</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>
