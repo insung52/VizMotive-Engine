@@ -12,11 +12,37 @@ struct PSInput
 	float lifePercent : LIFEPERC;
 };
 
-Texture1D<float> opacityCurve : register(t0);
-Texture2D<float4> particleTexture : register(t1);
+// Texture will be added later when texture support is implemented
+// Texture2D<float4> particleTexture : register(t0);
 
 float4 main(PSInput input) : SV_TARGET
 {
-	// Return input color from VS
-	return input.color;
+	// Sample texture (simple white for now - texture binding not implemented yet)
+	float4 texColor = float4(1, 1, 1, 1);
+
+	// Calculate opacity based on life percent and curve parameters
+	float t = input.lifePercent;
+	float opacityFactor = 0.0f;
+
+	if (t < xOpacityCurvePeakStart)
+	{
+		// Fade in
+		opacityFactor = t / xOpacityCurvePeakStart;
+	}
+	else if (t < xOpacityCurvePeakEnd)
+	{
+		// Peak (full opacity)
+		opacityFactor = 1.0f;
+	}
+	else
+	{
+		// Fade out
+		opacityFactor = 1.0f - (t - xOpacityCurvePeakEnd) / (1.0f - xOpacityCurvePeakEnd);
+	}
+
+	// Combine texture, vertex color, and opacity curve
+	float4 finalColor = texColor * input.color;
+	finalColor.a *= opacityFactor;
+
+	return finalColor;
 }

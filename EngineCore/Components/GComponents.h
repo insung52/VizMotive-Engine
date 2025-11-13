@@ -711,9 +711,8 @@ namespace vz
 		/*
 		graphics::GPUBuffer primitiveBuffer_;
 		graphics::RaytracingAccelerationStructure BLAS_;
+		graphics::Texture opacityCurveTexture_; // Removed - opacity calculated in PS using CB
 		*/
-
-		graphics::Texture opacityCurveTexture_;
 
 		// Runtime state (non-serialized)
 		float emit_ = 0.0f;
@@ -769,7 +768,6 @@ namespace vz
 		const graphics::GPUBuffer& GetIndirectBuffers() const { return indirectBuffers_; }
 		const graphics::GPUBuffer& GetConstantBuffer() const { return constantBuffer_; }
 		const graphics::GPUBuffer& GetDistanceBuffer() const { return distanceBuffer_; }
-		const graphics::Texture& GetOpacityCurveTexture() const { return opacityCurveTexture_; }
 
 		// Mutable versions for shader engine to bind
 		graphics::GPUBuffer& GetParticleBuffer() { return particleBuffer_; }
@@ -779,7 +777,6 @@ namespace vz
 		graphics::GPUBuffer& GetIndirectBuffers() { return indirectBuffers_; }
 		graphics::GPUBuffer& GetConstantBuffer() { return constantBuffer_; }
 		graphics::GPUBuffer& GetDistanceBuffer() { return distanceBuffer_; }
-		graphics::Texture& GetOpacityCurveTexture() { return opacityCurveTexture_; }
 
 		bool ResetResources(const std::string& resName) override;
 	};

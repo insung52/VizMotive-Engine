@@ -4,9 +4,7 @@
 // Simulate shader for particle system
 // Updates particle physics and removes dead particles
 
-// Resources
-Texture1D<float> opacityCurveTex : register(t0);
-
+// Resources (opacity curve removed - calculated in PS using CB)
 RWStructuredBuffer<Particle> particleBuffer : register(u0);
 RWStructuredBuffer<uint> aliveBuffer_CURRENT : register(u1);
 RWStructuredBuffer<uint> aliveBuffer_NEW : register(u2);
@@ -52,8 +50,8 @@ void main(uint3 DTid : SV_DispatchThreadID, uint Gid : SV_GroupIndex)
 	float4 particleColor = unpack_rgba(particle.color);
 	particle.color = pack_rgba(particleColor);
 
-	// Sample opacity curve
-	const float lifeOpa = opacityCurveTex.SampleLevel(sampler_linear_clamp, lifeLerp, 0);
+	// Opacity is now calculated in PS using CB parameters
+	// No need to sample opacity curve here
 
 	// Check if particle is still alive
 	if (particle.life > 0.0f)
