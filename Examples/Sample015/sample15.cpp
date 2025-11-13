@@ -256,22 +256,21 @@ int main(int, char**)
 		scene->AppendChild(particleEmitter);
 		//particleEmitter->Burst(100);
 		particleEmitter->SetParticleSize(0.1f);
-		particleEmitter->SetParticleRandomColor(0.5f);  // 30% 랜덤 색상 변화
-		//particleEmitter->SetParticleVelocity({ 0.f, 3.0f, 0.f });
-		//particleEmitter->SetParticleGravity({ 0.f, -9.8f, 0.f });
+		particleEmitter->SetParticleRandomColor(0.5f);  // 랜덤 색상 변화
 		particleEmitter->SetParticleEmitCount(10.0f);
 		particleEmitter->SetParticleRandomFactor(1.0f);  // 랜덤 오프셋 설정
-		particleEmitter->SetParticleLife(2.0f);          // 0.1초 → 2초로 증가
+		particleEmitter->SetParticleLife(2.0f);          // life 수명
 		particleEmitter->SetParticleRandomLife(0.5f);    // 랜덤 범위 증가
-		particleEmitter->SetParticleVelocity({ 0.f, -1.0f, 0.f });  // 속도 증가
+		particleEmitter->SetParticleVelocity({ 0.f, -0.3f, 0.f });  // 속도 증가
 		particleEmitter->SetParticleGravity({ 0.f, 0.f, 0.f });
-		particleEmitter->SetParticleDrag(0.98f);         // 공기 저항 추가 (매 프레임 2% 감속)
+		particleEmitter->SetParticleDrag(0.99f);         // 공기 저항 추가
 		particleEmitter->SetParticleMass(1.0f);
+		particleEmitter->SetParticleRotation(5.5f);		// 미작동
 
 		// 실제 수명 = life ± randomLife
 		// 예: 4.0 ± 2.0 = 2.0초 ~ 6.0초 사이 랜덤
 		// 투명도 커브 설정
-		//particleEmitter->SetParticleOpacityCurve(0.1f, 0.9f);
+		particleEmitter->SetParticleOpacityCurve(0.8f, 0.9f);
 		// 첫 번째 값: 페이드 인 완료 시점 (0.1 = 수명의 10% 지점)
 		// 두 번째 값: 페이드 아웃 시작 시점 (0.9 = 수명의 90% 지점)
 	}

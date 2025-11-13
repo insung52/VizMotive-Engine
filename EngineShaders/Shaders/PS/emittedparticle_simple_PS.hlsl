@@ -43,6 +43,7 @@ float4 main(PSInput input) : SV_TARGET
 	// Combine texture, vertex color, and opacity curve
 	float4 finalColor = texColor * input.color;
 	finalColor.a *= opacityFactor;
-
+    float blue = xOpacityCurvePeakEnd == 0.0f ? 1.0f : 0.0f;
+    //return float4(xOpacityCurvePeakEnd, 0.0f, blue, 1.0f);
 	return finalColor;
 }
