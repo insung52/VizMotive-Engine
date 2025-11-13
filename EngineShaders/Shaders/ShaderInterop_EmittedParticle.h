@@ -55,7 +55,7 @@ CBUFFER(EmittedParticleCB, CBSLOT_OTHER_EMITTEDPARTICLE)
 	float		xParticleSize;
 	float		xParticleScaling;
 	float		xParticleRotation;
-	float		xParticleRandomFactor;
+	float		xParticleRandomPositionOffset;  // Random position offset range
 
 	float		xParticleNormalFactor;
 	float		xParticleLifeSpan;
@@ -64,8 +64,13 @@ CBUFFER(EmittedParticleCB, CBSLOT_OTHER_EMITTEDPARTICLE)
 
 	float		xParticleMotionBlurAmount;
 	float		xParticleRandomColorFactor;
+	float		xParticleRandomVelocity;        // Random velocity multiplier
+	float		xParticleRandomSize;            // Random size multiplier
+
 	uint		xEmitterOptions;
 	float		xEmitterFixedTimestep;          // Fixed timestep for simulation (or -1 for variable)
+	uint		padding0;                       // Explicit padding for 16-byte alignment
+	uint		padding1;                       // Explicit padding for 16-byte alignment
 
 	uint2		xEmitterFramesXY;               // Sprite sheet dimensions
 	uint		xEmitterFrameCount;             // Total frames in sprite sheet
@@ -83,8 +88,8 @@ CBUFFER(EmittedParticleCB, CBSLOT_OTHER_EMITTEDPARTICLE)
 
 	float		xOpacityCurvePeakStart;         // Opacity curve fade-in end point (0~1)
 	float		xOpacityCurvePeakEnd;           // Opacity curve fade-out start point (0~1)
-	float		xPadding0;                      // Padding
-	float		xPadding1;                      // Padding
+	float		xParticleRandomRotation;        // Random rotation range (radians)
+	float		xParticleRandomRotationVelocity; // Random rotation velocity multiplier
 
 	// SPH fluid simulation parameters (advanced feature - commented out)
 	/*

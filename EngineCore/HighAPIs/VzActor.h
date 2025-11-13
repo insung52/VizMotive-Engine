@@ -266,7 +266,11 @@ namespace vzm
 		void SetParticleScaleX(float scale);
 		void SetParticleScaleY(float scale);
 		void SetParticleVelocity(const vfloat3& velocity);
-		void SetParticleRandomFactor(float factor);
+		void SetParticleRandomPositionOffset(float offset);
+		void SetParticleRandomVelocity(float randomVelocity);
+		void SetParticleRandomSize(float randomSize);
+		void SetParticleRandomRotation(float randomRotation);
+		void SetParticleRandomRotationVelocity(float randomRotationVelocity);
 		void SetParticleGravity(const vfloat3& gravity);
 		void SetParticleDrag(float drag);
 		void SetParticleMass(float mass);
