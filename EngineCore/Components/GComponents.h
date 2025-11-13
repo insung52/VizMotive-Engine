@@ -755,6 +755,12 @@ namespace vz
 		// Reset pending emission count after emitting
 		void ResetPendingEmitCount(float remainingFraction) { emit_ = remainingFraction; }
 
+		// Double buffer management (swap alive list buffers after simulation, like WickedEngine)
+		void SwapBuffers()
+		{
+			std::swap(aliveList_[0], aliveList_[1]);
+		}
+
 		// GPU buffer getters (for shader engine access)
 		const graphics::GPUBuffer& GetParticleBuffer() const { return particleBuffer_; }
 		const graphics::GPUBuffer& GetAliveList(uint32_t index) const { return aliveList_[index & 1]; }

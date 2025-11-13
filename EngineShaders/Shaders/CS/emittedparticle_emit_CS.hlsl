@@ -8,7 +8,7 @@
 StructuredBuffer<EmitLocation> emitBuffer : register(t0);
 
 RWStructuredBuffer<Particle> particleBuffer : register(u0);
-RWStructuredBuffer<uint> aliveBuffer_NEW : register(u1);
+RWStructuredBuffer<uint> aliveBuffer_CURRENT : register(u1);
 RWStructuredBuffer<uint> deadBuffer : register(u2);
 RWByteAddressBuffer counterBuffer : register(u3);
 
@@ -115,5 +115,5 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID)
 	// Add the particle index to the alive list (push operation)
 	uint aliveCount;
 	counterBuffer.InterlockedAdd(PARTICLECOUNTER_OFFSET_ALIVECOUNT_AFTERSIMULATION, 1, aliveCount);
-	aliveBuffer_NEW[aliveCount] = newParticleIndex;
+	aliveBuffer_CURRENT[aliveCount] = newParticleIndex;
 }

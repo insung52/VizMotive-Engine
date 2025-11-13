@@ -40,8 +40,8 @@ PSInput main(VSInput input)
 {
 	PSInput output;
 
-	// Read particle data from buffer (using instanceID directly, not aliveList yet)
-	uint particleIndex = input.instanceID;
+	// Read particle index from alive list
+	uint particleIndex = aliveList[input.instanceID];
 	Particle particle = particleBuffer[particleIndex];
 
 	// Check if particle is alive (has valid life)
