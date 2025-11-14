@@ -310,26 +310,27 @@ namespace vz::renderer
 		emitLocation.count = emitCount;
 		emitLocation.color = 0xFFFFFFFF; // White color (will use material color later)
 
-		// Create emit buffer (upload data)
-		GPUBuffer emitBuffer;
+		// Update emit buffer (reuse existing buffer instead of creating new one each frame)
+		GPUBuffer& emitBuffer = emitter.GetEmitBuffer();
 		{
-			GPUBufferDesc desc = {};
-			desc.size = sizeof(EmitLocation);
-			desc.bind_flags = BindFlag::SHADER_RESOURCE;
-			desc.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
-			desc.stride = sizeof(EmitLocation);
-			desc.usage = Usage::UPLOAD;
-
-			bool success = device->CreateBuffer(&desc, nullptr, &emitBuffer);
-			if (!success)
+			// Transition to COPY_DEST before updating
 			{
-				backlog::post("Failed to create emit buffer", backlog::LogLevel::Error);
-				device->EventEnd(cmd);
-				return;
+				GPUBarrier barriers[] = {
+					GPUBarrier::Buffer(&emitBuffer, ResourceState::SHADER_RESOURCE, ResourceState::COPY_DST)
+				};
+				device->Barrier(barriers, 1, cmd);
 			}
 
 			// Upload emit location data
 			device->UpdateBuffer(&emitBuffer, &emitLocation, cmd, sizeof(EmitLocation));
+
+			// Transition to SHADER_RESOURCE for use in compute shader
+			{
+				GPUBarrier barriers[] = {
+					GPUBarrier::Buffer(&emitBuffer, ResourceState::COPY_DST, ResourceState::SHADER_RESOURCE)
+				};
+				device->Barrier(barriers, 1, cmd);
+			}
 		}
 
 		// Update constant buffer
@@ -400,12 +401,9 @@ namespace vz::renderer
 				debugOnceCB = true;
 			}
 
-			// Update the constant buffer
-			device->UpdateBuffer(&emitter.GetConstantBuffer(), &cb, cmd, sizeof(EmittedParticleCB));
+			// Bind constant buffer with dynamic data (UPLOAD buffers should use BindDynamicConstantBuffer)
+			device->BindDynamicConstantBuffer(cb, CB_GETBINDSLOT(EmittedParticleCB), cmd);
 		}
-
-		// Bind constant buffer
-		device->BindConstantBuffer(&emitter.GetConstantBuffer(), CB_GETBINDSLOT(EmittedParticleCB), cmd);
 
 		// Bind resources
 		const GPUResource* srvs[] = {
@@ -499,12 +497,9 @@ namespace vz::renderer
 			cb.xParticleRandomRotation = emitter.GetRandomRotation();
 			cb.xParticleRandomRotationVelocity = emitter.GetRandomRotationVelocity();
 
-			// Update the constant buffer
-			device->UpdateBuffer(&emitter.GetConstantBuffer(), &cb, cmd, sizeof(EmittedParticleCB));
+			// Bind constant buffer with dynamic data (UPLOAD buffers should use BindDynamicConstantBuffer)
+			device->BindDynamicConstantBuffer(cb, CB_GETBINDSLOT(EmittedParticleCB), cmd);
 		}
-
-		// Bind constant buffer
-		device->BindConstantBuffer(&emitter.GetConstantBuffer(), CB_GETBINDSLOT(EmittedParticleCB), cmd);
 
 		// Bind UAVs (no SRVs needed - opacity calculated in shader using CB)
 		const GPUResource* uavs[] = {

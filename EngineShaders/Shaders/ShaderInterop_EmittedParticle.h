@@ -69,8 +69,8 @@ CBUFFER(EmittedParticleCB, CBSLOT_OTHER_EMITTEDPARTICLE)
 
 	uint		xEmitterOptions;
 	float		xEmitterFixedTimestep;          // Fixed timestep for simulation (or -1 for variable)
-	uint		padding0;                       // Explicit padding for 16-byte alignment
-	uint		padding1;                       // Explicit padding for 16-byte alignment
+	uint		xEmitterPadding0;               // Explicit padding for 16-byte alignment
+	uint		xEmitterPadding1;               // Explicit padding for 16-byte alignment
 
 	uint2		xEmitterFramesXY;               // Sprite sheet dimensions
 	uint		xEmitterFrameCount;             // Total frames in sprite sheet
@@ -116,8 +116,8 @@ struct EmitLocation
 	ShaderTransform transform;
 	uint count;
 	uint color;
-	int padding0;
-	int padding1;
+	int emitLocationPadding0;
+	int emitLocationPadding1;
 };
 
 // Thread group sizes for compute shaders
