@@ -280,6 +280,25 @@ namespace vz
 			device->SetName(&distanceBuffer_, "EmittedParticle_DistanceBuffer");
 		}
 
+		// Create emit buffer (reused every frame)
+		{
+			graphics::GPUBufferDesc desc = {};
+			desc.size = sizeof(EmitLocation);
+			desc.bind_flags = graphics::BindFlag::SHADER_RESOURCE;
+			desc.misc_flags = graphics::ResourceMiscFlag::BUFFER_STRUCTURED;
+			desc.stride = sizeof(EmitLocation);
+			desc.usage = graphics::Usage::DEFAULT;
+
+			bool success = device->CreateBuffer(&desc, nullptr, &emitBuffer_);
+			if (!success)
+			{
+				backlog::post("GEmittedParticleComponent::CreateGPUResources - Failed to create emit buffer", backlog::LogLevel::Error);
+				DestroyGPUResources();
+				return false;
+			}
+			device->SetName(&emitBuffer_, "EmittedParticle_EmitBuffer");
+		}
+
 		// Opacity curve is now calculated in pixel shader using CB parameters
 		// No need for opacity curve texture anymore
 
@@ -309,6 +328,7 @@ namespace vz
 		indirectBuffers_ = {};
 		constantBuffer_ = {};
 		distanceBuffer_ = {};
+		emitBuffer_ = {};
 		// opacityCurveTexture_ removed - no longer used
 
 		gpuResourcesCreated_ = false;
