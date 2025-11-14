@@ -699,6 +699,7 @@ namespace vz
 		graphics::GPUBuffer indirectBuffers_;        // For DrawIndexedInstancedIndirect
 		graphics::GPUBuffer constantBuffer_;         // Per-particle system constants
 		graphics::GPUBuffer distanceBuffer_;         // For sorting particles by depth
+		graphics::GPUBuffer emitBuffer_;             // Emit location data for current frame
 
 		// SPH buffers (advanced feature - commented out)
 		/*
@@ -768,6 +769,7 @@ namespace vz
 		const graphics::GPUBuffer& GetIndirectBuffers() const { return indirectBuffers_; }
 		const graphics::GPUBuffer& GetConstantBuffer() const { return constantBuffer_; }
 		const graphics::GPUBuffer& GetDistanceBuffer() const { return distanceBuffer_; }
+		const graphics::GPUBuffer& GetEmitBuffer() const { return emitBuffer_; }
 
 		// Mutable versions for shader engine to bind
 		graphics::GPUBuffer& GetParticleBuffer() { return particleBuffer_; }
@@ -777,6 +779,7 @@ namespace vz
 		graphics::GPUBuffer& GetIndirectBuffers() { return indirectBuffers_; }
 		graphics::GPUBuffer& GetConstantBuffer() { return constantBuffer_; }
 		graphics::GPUBuffer& GetDistanceBuffer() { return distanceBuffer_; }
+		graphics::GPUBuffer& GetEmitBuffer() { return emitBuffer_; }
 
 		bool ResetResources(const std::string& resName) override;
 	};
