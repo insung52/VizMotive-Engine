@@ -659,6 +659,11 @@ namespace vz::renderer
 			CommandList cmd
 		);
 
+		void SortParticles(
+			GEmittedParticleComponent& emitter,
+			CommandList cmd
+		);
+
 		void DrawParticles(
 			const GEmittedParticleComponent& emitter,
 			CommandList cmd
