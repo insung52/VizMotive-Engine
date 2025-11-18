@@ -867,6 +867,12 @@ int main(int, char**)
 							vzlog("Opacity Curve Changed: start=%.2f, end=%.2f", opacity_peak_start, opacity_peak_end);
 						}
 
+						static bool enable_sorting = true;
+						if (ImGui::Checkbox("Enable Sorting", &enable_sorting))
+						{
+							particleEmitter->SetParticleSorted(enable_sorting);
+						}
+
 						if (ImGui::Button("Burst 100"))
 						{
 							particleEmitter->Burst(100);
