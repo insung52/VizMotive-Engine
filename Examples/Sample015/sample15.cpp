@@ -873,6 +873,12 @@ int main(int, char**)
 							particleEmitter->SetParticleSorted(enable_sorting);
 						}
 
+						static float motion_blur = 0.0f;
+						if (ImGui::SliderFloat("Motion Blur", &motion_blur, 0.0f, 10.0f))
+						{
+							particleEmitter->SetParticleMotionBlurAmount(motion_blur);
+						}
+
 						if (ImGui::Button("Burst 100"))
 						{
 							particleEmitter->Burst(100);
