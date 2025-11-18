@@ -578,6 +578,12 @@ namespace vz::renderer
 		renderer::initialized.store(true);
 		return true;
 	}
+	// Forward declaration for particle system cleanup
+	namespace particlesystem
+	{
+		void Deinitialize();
+	}
+
 	void Deinitialize()
 	{
 		jobsystem::WaitAllJobs();
@@ -618,6 +624,7 @@ namespace vz::renderer
 		font::Deinitialize();
 		gpubvh::Deinitialize();
 		gpusortlib::Deinitialize();
+		particlesystem::Deinitialize();
 		renderer::initialized.store(false);
 	}
 }

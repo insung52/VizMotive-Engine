@@ -174,6 +174,34 @@ namespace vz::renderer
 
 			initialized = true;
 		}
+
+		void Deinitialize()
+		{
+			if (!initialized)
+				return;
+
+			// Release shaders
+			emitCS = {};
+			simulateCS = {};
+			sortCS = {};
+			kickoffUpdateCS = {};
+			finishUpdateCS = {};
+			particleVS = {};
+			particlePS = {};
+
+			// Release PSOs
+			emitPSO = {};
+			simulatePSO = {};
+			sortPSO = {};
+			kickoffUpdatePSO = {};
+			finishUpdatePSO = {};
+			particleRenderPSO = {};
+
+			// Release index buffer
+			particleIndexBuffer = {};
+
+			initialized = false;
+		}
 	}
 
 	void GRenderPath3DDetails::UpdateParticleSystem(
