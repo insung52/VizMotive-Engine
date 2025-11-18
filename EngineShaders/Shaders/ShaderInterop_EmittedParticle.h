@@ -91,6 +91,8 @@ CBUFFER(EmittedParticleCB, CBSLOT_OTHER_EMITTEDPARTICLE)
 	float		xParticleRandomRotation;        // Random rotation range (radians)
 	float		xParticleRandomRotationVelocity; // Random rotation velocity multiplier
 
+	float4		xParticleBaseColor;             // Base color (RGBA)
+
 	// SPH fluid simulation parameters (advanced feature - commented out)
 	/*
 	float		xSPH_h;                         // smoothing radius

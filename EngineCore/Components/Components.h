@@ -3042,6 +3042,9 @@ namespace vz
 		float randomRotation_ = 1.0f;       // Random rotation range (radians)
 		float randomRotationVelocity_ = 1.0f; // Random rotation velocity multiplier
 
+		// Color
+		XMFLOAT4 baseColor_ = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f); // Base color (RGBA)
+
 		// Velocity and physics
 		XMFLOAT3 velocity_ = XMFLOAT3(0, 1, 0);
 		XMFLOAT3 gravity_ = XMFLOAT3(0, -9.8f, 0);
@@ -3134,6 +3137,7 @@ namespace vz
 		inline float GetRandomSize() const { return randomSize_; }
 		inline float GetRandomRotation() const { return randomRotation_; }
 		inline float GetRandomRotationVelocity() const { return randomRotationVelocity_; }
+		inline XMFLOAT4 GetBaseColor() const { return baseColor_; }
 		inline XMFLOAT3 GetVelocity() const { return velocity_; }
 		inline XMFLOAT3 GetGravity() const { return gravity_; }
 		inline float GetDrag() const { return drag_; }
@@ -3167,6 +3171,7 @@ namespace vz
 		inline void SetRandomSize(float randomSize) { randomSize_ = randomSize; timeStampSetter_ = TimerNow; }
 		inline void SetRandomRotation(float randomRotation) { randomRotation_ = randomRotation; timeStampSetter_ = TimerNow; }
 		inline void SetRandomRotationVelocity(float randomRotationVelocity) { randomRotationVelocity_ = randomRotationVelocity; timeStampSetter_ = TimerNow; }
+		inline void SetBaseColor(const XMFLOAT4& color) { baseColor_ = color; timeStampSetter_ = TimerNow; }
 		inline void SetVelocity(const XMFLOAT3& velocity) { velocity_ = velocity; timeStampSetter_ = TimerNow; }
 		inline void SetGravity(const XMFLOAT3& gravity) { gravity_ = gravity; timeStampSetter_ = TimerNow; }
 		inline void SetDrag(float drag) { drag_ = drag; timeStampSetter_ = TimerNow; }
