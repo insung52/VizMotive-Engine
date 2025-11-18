@@ -251,19 +251,18 @@ int main(int, char**)
 
 		// Create a particle emitter (static for UI access)
 		static VzActorParticle* particleEmitter = vzm::NewActorParticle("Particle Emitter");
+		// geometry, material
 		particleEmitter->SetPosition({ 0.f, 1.f, 0.f });
 		particleEmitter->SetVisibleLayerMask(0xF, true);
 		scene->AppendChild(particleEmitter);
 		//particleEmitter->Burst(100);
 		particleEmitter->SetParticleSize(0.1f);
-		particleEmitter->SetParticleBaseColor({ 1.0f, 1.0f, 1.0f, 1.0f });  // 기본 흰색
+		particleEmitter->SetParticleBaseColor({ 1.0f, 1.0f, 1.0f, 1.0f });  // 기본 흰색, 이후엔 메터리얼로 처리해야함
 		particleEmitter->SetParticleRandomColor(0.5f);  // 랜덤 색상 변화
 		particleEmitter->SetParticleEmitCount(10.0f);
 		particleEmitter->SetParticleRandomPositionOffset(1.0f);  // 랜덤 위치 오프셋
 		particleEmitter->SetParticleRandomVelocity(1.0f);        // 랜덤 속도
 		particleEmitter->SetParticleRandomSize(1.0f);            // 랜덤 크기
-		particleEmitter->SetParticleRandomRotation(1.0f);        // 랜덤 회전
-		particleEmitter->SetParticleRandomRotationVelocity(1.0f); // 랜덤 회전 속도
 		particleEmitter->SetParticleLife(2.0f);          // life 수명
 		particleEmitter->SetParticleRandomLife(0.5f);    // 랜덤 범위 증가
 		particleEmitter->SetParticleVelocity({ 0.f, -0.3f, 0.f });  // 속도 증가
@@ -271,6 +270,8 @@ int main(int, char**)
 		particleEmitter->SetParticleDrag(0.99f);         // 공기 저항 추가
 		particleEmitter->SetParticleMass(1.0f);
 		particleEmitter->SetParticleRotation(5.5f);		// 미작동
+		particleEmitter->SetParticleRandomRotation(1.0f);        // 랜덤 회전
+		particleEmitter->SetParticleRandomRotationVelocity(1.0f); // 랜덤 회전 속도
 		particleEmitter->SetParticleSorted(true);		// 깊이 정렬 활성화 (반짝임 방지)
 
 		// 실제 수명 = life ± randomLife
