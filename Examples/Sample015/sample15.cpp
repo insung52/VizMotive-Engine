@@ -256,6 +256,7 @@ int main(int, char**)
 		scene->AppendChild(particleEmitter);
 		//particleEmitter->Burst(100);
 		particleEmitter->SetParticleSize(0.1f);
+		particleEmitter->SetParticleBaseColor({ 1.0f, 1.0f, 1.0f, 1.0f });  // 기본 흰색
 		particleEmitter->SetParticleRandomColor(0.5f);  // 랜덤 색상 변화
 		particleEmitter->SetParticleEmitCount(10.0f);
 		particleEmitter->SetParticleRandomPositionOffset(1.0f);  // 랜덤 위치 오프셋
@@ -270,6 +271,7 @@ int main(int, char**)
 		particleEmitter->SetParticleDrag(0.99f);         // 공기 저항 추가
 		particleEmitter->SetParticleMass(1.0f);
 		particleEmitter->SetParticleRotation(5.5f);		// 미작동
+		particleEmitter->SetParticleSorted(true);		// 깊이 정렬 활성화 (반짝임 방지)
 
 		// 실제 수명 = life ± randomLife
 		// 예: 4.0 ± 2.0 = 2.0초 ~ 6.0초 사이 랜덤
@@ -822,6 +824,12 @@ int main(int, char**)
 							particleEmitter->SetParticleRandomRotationVelocity(random_rotation_velocity);
 						}
 
+						static float base_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+						if (ImGui::ColorEdit4("Base Color", base_color))
+						{
+							particleEmitter->SetParticleBaseColor({ base_color[0], base_color[1], base_color[2], base_color[3] });
+						}
+
 						static float random_color = 0.5f;
 						if (ImGui::SliderFloat("Random Color", &random_color, 0.0f, 1.0f))
 						{
@@ -848,12 +856,15 @@ int main(int, char**)
 
 						static float opacity_peak_start = 0.8f;
 						static float opacity_peak_end = 0.9f;
-						bool opacity_changed = false;
-						opacity_changed |= ImGui::SliderFloat("Fade In End", &opacity_peak_start, 0.0f, 1.0f);
-						opacity_changed |= ImGui::SliderFloat("Fade Out Start", &opacity_peak_end, 0.0f, 1.0f);
-						if (opacity_changed)
+						if (ImGui::SliderFloat("Fade In End", &opacity_peak_start, 0.0f, 1.0f))
 						{
 							particleEmitter->SetParticleOpacityCurve(opacity_peak_start, opacity_peak_end);
+							vzlog("Opacity Curve Changed: start=%.2f, end=%.2f", opacity_peak_start, opacity_peak_end);
+						}
+						if (ImGui::SliderFloat("Fade Out Start", &opacity_peak_end, 0.0f, 1.0f))
+						{
+							particleEmitter->SetParticleOpacityCurve(opacity_peak_start, opacity_peak_end);
+							vzlog("Opacity Curve Changed: start=%.2f, end=%.2f", opacity_peak_start, opacity_peak_end);
 						}
 
 						if (ImGui::Button("Burst 100"))
