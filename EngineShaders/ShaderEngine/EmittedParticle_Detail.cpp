@@ -109,10 +109,11 @@ namespace vz::renderer
 				blendState.independent_blend_enable = false;
 
 				// Create depth state (read-only depth, no writes)
+				// Note: Using GREATER_EQUAL to reduce z-fighting when particles overlap
 				static DepthStencilState depthState;
 				depthState.depth_enable = true;
 				depthState.depth_write_mask = DepthWriteMask::ZERO;
-				depthState.depth_func = ComparisonFunc::GREATER;
+				depthState.depth_func = ComparisonFunc::GREATER_EQUAL;
 
 				// Create rasterizer state (no culling for billboards)
 				static RasterizerState rasterizerState;
@@ -383,7 +384,20 @@ namespace vz::renderer
 			cb.xParticleRandomRotation = emitter.GetRandomRotation();
 			cb.xParticleRandomRotationVelocity = emitter.GetRandomRotationVelocity();
 
-			// DEBUG: Print CB values (only once)
+			XMFLOAT4 baseColor = emitter.GetBaseColor();
+			cb.xParticleBaseColor = float4(baseColor.x, baseColor.y, baseColor.z, baseColor.w);
+
+			// DEBUG: Print CB values (including opacity curve - always print for debugging)
+			static float prevOpacityStart = -1.0f;
+			static float prevOpacityEnd = -1.0f;
+			if (prevOpacityStart != cb.xOpacityCurvePeakStart || prevOpacityEnd != cb.xOpacityCurvePeakEnd)
+			{
+				backlog::post("[PARTICLE DEBUG] Opacity Curve: start=" + std::to_string(cb.xOpacityCurvePeakStart) +
+							  ", end=" + std::to_string(cb.xOpacityCurvePeakEnd), backlog::LogLevel::Info);
+				prevOpacityStart = cb.xOpacityCurvePeakStart;
+				prevOpacityEnd = cb.xOpacityCurvePeakEnd;
+			}
+
 			static bool debugOnceCB = false;
 			if (!debugOnceCB)
 			{
@@ -497,6 +511,9 @@ namespace vz::renderer
 			cb.xParticleRandomRotation = emitter.GetRandomRotation();
 			cb.xParticleRandomRotationVelocity = emitter.GetRandomRotationVelocity();
 
+			XMFLOAT4 baseColor = emitter.GetBaseColor();
+			cb.xParticleBaseColor = float4(baseColor.x, baseColor.y, baseColor.z, baseColor.w);
+
 			// Bind constant buffer with dynamic data (UPLOAD buffers should use BindDynamicConstantBuffer)
 			device->BindDynamicConstantBuffer(cb, CB_GETBINDSLOT(EmittedParticleCB), cmd);
 		}
@@ -541,8 +558,16 @@ namespace vz::renderer
 		// Bind pipeline state
 		device->BindPipelineState(&particlesystem::particleRenderPSO, cmd);
 
-		// Bind constant buffer (needed for opacity curve parameters in PS)
-		device->BindConstantBuffer(&emitter.GetConstantBuffer(), CB_GETBINDSLOT(EmittedParticleCB), cmd);
+		// Prepare constant buffer with current parameters (needed for opacity curve and base color in PS)
+		EmittedParticleCB cb;
+		cb.xOpacityCurvePeakStart = emitter.GetOpacityCurvePeakStart();
+		cb.xOpacityCurvePeakEnd = emitter.GetOpacityCurvePeakEnd();
+
+		XMFLOAT4 baseColor = emitter.GetBaseColor();
+		cb.xParticleBaseColor = float4(baseColor.x, baseColor.y, baseColor.z, baseColor.w);
+
+		// Bind constant buffer dynamically
+		device->BindDynamicConstantBuffer(cb, CB_GETBINDSLOT(EmittedParticleCB), cmd);
 
 		// Bind resources
 		// t0: particle buffer, t1: alive list
