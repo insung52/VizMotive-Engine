@@ -79,6 +79,18 @@ PSInput main(VSInput input)
 	// Scale billboard
 	quadPos *= particleSize;
 
+	// Motion blur: stretch quad along velocity direction in view space
+	if (xParticleMotionBlurAmount > 0.0f)
+	{
+		// Transform velocity to view space
+		float3 velocityViewSpace = mul((float3x3)GetCamera().view, particle.velocity);
+
+		// Stretch quad vertices along velocity direction
+		// dot(quadPos, velocity) projects the vertex position onto the velocity vector
+		// This makes vertices along the motion direction stretch more
+		quadPos += dot(quadPos, velocityViewSpace) * velocityViewSpace * xParticleMotionBlurAmount;
+	}
+
 	// Billboard facing camera
 	// Use inverse view matrix columns for world-space camera axes
 	float3 cameraRight = float3(GetCamera().inverse_view._11, GetCamera().inverse_view._21, GetCamera().inverse_view._31);

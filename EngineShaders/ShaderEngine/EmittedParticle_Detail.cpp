@@ -657,13 +657,15 @@ namespace vz::renderer
 		// Bind pipeline state
 		device->BindPipelineState(&particlesystem::particleRenderPSO, cmd);
 
-		// Prepare constant buffer with current parameters (needed for opacity curve and base color in PS)
+		// Prepare constant buffer with current parameters (needed for opacity curve, base color, and motion blur in VS/PS)
 		EmittedParticleCB cb;
 		cb.xOpacityCurvePeakStart = emitter.GetOpacityCurvePeakStart();
 		cb.xOpacityCurvePeakEnd = emitter.GetOpacityCurvePeakEnd();
 
 		XMFLOAT4 baseColor = emitter.GetBaseColor();
 		cb.xParticleBaseColor = float4(baseColor.x, baseColor.y, baseColor.z, baseColor.w);
+
+		cb.xParticleMotionBlurAmount = emitter.GetMotionBlurAmount();
 
 		// Bind constant buffer dynamically
 		device->BindDynamicConstantBuffer(cb, CB_GETBINDSLOT(EmittedParticleCB), cmd);

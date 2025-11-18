@@ -948,12 +948,14 @@ namespace vz
 		inline const XMFLOAT4& GetBaseColor() const { return baseColor_; }	// w is opacity
 		inline const XMFLOAT4& GetSpecularColor() const { return specularColor_; }
 		inline const XMFLOAT4& GetEmissiveColor() const { return emissiveColor_; }	// w is emissive strength
+		inline float GetEmissiveStrength() const { return emissiveColor_.w; }  // Helper to get strength directly
 
 		inline void SetAlphaRef(const float alphaRef) { alphaRef_ = alphaRef; timeStampSetter_ = TimerNow; }
 		inline void SetSaturate(const float saturate) { saturation_ = saturate; timeStampSetter_ = TimerNow; }
 		inline void SetBaseColor(const XMFLOAT4& baseColor) { baseColor_ = baseColor; timeStampSetter_ = TimerNow; }
 		inline void SetSpecularColor(const XMFLOAT4& specularColor) { specularColor_ = specularColor; timeStampSetter_ = TimerNow;}
 		inline void SetEmissiveColor(const XMFLOAT4& emissiveColor) { emissiveColor_ = emissiveColor; timeStampSetter_ = TimerNow;}
+		inline void SetEmissiveStrength(float strength) { emissiveColor_.w = strength; timeStampSetter_ = TimerNow; }  // Helper to set strength directly
 		inline void SetMatalness(const float metalness) { metalness_ = metalness; timeStampSetter_ = TimerNow; }
 		inline void SetRoughness(const float roughness) { roughness_ = roughness; timeStampSetter_ = TimerNow; }
 		inline void SetWetmapEnabled(const bool value) { FLAG_SETTER(flags_, RenderFlags::WETMAP); timeStampSetter_ = TimerNow; }
