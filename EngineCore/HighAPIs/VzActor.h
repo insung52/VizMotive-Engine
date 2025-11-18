@@ -282,5 +282,6 @@ namespace vzm
 		void SetParticleRotation(float rotation);
 		void SetParticleOpacityCurve(float peakStart, float peakEnd);
 		void SetParticleSorted(bool sorted);
+		void SetParticleBaseColor(const vfloat4& color);
 	};
 }

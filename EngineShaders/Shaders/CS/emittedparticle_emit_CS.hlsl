@@ -78,8 +78,8 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID)
 	uint rotationVel_packed = uint((rotationVelocity + 3.14159265f) / (2.0f * 3.14159265f) * 65535.0f);
 	uint rotation_rotationVelocity = (rotation_packed << 16) | rotationVel_packed;
 
-	// Get base color from material and emit location
-	float4 baseColor = unpack_rgba(location.color);
+	// Get base color from emitter settings and emit location
+	float4 baseColor = xParticleBaseColor * unpack_rgba(location.color);
 
 	// Apply random color factor
 	baseColor.r *= lerp(1.0f, rand(seed, 700), xParticleRandomColorFactor);

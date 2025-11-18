@@ -881,4 +881,10 @@ namespace vzm
 		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
 		if (emitter) { emitter->SetSorted(sorted); UpdateTimeStamp(); }
 	}
+
+	void VzActorParticle::SetParticleBaseColor(const vfloat4& color)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (emitter) { emitter->SetBaseColor(XMFLOAT4(color.x, color.y, color.z, color.w)); UpdateTimeStamp(); }
+	}
 }
