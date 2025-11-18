@@ -10,6 +10,7 @@ RWStructuredBuffer<uint> aliveBuffer_CURRENT : register(u1);
 RWStructuredBuffer<uint> aliveBuffer_NEW : register(u2);
 RWStructuredBuffer<uint> deadBuffer : register(u3);
 RWByteAddressBuffer counterBuffer : register(u4);
+RWStructuredBuffer<float> distanceBuffer : register(u5);
 
 // Depth collision resources (optional - Phase 6)
 // Texture2D<float> texture_depth : register(t1);
@@ -99,6 +100,11 @@ void main(uint3 DTid : SV_DispatchThreadID, uint Gid : SV_GroupIndex)
 		uint newAliveIndex;
 		counterBuffer.InterlockedAdd(PARTICLECOUNTER_OFFSET_ALIVECOUNT_AFTERSIMULATION, 1, newAliveIndex);
 		aliveBuffer_NEW[newAliveIndex] = particleIndex;
+
+		// Calculate distance to camera for sorting (if enabled)
+		float3 eyeVector = particle.position - GetCamera().position;
+		float distSQ = dot(eyeVector, eyeVector);
+		distanceBuffer[newAliveIndex] = -distSQ; // Negative for far-to-near sorting
 	}
 	else
 	{
