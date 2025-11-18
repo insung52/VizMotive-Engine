@@ -9,6 +9,7 @@ namespace vz::renderer
 		// Compute shaders
 		Shader emitCS;
 		Shader simulateCS;
+		Shader sortCS;
 		Shader kickoffUpdateCS;
 		Shader finishUpdateCS;
 
@@ -19,6 +20,7 @@ namespace vz::renderer
 		// Pipeline State Objects
 		PipelineState emitPSO;
 		PipelineState simulatePSO;
+		PipelineState sortPSO;
 		PipelineState kickoffUpdatePSO;
 		PipelineState finishUpdatePSO;
 		PipelineState particleRenderPSO;
@@ -50,6 +52,15 @@ namespace vz::renderer
 				if (!shader::LoadShader(ShaderStage::CS, simulateCS, "emittedparticle_simulate_CS.hlsl"))
 				{
 					backlog::post("Failed to load emittedparticle_simulate_CS.hlsl", backlog::LogLevel::Error);
+				}
+			}
+
+			// Load sort compute shader
+			{
+				sortCS = {};
+				if (!shader::LoadShader(ShaderStage::CS, sortCS, "emittedparticle_sort_CS.hlsl"))
+				{
+					backlog::post("Failed to load emittedparticle_sort_CS.hlsl", backlog::LogLevel::Error);
 				}
 			}
 
@@ -231,6 +242,18 @@ namespace vz::renderer
 			device->Barrier(barriers, arraysize(barriers), cmd);
 		}
 
+		// Sort particles (if enabled)
+		SortParticles(emitter, cmd);
+
+		// Barrier after sort (if sorting was performed)
+		if (emitter.IsSorted())
+		{
+			GPUBarrier barriers[] = {
+				GPUBarrier::Memory(),
+			};
+			device->Barrier(barriers, arraysize(barriers), cmd);
+		}
+
 		// Finish update: prepare draw arguments
 		{
 			device->EventBegin("Finish Update", cmd);
@@ -250,8 +273,6 @@ namespace vz::renderer
 
 			device->EventEnd(cmd);
 		}
-
-		// TODO: Sort particles (Phase 7)
 
 		// Note: Counter readback would require async GPU->CPU copy which is complex
 		// For now, we rely on indirect draw arguments being prepared correctly
@@ -525,6 +546,7 @@ namespace vz::renderer
 			&emitter.GetAliveList(1),                              // u2: alive list NEW (write to, always index 1)
 			&emitter.GetDeadList(),                                // u3: dead list
 			&emitter.GetCounterBuffer(),                           // u4: counter buffer
+			&emitter.GetDistanceBuffer(),                          // u5: distance buffer (for sorting)
 		};
 		device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
 
@@ -534,6 +556,55 @@ namespace vz::renderer
 
 		// Dispatch indirectly based on alive count
 		device->DispatchIndirect(&emitter.GetIndirectBuffers(), ARGUMENTBUFFER_OFFSET_DISPATCHSIMULATION, cmd);
+
+		device->EventEnd(cmd);
+	}
+
+	void GRenderPath3DDetails::SortParticles(
+		GEmittedParticleComponent& emitter,
+		CommandList cmd
+	)
+	{
+		// Skip sorting if not enabled
+		if (!emitter.IsSorted())
+		{
+			return;
+		}
+
+		// Skip if sort shader is not valid
+		if (!particlesystem::sortCS.IsValid())
+		{
+			return;
+		}
+
+		device->EventBegin("Sort Particles", cmd);
+
+		// Bind resources for sorting
+		// t0: counter buffer (to get alive count)
+		// t1: distance buffer (read distances)
+		const GPUResource* srvs[] = {
+			&emitter.GetCounterBuffer(),        // t0: counter buffer
+			&emitter.GetDistanceBuffer(),       // t1: distance buffer
+		};
+		device->BindResources(srvs, 0, arraysize(srvs), cmd);
+
+		// u0: alive buffer (read and write sorted indices)
+		const GPUResource* uavs[] = {
+			&emitter.GetAliveList(1),           // u0: alive list NEW (read/write - contains particles after simulation)
+		};
+		device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+		// Bind sort compute shader
+		device->BindComputeShader(&particlesystem::sortCS, cmd);
+
+		// Dispatch sort shader
+		// Each thread group sorts 512 particles using bitonic sort
+		// We need to dispatch enough thread groups to cover all alive particles
+		const uint32_t SORT_SIZE = 512;
+		uint32_t maxParticles = emitter.GetMaxParticles();
+		uint32_t numThreadGroups = (maxParticles + SORT_SIZE - 1) / SORT_SIZE;
+
+		device->Dispatch(numThreadGroups, 1, 1, cmd);
 
 		device->EventEnd(cmd);
 	}
