@@ -280,6 +280,18 @@ int main(int, char**)
 		particleEmitter->SetParticleOpacityCurve(0.8f, 0.9f);
 		// 첫 번째 값: 페이드 인 완료 시점 (0.1 = 수명의 10% 지점)
 		// 두 번째 값: 페이드 아웃 시작 시점 (0.9 = 수명의 90% 지점)
+
+		// Create material for particle
+		VzMaterial* particleMaterial = vzm::NewMaterial("Particle Material");
+		if (particleMaterial)
+		{
+			particleMaterial->SetBaseColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+			particleMaterial->SetEmissiveColor({ 1.0f, 1.0f, 1.0f });
+			particleMaterial->SetEmissiveStrength(0.0f);
+
+			// Connect to particle
+			particleEmitter->SetParticleMaterialID(particleMaterial->GetVID());
+		}
 	}
 	//renderer->SetLayerMask(0xF);
 	camera->SetVisibleLayerMask(0xF);
@@ -883,6 +895,35 @@ int main(int, char**)
 						if (ImGui::Button("Burst 100"))
 						{
 							particleEmitter->Burst(100);
+						}
+					}
+
+					ImGui::Separator();
+					vzimgui::IGTextTitle("----- Particle Material -----");
+					{
+						static VzMaterial* particleMaterial = nullptr;
+						if (!particleMaterial)
+						{
+							std::vector<VzBaseComp*> components;
+							if (GetComponentsByName("Particle Material", components) > 0)
+							{
+								particleMaterial = (VzMaterial*)components[0];
+							}
+						}
+
+						if (particleMaterial)
+						{
+							static float emissive_color[3] = { 1.0f, 1.0f, 1.0f };
+							if (ImGui::ColorEdit3("Emissive Color", emissive_color))
+							{
+								particleMaterial->SetEmissiveColor({ emissive_color[0], emissive_color[1], emissive_color[2] });
+							}
+
+							static float emissive_strength = 0.0f;
+							if (ImGui::SliderFloat("Emissive Strength", &emissive_strength, 0.0f, 10.0f))
+							{
+								particleMaterial->SetEmissiveStrength(emissive_strength);
+							}
 						}
 					}
 				}

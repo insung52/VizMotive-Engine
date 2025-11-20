@@ -284,5 +284,6 @@ namespace vzm
 		void SetParticleSorted(bool sorted);
 		void SetParticleBaseColor(const vfloat4& color);
 		void SetParticleMotionBlurAmount(float amount);
+		void SetParticleMaterialID(const VID materialVID);
 	};
 }
