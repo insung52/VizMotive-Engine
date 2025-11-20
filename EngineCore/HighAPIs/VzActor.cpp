@@ -894,4 +894,18 @@ namespace vzm
 		if (emitter) { emitter->SetMotionBlurAmount(amount); UpdateTimeStamp(); }
 	}
 
+	void VzActorParticle::SetParticleMaterialID(const VID materialVID)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (!emitter) return;
+
+		// ⚠️ KEY CHANGE: VID == Entity in current system, use it directly
+		// No need for GetMaterialComponentByVUID which expects encoded VID
+		MaterialComponent* material = compfactory::GetMaterialComponent(materialVID);
+		if (!material) return;
+
+		emitter->SetMaterialID(material->GetEntity());
+		UpdateTimeStamp();
+	}
+
 }

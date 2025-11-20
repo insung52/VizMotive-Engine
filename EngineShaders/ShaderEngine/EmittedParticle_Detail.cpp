@@ -667,6 +667,18 @@ namespace vz::renderer
 
 		cb.xParticleMotionBlurAmount = emitter.GetMotionBlurAmount();
 
+		// Get emissive from material if available
+		cb.xParticleEmissive = 0.0f;
+		Entity materialID = emitter.GetMaterialID();
+		if (materialID != INVALID_ENTITY)
+		{
+			MaterialComponent* material = compfactory::GetMaterialComponent(materialID);
+			if (material)
+			{
+				cb.xParticleEmissive = material->GetEmissiveStrength();
+			}
+		}
+
 		// Bind constant buffer dynamically
 		device->BindDynamicConstantBuffer(cb, CB_GETBINDSLOT(EmittedParticleCB), cmd);
 
