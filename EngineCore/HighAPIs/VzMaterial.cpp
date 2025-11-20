@@ -73,6 +73,24 @@ namespace vzm
 		UpdateTimeStamp();
 	}
 
+	void VzMaterial::SetEmissiveColor(const vfloat3& color)
+	{
+		GET_MATERIAL_COMP(material, );
+		XMFLOAT4 emissive = material->GetEmissiveColor();
+		emissive.x = color.x;
+		emissive.y = color.y;
+		emissive.z = color.z;
+		material->SetEmissiveColor(emissive);
+		UpdateTimeStamp();
+	}
+
+	void VzMaterial::SetEmissiveStrength(float strength)
+	{
+		GET_MATERIAL_COMP(material, );
+		material->SetEmissiveStrength(strength);
+		UpdateTimeStamp();
+	}
+
 	void VzMaterial::SetGaussianSplattingEnabled(const bool enabled)
 	{
 		GET_MATERIAL_COMP(material, );

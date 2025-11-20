@@ -3024,6 +3024,7 @@ namespace vz
 		uint32_t flags_ = EMPTY;
 		ShaderType shaderType_ = ShaderType::SOFT;
 		Entity meshID_ = INVALID_ENTITY;
+		Entity materialID_ = INVALID_ENTITY;  // Material entity (VID == Entity in current system)
 
 		// Particle emission and behavior
 		uint32_t maxParticles_ = 1000;
@@ -3122,6 +3123,7 @@ namespace vz
 		// Property getters
 		inline ShaderType GetShaderType() const { return shaderType_; }
 		inline Entity GetMeshID() const { return meshID_; }
+		inline Entity GetMaterialID() const { return materialID_; }
 		inline uint32_t GetMaxParticles() const { return maxParticles_; }
 		inline float GetEmitCount() const { return emitCount_; }
 		inline float GetSize() const { return size_; }
@@ -3156,6 +3158,7 @@ namespace vz
 		// Property setters
 		inline void SetShaderType(ShaderType type) { shaderType_ = type; timeStampSetter_ = TimerNow; }
 		inline void SetMeshID(Entity id) { meshID_ = id; timeStampSetter_ = TimerNow; }
+		inline void SetMaterialID(Entity id) { materialID_ = id; timeStampSetter_ = TimerNow; }
 		inline void SetMaxParticles(uint32_t count) { maxParticles_ = count; timeStampSetter_ = TimerNow; }
 		inline void SetEmitCount(float count) { emitCount_ = count; timeStampSetter_ = TimerNow; }
 		inline void SetSize(float size) { size_ = size; timeStampSetter_ = TimerNow; }
