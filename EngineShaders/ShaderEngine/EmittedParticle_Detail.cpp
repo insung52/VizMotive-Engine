@@ -662,12 +662,10 @@ namespace vz::renderer
 		cb.xOpacityCurvePeakStart = emitter.GetOpacityCurvePeakStart();
 		cb.xOpacityCurvePeakEnd = emitter.GetOpacityCurvePeakEnd();
 
-		XMFLOAT4 baseColor = emitter.GetBaseColor();
-		cb.xParticleBaseColor = float4(baseColor.x, baseColor.y, baseColor.z, baseColor.w);
-
 		cb.xParticleMotionBlurAmount = emitter.GetMotionBlurAmount();
 
-		// Get emissive from material if available
+		// Get base color and emissive from material if available
+		cb.xParticleBaseColor = float4(1.0f, 1.0f, 1.0f, 1.0f);  // Default white
 		cb.xParticleEmissive = 0.0f;
 		Entity materialID = emitter.GetMaterialID();
 		if (materialID != INVALID_ENTITY)
@@ -675,6 +673,8 @@ namespace vz::renderer
 			MaterialComponent* material = compfactory::GetMaterialComponent(materialID);
 			if (material)
 			{
+				XMFLOAT4 baseColor = material->GetBaseColor();
+				cb.xParticleBaseColor = float4(baseColor.x, baseColor.y, baseColor.z, baseColor.w);
 				cb.xParticleEmissive = material->GetEmissiveStrength();
 			}
 		}

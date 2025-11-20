@@ -257,7 +257,6 @@ int main(int, char**)
 		scene->AppendChild(particleEmitter);
 		//particleEmitter->Burst(100);
 		particleEmitter->SetParticleSize(0.1f);
-		particleEmitter->SetParticleBaseColor({ 1.0f, 1.0f, 1.0f, 1.0f });  // 기본 흰색, 이후엔 메터리얼로 처리해야함
 		particleEmitter->SetParticleRandomColor(0.5f);  // 랜덤 색상 변화
 		particleEmitter->SetParticleEmitCount(10.0f);
 		particleEmitter->SetParticleRandomPositionOffset(1.0f);  // 랜덤 위치 오프셋
@@ -837,12 +836,6 @@ int main(int, char**)
 							particleEmitter->SetParticleRandomRotationVelocity(random_rotation_velocity);
 						}
 
-						static float base_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-						if (ImGui::ColorEdit4("Base Color", base_color))
-						{
-							particleEmitter->SetParticleBaseColor({ base_color[0], base_color[1], base_color[2], base_color[3] });
-						}
-
 						static float random_color = 0.5f;
 						if (ImGui::SliderFloat("Random Color", &random_color, 0.0f, 1.0f))
 						{
@@ -913,6 +906,12 @@ int main(int, char**)
 
 						if (particleMaterial)
 						{
+							static float base_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+							if (ImGui::ColorEdit4("Base Color", base_color))
+							{
+								particleMaterial->SetBaseColor({ base_color[0], base_color[1], base_color[2], base_color[3] });
+							}
+
 							static float emissive_color[3] = { 1.0f, 1.0f, 1.0f };
 							if (ImGui::ColorEdit3("Emissive Color", emissive_color))
 							{
