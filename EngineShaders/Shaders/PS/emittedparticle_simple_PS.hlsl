@@ -40,8 +40,8 @@ float4 main(PSInput input) : SV_TARGET
 		opacityFactor = 1.0f - (t - xOpacityCurvePeakEnd) / (1.0f - xOpacityCurvePeakEnd);
 	}
 
-	// Combine texture, vertex color, and opacity curve
-	float4 finalColor = texColor * input.color;
+	// Combine texture, material base color, vertex color (random tint), and opacity curve
+	float4 finalColor = texColor * xParticleBaseColor * input.color;
 	finalColor.a *= opacityFactor;
 
 	// Apply emissive (HDR multiplier, like WickedEngine)
