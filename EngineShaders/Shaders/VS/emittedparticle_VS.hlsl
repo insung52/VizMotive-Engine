@@ -73,8 +73,21 @@ PSInput main(VSInput input)
 	float3 quadPos = BILLBOARD[vertexIndex];
 	float2 uv = UVS[vertexIndex];
 
-	// No rotation for debug
-	// quadPos.xy already set
+	// Apply rotation (unpack from uint16)
+	// Rotation is in upper 16 bits, rotationVel in lower 16 bits
+	uint packedRotation = particle.rotation_rotationVelocity;
+	uint rotationBits = (packedRotation >> 16) & 0xFFFF; // Upper 16 bits
+	// Unpack: 0~65535 -> -PI ~ +PI
+	float rotation = (float(rotationBits) / 65535.0f) * 2.0f * 3.14159265f - 3.14159265f;
+
+	// 2D rotation matrix
+	float cosRot = cos(rotation);
+	float sinRot = sin(rotation);
+	float2 rotatedXY = float2(
+		quadPos.x * cosRot - quadPos.y * sinRot,
+		quadPos.x * sinRot + quadPos.y * cosRot
+	);
+	quadPos.xy = rotatedXY;
 
 	// Scale billboard
 	quadPos *= particleSize;
