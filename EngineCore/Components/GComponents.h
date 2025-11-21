@@ -746,6 +746,9 @@ namespace vz
 			}
 		}
 
+		// Override SetMaxParticles to handle GPU resource recreation
+		void SetMaxParticles(uint32_t count) override;
+
 		// Check if particle system is inactive (no particles alive)
 		bool IsInactive() const { return activeFrames_ == 0; }
 
