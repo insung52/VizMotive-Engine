@@ -789,9 +789,15 @@ int main(int, char**)
 						}
 
 						static float emit_count = 10.0f;
-						if (ImGui::SliderFloat("Emit Count", &emit_count, 1.0f, 100.0f))
+						if (ImGui::SliderFloat("Emit Count", &emit_count, 1.0f, 10000.0f))
 						{
 							particleEmitter->SetParticleEmitCount(emit_count);
+						}
+
+						static int max_particles = 1000;
+						if (ImGui::SliderInt("Max Particles", &max_particles, 100, 1000000))
+						{
+							particleEmitter->SetParticleMaxCount((uint32_t)max_particles);
 						}
 
 						static float particle_life = 2.0f;
