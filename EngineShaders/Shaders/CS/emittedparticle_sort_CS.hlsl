@@ -43,7 +43,8 @@ void main(
         if (GI + i * NUM_THREADS < numElementsInThreadGroup)
         {
             uint particleIndex = aliveBuffer[GlobalBaseIndex + i * NUM_THREADS];
-            float dist = distanceBuffer[GlobalBaseIndex + i * NUM_THREADS];
+            // Read distance using particleIndex, not alive buffer index!
+            float dist = distanceBuffer[particleIndex];
             g_LDS[LocalBaseIndex + i * NUM_THREADS] = float2(dist, (float)particleIndex);
         }
     }

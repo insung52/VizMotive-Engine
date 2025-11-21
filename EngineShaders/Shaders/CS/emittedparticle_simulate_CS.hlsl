@@ -102,14 +102,17 @@ void main(uint3 DTid : SV_DispatchThreadID, uint Gid : SV_GroupIndex)
 		aliveBuffer_NEW[newAliveIndex] = particleIndex;
 
 		// Calculate distance to camera for sorting (if enabled)
+		// IMPORTANT: Store at particleIndex, not newAliveIndex!
+		// Sort shader reads: particleIndex = aliveBuffer[i], then distanceBuffer[particleIndex]
 		float3 eyeVector = particle.position - GetCamera().position;
 		float distSQ = dot(eyeVector, eyeVector);
-		distanceBuffer[newAliveIndex] = -distSQ; // Negative for far-to-near sorting
+		distanceBuffer[particleIndex] = -distSQ; // Negative for far-to-near sorting
 	}
 	else
 	{
 		// === Particle Death ===
-		// Add to dead list (push)
+		// Add to dead list (push to END to match Emit's pop from END)
+		// Emit pops from END (deadCount - 1), so we push to END too
 		uint deadIndex;
 		counterBuffer.InterlockedAdd(PARTICLECOUNTER_OFFSET_DEADCOUNT, 1, deadIndex);
 		deadBuffer[deadIndex] = particleIndex;

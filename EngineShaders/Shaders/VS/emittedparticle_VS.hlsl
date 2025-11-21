@@ -16,6 +16,8 @@ struct PSInput
 	float2 uv : TEXCOORD0;
 	float4 color : COLOR;
 	float lifePercent : LIFEPERC;
+	nointerpolation uint particleIndex : PARTICLEIDX;  // DEBUG: particle index
+	nointerpolation uint aliveListIndex : ALIVELISTIDX;  // DEBUG: alive list index
 };
 
 StructuredBuffer<Particle> particleBuffer : register(t0);
@@ -122,6 +124,10 @@ PSInput main(VSInput input)
 
 	// Set color at the end (after all other processing)
 	output.color = particleColor;
+
+	// DEBUG: Pass particle index and alive list index to pixel shader
+	output.particleIndex = particleIndex;
+	output.aliveListIndex = input.instanceID;
 
 	return output;
 }
