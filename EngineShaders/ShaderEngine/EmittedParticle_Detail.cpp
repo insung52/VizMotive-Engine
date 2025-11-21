@@ -226,7 +226,13 @@ namespace vz::renderer
 		device->EventBegin("ParticleSystem Update", cmd);
 		auto prof_range = profiler::BeginRangeGPU("ParticleSystem", &cmd);
 
-		// Emit new particles FIRST (before kickoff)
+		// Swap buffer indices BEFORE GPU commands (like WickedEngine does in UpdateCPU)
+		// This ensures proper double buffering:
+		// - Current frame reads from aliveList[0] (previous frame's NEW list)
+		// - Current frame writes to aliveList[1] (becomes next frame's OLD list)
+		emitter.SwapBuffers();
+
+		// Emit new particles FIRST
 		EmitParticles(emitter, instanceIndex, cmd);
 
 		// Barrier after emit
@@ -238,6 +244,7 @@ namespace vz::renderer
 		}
 
 		// Kickoff update: prepare counters and indirect args AFTER emit
+		// This sets ALIVECOUNT for Simulate to process (including newly emitted particles)
 		{
 			device->EventBegin("Kickoff Update", cmd);
 
@@ -308,11 +315,6 @@ namespace vz::renderer
 		// 1. emit shader creates particles (aliveCount_afterSimulation > 0)
 		// 2. finishUpdate prepares correct draw args
 		// 3. DrawIndexedInstancedIndirect uses correct offset
-
-		// Swap buffer indices for next frame
-		// This ensures that next frame's Emit writes to the buffer that Simulate didn't write to this frame
-		// and next frame's Simulate reads from the buffer that contains updated particles
-		emitter.SwapBuffers();
 
 		device->EventEnd(cmd);
 		profiler::EndRange(prof_range);
@@ -477,8 +479,9 @@ namespace vz::renderer
 		const GPUResource* uavs[] = {
 			&emitter.GetParticleBuffer(),                        // u0: particle buffer
 			&emitter.GetAliveList(0),                            // u1: alive list CURRENT (Emit writes here, always index 0)
-			&emitter.GetDeadList(),                              // u2: dead list
-			&emitter.GetCounterBuffer(),                         // u3: counter buffer
+			&emitter.GetAliveList(1),                            // u2: alive list NEW (not used in emit, but must be bound)
+			&emitter.GetDeadList(),                              // u3: dead list
+			&emitter.GetCounterBuffer(),                         // u4: counter buffer
 		};
 		device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
 

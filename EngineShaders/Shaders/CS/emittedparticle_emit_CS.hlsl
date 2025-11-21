@@ -9,8 +9,9 @@ StructuredBuffer<EmitLocation> emitBuffer : register(t0);
 
 RWStructuredBuffer<Particle> particleBuffer : register(u0);
 RWStructuredBuffer<uint> aliveBuffer_CURRENT : register(u1);
-RWStructuredBuffer<uint> deadBuffer : register(u2);
-RWByteAddressBuffer counterBuffer : register(u3);
+RWStructuredBuffer<uint> aliveBuffer_NEW : register(u2);
+RWStructuredBuffer<uint> deadBuffer : register(u3);
+RWByteAddressBuffer counterBuffer : register(u4);
 
 // Simple random number generator
 float rand(uint seed, uint offset)
@@ -99,6 +100,8 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID)
 	particle.color = pack_rgba(baseColor);
 
 	// Get a particle index from the dead list (pop operation)
+	// We pop from the END of the dead list (deadCount - 1)
+	// Simulate must push to the END too for consistency
 	int deadCount;
 	counterBuffer.InterlockedAdd(PARTICLECOUNTER_OFFSET_DEADCOUNT, -1, deadCount);
 
@@ -106,7 +109,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint3 GTid : SV_GroupThreadID)
 	if (deadCount < 1)
 		return; // No dead particles available, cannot emit
 
-	// Get the index of the dead particle
+	// Get the index of the dead particle (pop from end)
 	uint newParticleIndex = deadBuffer[deadCount - 1];
 
 	// Write the new particle to the particle buffer
