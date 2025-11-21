@@ -3159,7 +3159,7 @@ namespace vz
 		inline void SetShaderType(ShaderType type) { shaderType_ = type; timeStampSetter_ = TimerNow; }
 		inline void SetMeshID(Entity id) { meshID_ = id; timeStampSetter_ = TimerNow; }
 		inline void SetMaterialID(Entity id) { materialID_ = id; timeStampSetter_ = TimerNow; }
-		inline void SetMaxParticles(uint32_t count) { maxParticles_ = count; timeStampSetter_ = TimerNow; }
+		virtual void SetMaxParticles(uint32_t count) { maxParticles_ = count; timeStampSetter_ = TimerNow; }
 		inline void SetEmitCount(float count) { emitCount_ = count; timeStampSetter_ = TimerNow; }
 		inline void SetSize(float size) { size_ = size; timeStampSetter_ = TimerNow; }
 		inline void SetRandomPositionOffset(float offset) { randomPositionOffset_ = offset; timeStampSetter_ = TimerNow; }

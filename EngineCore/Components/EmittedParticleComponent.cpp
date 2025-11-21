@@ -334,6 +334,23 @@ namespace vz
 		gpuResourcesCreated_ = false;
 	}
 
+	void GEmittedParticleComponent::SetMaxParticles(uint32_t count)
+	{
+		if (maxParticles_ != count)
+		{
+			backlog::post("GEmittedParticleComponent::SetMaxParticles - Changing from " +
+				std::to_string(maxParticles_) + " to " + std::to_string(count) + " particles", backlog::LogLevel::Info);
+
+			maxParticles_ = count;
+			timeStampSetter_ = TimerNow;
+
+			// Invalidate GPU resources (like WickedEngine does)
+			// They will be recreated in next CreateGPUResources() call
+			counterBuffer_ = {};
+			gpuResourcesCreated_ = false;
+		}
+	}
+
 	void GEmittedParticleComponent::UpdateCPU(const TransformComponent& transform, float dt)
 	{
 		// Update world matrix
