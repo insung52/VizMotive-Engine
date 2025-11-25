@@ -40,45 +40,45 @@ namespace vz::renderer
 			// Load emit compute shader
 			{
 				emitCS = {};
-				if (!shader::LoadShader(ShaderStage::CS, emitCS, "emittedparticle_emit_CS.hlsl"))
+				if (!shader::LoadShader(ShaderStage::CS, emitCS, "emittedparticle_emit_CS.cso"))
 				{
-					backlog::post("Failed to load emittedparticle_emit_CS.hlsl", backlog::LogLevel::Error);
+					backlog::post("Failed to load emittedparticle_emit_CS.cso", backlog::LogLevel::Error);
 				}
 			}
 
 			// Load simulate compute shader
 			{
 				simulateCS = {};
-				if (!shader::LoadShader(ShaderStage::CS, simulateCS, "emittedparticle_simulate_CS.hlsl"))
+				if (!shader::LoadShader(ShaderStage::CS, simulateCS, "emittedparticle_simulate_CS.cso"))
 				{
-					backlog::post("Failed to load emittedparticle_simulate_CS.hlsl", backlog::LogLevel::Error);
+					backlog::post("Failed to load emittedparticle_simulate_CS.cso", backlog::LogLevel::Error);
 				}
 			}
 
 			// Load sort compute shader
 			{
 				sortCS = {};
-				if (!shader::LoadShader(ShaderStage::CS, sortCS, "emittedparticle_sort_CS.hlsl"))
+				if (!shader::LoadShader(ShaderStage::CS, sortCS, "emittedparticle_sort_CS.cso"))
 				{
-					backlog::post("Failed to load emittedparticle_sort_CS.hlsl", backlog::LogLevel::Error);
+					backlog::post("Failed to load emittedparticle_sort_CS.cso", backlog::LogLevel::Error);
 				}
 			}
 
 			// Load kickoff update compute shader
 			{
 				kickoffUpdateCS = {};
-				if (!shader::LoadShader(ShaderStage::CS, kickoffUpdateCS, "emittedparticle_kickoffUpdate_CS.hlsl"))
+				if (!shader::LoadShader(ShaderStage::CS, kickoffUpdateCS, "emittedparticle_kickoffUpdate_CS.cso"))
 				{
-					backlog::post("Failed to load emittedparticle_kickoffUpdate_CS.hlsl", backlog::LogLevel::Error);
+					backlog::post("Failed to load emittedparticle_kickoffUpdate_CS.cso", backlog::LogLevel::Error);
 				}
 			}
 
 			// Load finish update compute shader
 			{
 				finishUpdateCS = {};
-				if (!shader::LoadShader(ShaderStage::CS, finishUpdateCS, "emittedparticle_finishUpdate_CS.hlsl"))
+				if (!shader::LoadShader(ShaderStage::CS, finishUpdateCS, "emittedparticle_finishUpdate_CS.cso"))
 				{
-					backlog::post("Failed to load emittedparticle_finishUpdate_CS.hlsl", backlog::LogLevel::Error);
+					backlog::post("Failed to load emittedparticle_finishUpdate_CS.cso", backlog::LogLevel::Error);
 				}
 			}
 
@@ -89,18 +89,18 @@ namespace vz::renderer
 			// Load particle vertex shader
 			{
 				particleVS = {};
-				if (!shader::LoadShader(ShaderStage::VS, particleVS, "emittedparticle_VS.hlsl"))
+				if (!shader::LoadShader(ShaderStage::VS, particleVS, "emittedparticle_VS.cso"))
 				{
-					backlog::post("Failed to load emittedparticle_VS.hlsl", backlog::LogLevel::Error);
+					backlog::post("Failed to load emittedparticle_VS.cso", backlog::LogLevel::Error);
 				}
 			}
 
 			// Load particle pixel shader
 			{
 				particlePS = {};
-				if (!shader::LoadShader(ShaderStage::PS, particlePS, "emittedparticle_simple_PS.hlsl"))
+				if (!shader::LoadShader(ShaderStage::PS, particlePS, "emittedparticle_simple_PS.cso"))
 				{
-					backlog::post("Failed to load emittedparticle_simple_PS.hlsl", backlog::LogLevel::Error);
+					backlog::post("Failed to load emittedparticle_simple_PS.cso", backlog::LogLevel::Error);
 				}
 			}
 
