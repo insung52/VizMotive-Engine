@@ -46,8 +46,9 @@ float4 main(PSInput input) : SV_TARGET
 	float4 finalColor = texColor * xParticleBaseColor * input.color;
 	finalColor.a *= opacityFactor;
 
-	// Apply emissive (HDR multiplier, like WickedEngine)
-	finalColor.rgb *= (1.0f + xParticleEmissive);
+	// Apply emissive (HDR multiplier with color, like WickedEngine)
+	// Emissive color is multiplied by strength and added to the base color
+	finalColor.rgb += xParticleEmissiveColor * xParticleEmissiveStrength;
 
 	// DEBUG: Visualize opacity curve parameters
 	// Uncomment to see the curve values as color

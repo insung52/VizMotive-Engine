@@ -93,10 +93,8 @@ CBUFFER(EmittedParticleCB, CBSLOT_OTHER_EMITTEDPARTICLE)
 
 	float4		xParticleBaseColor;             // Base color (RGBA)
 
-	float		xParticleEmissive;              // Material emissive strength
-	float		xEmitterPadding2;
-	float		xEmitterPadding3;
-	float		xEmitterPadding4;
+	float3		xParticleEmissiveColor;         // Material emissive color (RGB)
+	float		xParticleEmissiveStrength;      // Material emissive strength
 
 	// SPH fluid simulation parameters (advanced feature - commented out)
 	/*
