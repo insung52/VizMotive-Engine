@@ -669,7 +669,8 @@ namespace vz::renderer
 
 		// Get base color and emissive from material if available
 		cb.xParticleBaseColor = float4(1.0f, 1.0f, 1.0f, 1.0f);  // Default white
-		cb.xParticleEmissive = 0.0f;
+		cb.xParticleEmissiveColor = float3(1.0f, 1.0f, 1.0f);    // Default white emissive
+		cb.xParticleEmissiveStrength = 0.0f;
 		Entity materialID = emitter.GetMaterialID();
 		if (materialID != INVALID_ENTITY)
 		{
@@ -678,7 +679,11 @@ namespace vz::renderer
 			{
 				XMFLOAT4 baseColor = material->GetBaseColor();
 				cb.xParticleBaseColor = float4(baseColor.x, baseColor.y, baseColor.z, baseColor.w);
-				cb.xParticleEmissive = material->GetEmissiveStrength();
+				
+				// Get emissive color and strength
+				XMFLOAT4 emissiveColor = material->GetEmissiveColor();
+				cb.xParticleEmissiveColor = float3(emissiveColor.x, emissiveColor.y, emissiveColor.z);
+				cb.xParticleEmissiveStrength = material->GetEmissiveStrength();
 			}
 		}
 
