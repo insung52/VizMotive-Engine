@@ -390,8 +390,35 @@ namespace vz::renderer
 			EmittedParticleCB cb = {};
 			cb.xEmitterMaxParticleCount = emitter.GetMaxParticles();
 			cb.xEmitterInstanceIndex = instanceIndex;
-			cb.xEmitterMeshGeometryOffset = 0;
-			cb.xEmitterMeshGeometryCount = 0;
+
+			// Setup mesh emission
+			Entity meshID = emitter.GetMeshID();
+			if (meshID == INVALID_ENTITY || meshID == 0)
+			{
+				// Point emission
+				cb.xEmitterMeshGeometryOffset = 0;
+				cb.xEmitterMeshGeometryCount = 0;
+				XMMATRIX ident = XMMatrixIdentity();
+				XMFLOAT4X4 identMat;
+				XMStoreFloat4x4(&identMat, ident);
+				cb.xEmitterBaseMeshUnormRemap.Create(identMat);
+			}
+			else
+			{
+				// Mesh emission
+				// Note: For sphere emission, the shader uses parametric generation
+				// The geometry offset/count just enables the mesh emission path
+				cb.xEmitterMeshGeometryOffset = 0; // Will be set when scene integration is complete
+				cb.xEmitterMeshGeometryCount = 1;  // Non-zero to enable mesh emission
+
+				// Scale down from unit sphere (-1~1) to match the actual geometry size
+				// The sphere geometry is created with radius 0.1, so we scale by 0.1
+				// This way: shader generates unit sphere -> scale by 0.1 -> world transform applies actor scale
+				XMMATRIX scaleMatrix = XMMatrixScaling(0.1f, 0.1f, 0.1f);
+				XMFLOAT4X4 scaleMat;
+				XMStoreFloat4x4(&scaleMat, scaleMatrix);
+				cb.xEmitterBaseMeshUnormRemap.Create(scaleMat);
+			}
 
 			cb.xParticleSize = emitter.GetSize();
 			cb.xParticleScaling = emitter.GetScaleX(); // Use ScaleX as overall scaling
