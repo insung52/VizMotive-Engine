@@ -908,4 +908,30 @@ namespace vzm
 		UpdateTimeStamp();
 	}
 
+	void VzActorParticle::SetNormalFactor(float factor)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (!emitter) return;
+
+		emitter->SetNormalFactor(factor);
+		UpdateTimeStamp();
+	}
+
+	void VzActorParticle::SetMeshID(const VID meshVID)
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (!emitter) return;
+
+		emitter->SetMeshID(meshVID);
+		UpdateTimeStamp();
+	}
+
+	VID VzActorParticle::GetMeshID() const
+	{
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (!emitter) return INVALID_ENTITY;
+
+		return emitter->GetMeshID();
+	}
+
 }
