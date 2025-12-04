@@ -143,6 +143,9 @@ int main(int, char**)
 	const int NUM_RANDOM_OBJS = 5;
 	const int LIGHT_TYPE = 0;
 
+	// Declare geometry at file scope so GUI can access it
+	static VzGeometry* sphereGeometry = nullptr;
+
 	{
 		scene = NewScene("my scene");
 		renderer = NewRenderer("main renderer");
@@ -177,13 +180,13 @@ int main(int, char**)
 		std::uniform_real_distribution<float> dist_z2(-3.f, 3.f);
 
 		const float lightRange = 1.0f;
-		VzGeometry* sphereGeometry = vzm::NewGeometry("sphere_geometry");
+		sphereGeometry = vzm::NewGeometry("sphere_geometry");
 		VzMaterial* sphereMaterial = vzm::NewMaterial("sphere_material");
 		sphereMaterial->SetBaseColor({ 0.8f, 0.8f, 0.8f, 1.0f });
 		vz::geogen::GenerateIcosahedronGeometry(
 			sphereGeometry->GetVID(),
-			0.1f,    // radius    
-			2         // detail level for smoother sphere    
+			0.1f,    // radius (used in mesh emission scaling)
+			2         // detail level for smoother sphere
 		);
 
 		vzm::VzActor* axis_helper = vzm::LoadModelFile("../Assets/axis.obj");
@@ -195,6 +198,8 @@ int main(int, char**)
 		std::vector<ActorVID> axis_helper_children = axis_helper_light->GetChildren();
 		axis_helper_light->EnableUnlit(true);
 
+		// Save first sphere for attaching GUI-controlled particle emitter later
+		static VzActorStaticMesh* particleSphere = nullptr;
 		for (int idx = 0; idx < NUM_RANDOM_OBJS; ++idx)
 		{
 			VzActorStaticMesh* sphere = vzm::NewActorStaticMesh(
@@ -209,6 +214,12 @@ int main(int, char**)
 			sphere->SetPosition({ x, y, z });
 			sphere->SetVisibleLayerMask(0x1, true);
 			scene->AppendChild(sphere);
+
+			// Save first sphere for particle attachment
+			if (idx == 0)
+			{
+				particleSphere = sphere;
+			}
 		}
 
 		for (int idx = 0; idx < NUM_RANDOM_LIGHTS; ++idx)
@@ -252,9 +263,20 @@ int main(int, char**)
 		// Create a particle emitter (static for UI access)
 		static VzActorParticle* particleEmitter = vzm::NewActorParticle("Particle Emitter");
 		// geometry, material
-		particleEmitter->SetPosition({ 0.f, 1.f, 0.f });
+		particleEmitter->SetPosition({ 0.f, 0.f, 0.f });  // Local position relative to sphere
 		particleEmitter->SetVisibleLayerMask(0xF, true);
-		scene->AppendChild(particleEmitter);
+
+		// Attach to first sphere for mesh emission
+		if (particleSphere)
+		{
+			particleSphere->AppendChild(particleEmitter);
+			// Enable mesh emission by setting the sphere geometry
+			particleEmitter->SetMeshID(sphereGeometry->GetVID());
+		}
+		else
+		{
+			scene->AppendChild(particleEmitter);
+		}
 		//particleEmitter->Burst(100);
 		particleEmitter->SetParticleSize(0.1f);
 		particleEmitter->SetParticleRandomColor(0.5f);  // 랜덤 색상 변화
@@ -890,6 +912,61 @@ int main(int, char**)
 						{
 							particleEmitter->SetParticleMotionBlurAmount(motion_blur);
 						}
+
+						// Mesh Emission Section
+						ImGui::Separator();
+						vzimgui::IGTextTitle("----- Mesh Emission -----");
+
+						static float normal_factor = 0.0f;
+						if (ImGui::SliderFloat("Normal Factor", &normal_factor, 0.0f, 10.0f))
+						{
+							particleEmitter->SetNormalFactor(normal_factor);
+						}
+						if (ImGui::IsItemHovered())
+						{
+							ImGui::SetTooltip("Controls how much particles follow mesh surface normal direction.\n0 = no normal influence, higher = stronger push along normal");
+						}
+
+						VID currentMeshID = particleEmitter->GetMeshID();
+
+						ImGui::Text("Emission Mesh: %s", currentMeshID == 0 ? "None (Point Emission)" : "Attached");
+
+						if (ImGui::Button("Attach Cube Mesh"))
+						{
+							// Use the box geometry that was created for the floor
+							std::vector<VzBaseComp*> components;
+							if (GetComponentsByName("Box floor", components) > 0)
+							{
+								particleEmitter->SetMeshID(components[0]->GetVID());
+								vzlog("Attached box geometry to particle emitter");
+							}
+							else
+							{
+								vzlog("Box floor geometry not found!");
+							}
+						}
+						ImGui::SameLine();
+						if (ImGui::Button("Attach Sphere Mesh"))
+						{
+							// Use the sphere geometry that was already created
+							if (sphereGeometry)
+							{
+								particleEmitter->SetMeshID(sphereGeometry->GetVID());
+								vzlog("Attached sphere geometry to particle emitter");
+							}
+							else
+							{
+								vzlog("Sphere geometry not found!");
+							}
+						}
+						ImGui::SameLine();
+						if (ImGui::Button("Detach Mesh"))
+						{
+							particleEmitter->SetMeshID(0);
+							vzlog("Detached mesh from particle emitter (back to point emission)");
+						}
+
+						ImGui::Separator();
 
 						if (ImGui::Button("Burst 100"))
 						{

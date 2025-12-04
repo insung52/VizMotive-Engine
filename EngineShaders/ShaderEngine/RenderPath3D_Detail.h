@@ -13,6 +13,9 @@
 
 using namespace vz::geometrics;
 
+// Forward declarations
+class GMeshComponent;
+
 namespace vz::renderer
 {
 	enum MIPGENFILTER
