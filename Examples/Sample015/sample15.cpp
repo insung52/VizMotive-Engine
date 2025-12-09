@@ -151,6 +151,7 @@ int main(int, char**)
 		renderer = NewRenderer("main renderer");
 		renderer->SetCanvas(1, 1, 96.f, nullptr);
 		renderer->SetClearColor({ 0.2f, 0.2f, 0.3f, 1.f });
+		renderer->EnableFrameLock(0);  // Disable frame rate limiting for smooth particle rendering
 		camera = NewCamera("main camera");
 		glm::fvec3 pos(0.f, 3.f, 6.f), up(0, 1, 0), view = glm::fvec3(0, 0, 0) - pos;
 		camera->SetWorldPose(__FC3 pos, __FC3 view, __FC3 up);
