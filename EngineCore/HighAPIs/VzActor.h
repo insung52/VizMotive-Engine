@@ -284,7 +284,10 @@ namespace vzm
 		void SetParticleSorted(bool sorted);
 		void SetParticleBaseColor(const vfloat4& color);
 		void SetParticleMotionBlurAmount(float amount);
-		void SetParticleMaterialID(const VID materialVID);
+		// Material (WickedEngine approach: attach MaterialComponent to Entity)
+		void SetMaterial(const MaterialVID vid);
+		void SetMaterial(const VzBaseComp* material) { SetMaterial(material->GetVID()); }
+		MaterialVID GetMaterial() const;
 
 		// Mesh emission
 		void SetNormalFactor(float factor);

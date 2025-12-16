@@ -694,10 +694,12 @@ namespace vz::renderer
 
 		cb.xParticleMotionBlurAmount = emitter.GetMotionBlurAmount();
 
-		// Get base color and emissive from material if available
+		// Get base color and emissive from material (shared with mesh)
 		cb.xParticleBaseColor = float4(1.0f, 1.0f, 1.0f, 1.0f);  // Default white
 		cb.xParticleEmissiveColor = float3(1.0f, 1.0f, 1.0f);    // Default white emissive
 		cb.xParticleEmissiveStrength = 0.0f;
+
+		// Get material from materialID (shared with mesh - WickedEngine approach)
 		Entity materialID = emitter.GetMaterialID();
 		if (materialID != INVALID_ENTITY)
 		{
@@ -706,7 +708,7 @@ namespace vz::renderer
 			{
 				XMFLOAT4 baseColor = material->GetBaseColor();
 				cb.xParticleBaseColor = float4(baseColor.x, baseColor.y, baseColor.z, baseColor.w);
-				
+
 				// Get emissive color and strength
 				XMFLOAT4 emissiveColor = material->GetEmissiveColor();
 				cb.xParticleEmissiveColor = float3(emissiveColor.x, emissiveColor.y, emissiveColor.z);

@@ -263,7 +263,6 @@ int main(int, char**)
 
 		// Create a particle emitter (static for UI access)
 		static VzActorParticle* particleEmitter = vzm::NewActorParticle("Particle Emitter");
-		// geometry, material
 		particleEmitter->SetPosition({ 0.f, 0.f, 0.f });  // Local position relative to sphere
 		particleEmitter->SetVisibleLayerMask(0xF, true);
 
@@ -278,7 +277,8 @@ int main(int, char**)
 		{
 			scene->AppendChild(particleEmitter);
 		}
-		//particleEmitter->Burst(100);
+
+		// Configure particle properties
 		particleEmitter->SetParticleSize(0.1f);
 		particleEmitter->SetParticleRandomColor(0.5f);  // 랜덤 색상 변화
 		particleEmitter->SetParticleEmitCount(10.0f);
@@ -291,29 +291,15 @@ int main(int, char**)
 		particleEmitter->SetParticleGravity({ 0.f, 0.f, 0.f });
 		particleEmitter->SetParticleDrag(0.99f);         // 공기 저항 추가
 		particleEmitter->SetParticleMass(1.0f);
-		particleEmitter->SetParticleRotation(5.5f);		// 미작동
+		particleEmitter->SetParticleRotation(5.5f);
 		particleEmitter->SetParticleRandomRotation(1.0f);        // 랜덤 회전
 		particleEmitter->SetParticleRandomRotationVelocity(1.0f); // 랜덤 회전 속도
 		particleEmitter->SetParticleSorted(true);		// 깊이 정렬 활성화 (반짝임 방지)
-
-		// 실제 수명 = life ± randomLife
-		// 예: 4.0 ± 2.0 = 2.0초 ~ 6.0초 사이 랜덤
-		// 투명도 커브 설정
 		particleEmitter->SetParticleOpacityCurve(0.8f, 0.9f);
-		// 첫 번째 값: 페이드 인 완료 시점 (0.1 = 수명의 10% 지점)
-		// 두 번째 값: 페이드 아웃 시작 시점 (0.9 = 수명의 90% 지점)
 
-		// Create material for particle
-		VzMaterial* particleMaterial = vzm::NewMaterial("Particle Material");
-		if (particleMaterial)
-		{
-			particleMaterial->SetBaseColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-			particleMaterial->SetEmissiveColor({ 1.0f, 1.0f, 1.0f });
-			particleMaterial->SetEmissiveStrength(0.0f);
-
-			// Connect to particle
-			particleEmitter->SetParticleMaterialID(particleMaterial->GetVID());
-		}
+		// WickedEngine approach: Attach Material to ParticleEmitter Entity
+		// This allows changing sphere material to also affect particles
+		particleEmitter->SetMaterial(sphereMaterial);
 	}
 	//renderer->SetLayerMask(0xF);
 	camera->SetVisibleLayerMask(0xF);
@@ -978,34 +964,36 @@ int main(int, char**)
 					ImGui::Separator();
 					vzimgui::IGTextTitle("----- Particle Material -----");
 					{
-						static VzMaterial* particleMaterial = nullptr;
-						if (!particleMaterial)
+						// WickedEngine approach: Control sphere material (shared by particle)
+						static VzMaterial* sharedMaterial = nullptr;
+						if (!sharedMaterial)
 						{
 							std::vector<VzBaseComp*> components;
-							if (GetComponentsByName("Particle Material", components) > 0)
+							if (GetComponentsByName("sphere_material", components) > 0)
 							{
-								particleMaterial = (VzMaterial*)components[0];
+								sharedMaterial = (VzMaterial*)components[0];
 							}
 						}
 
-						if (particleMaterial)
+						if (sharedMaterial)
 						{
-							static float base_color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-							if (ImGui::ColorEdit4("Base Color", base_color))
+							static float base_color[4] = { 0.8f, 0.8f, 0.8f, 1.0f };
+							if (ImGui::ColorEdit4("Base Color (Sphere + Particle)", base_color))
 							{
-								particleMaterial->SetBaseColor({ base_color[0], base_color[1], base_color[2], base_color[3] });
+								// This will change both sphere and particle colors
+								sharedMaterial->SetBaseColor({ base_color[0], base_color[1], base_color[2], base_color[3] });
 							}
 
 							static float emissive_color[3] = { 1.0f, 1.0f, 1.0f };
 							if (ImGui::ColorEdit3("Emissive Color", emissive_color))
 							{
-								particleMaterial->SetEmissiveColor({ emissive_color[0], emissive_color[1], emissive_color[2] });
+								sharedMaterial->SetEmissiveColor({ emissive_color[0], emissive_color[1], emissive_color[2] });
 							}
 
 							static float emissive_strength = 0.0f;
 							if (ImGui::SliderFloat("Emissive Strength", &emissive_strength, 0.0f, 10.0f))
 							{
-								particleMaterial->SetEmissiveStrength(emissive_strength);
+								sharedMaterial->SetEmissiveStrength(emissive_strength);
 							}
 						}
 					}
