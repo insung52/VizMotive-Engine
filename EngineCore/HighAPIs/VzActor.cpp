@@ -894,18 +894,24 @@ namespace vzm
 		if (emitter) { emitter->SetMotionBlurAmount(amount); UpdateTimeStamp(); }
 	}
 
-	void VzActorParticle::SetParticleMaterialID(const VID materialVID)
+	void VzActorParticle::SetMaterial(const MaterialVID vid)
+	{
+		// Store material VID in EmittedParticleComponent (like RenderableComponent)
+		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
+		if (!emitter)
+		{
+			backlog::post("VzActorParticle::SetMaterial >> Invalid particle emitter!", backlog::LogLevel::Error);
+			return;
+		}
+
+		emitter->SetMaterialID(vid);
+		UpdateTimeStamp();
+	}
+
+	MaterialVID VzActorParticle::GetMaterial() const
 	{
 		EmittedParticleComponent* emitter = compfactory::GetEmittedParticleComponent(componentVID_);
-		if (!emitter) return;
-
-		// ⚠️ KEY CHANGE: VID == Entity in current system, use it directly
-		// No need for GetMaterialComponentByVUID which expects encoded VID
-		MaterialComponent* material = compfactory::GetMaterialComponent(materialVID);
-		if (!material) return;
-
-		emitter->SetMaterialID(material->GetEntity());
-		UpdateTimeStamp();
+		return emitter ? emitter->GetMaterialID() : INVALID_ENTITY;
 	}
 
 	void VzActorParticle::SetNormalFactor(float factor)

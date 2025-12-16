@@ -3024,7 +3024,7 @@ namespace vz
 		uint32_t flags_ = EMPTY;
 		ShaderType shaderType_ = ShaderType::SOFT;
 		Entity meshID_ = INVALID_ENTITY;
-		Entity materialID_ = INVALID_ENTITY;  // Material entity (VID == Entity in current system)
+		Entity materialID_ = INVALID_ENTITY;  // Material VID (for WickedEngine approach)
 
 		// Particle emission and behavior
 		uint32_t maxParticles_ = 1000;
