@@ -54,6 +54,12 @@ void bind_engine(py::module& m) {
           "Create a new static mesh actor",
           py::return_value_policy::reference);
 
+    m.def("new_light", &vzm::NewLight,
+          py::arg("name"),
+          py::arg("parent_vid") = 0u,
+          "Create a new light",
+          py::return_value_policy::reference);
+
     // Component query functions
     m.def("get_first_vid_by_name", &vzm::GetFirstVidByName,
           py::arg("name"),

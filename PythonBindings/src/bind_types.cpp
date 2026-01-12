@@ -7,6 +7,7 @@
 #include "vzm2/VzActor.h"
 #include "vzm2/VzGeometry.h"
 #include "vzm2/VzMaterial.h"
+#include "vzm2/VzLight.h"
 
 namespace py = pybind11;
 
@@ -64,7 +65,10 @@ void bind_types(py::module& m) {
         .def("set_perspective_projection", &vzm::VzCamera::SetPerspectiveProjection,
              py::arg("zNearP"), py::arg("zFarP"), py::arg("fovInDegree"),
              py::arg("aspectRatio"), py::arg("isVertical") = true,
-             "Set perspective projection parameters");
+             "Set perspective projection parameters")
+        .def("set_visible_layer_mask", &vzm::VzCamera::SetVisibleLayerMask,
+             py::arg("mask"),
+             "Set visible layer mask for camera");
 
     // Renderer
     py::class_<vzm::VzRenderer, vzm::VzBaseComp>(m, "VzRenderer")
@@ -73,6 +77,12 @@ void bind_types(py::module& m) {
         .def("set_canvas", &vzm::VzRenderer::SetCanvas,
              py::arg("w"), py::arg("h"), py::arg("dpi"), py::arg("window") = nullptr,
              "Set canvas size and DPI")
+        .def("get_canvas", [](vzm::VzRenderer* renderer) {
+            uint32_t w = 0, h = 0;
+            float dpi = 0.0f;
+            renderer->GetCanvas(&w, &h, &dpi, nullptr);
+            return py::make_tuple(w, h, dpi);
+        }, "Get canvas size and DPI, returns (width, height, dpi)")
         .def("set_clear_color", [](vzm::VzRenderer* renderer, const std::vector<float>& color) {
             if (color.size() != 4) {
                 throw std::runtime_error("Color must have 4 elements (RGBA)");
@@ -84,7 +94,19 @@ void bind_types(py::module& m) {
         .def("render",
              py::overload_cast<const SceneVID, const CamVID, const float>(&vzm::VzRenderer::Render),
              py::arg("scene_vid"), py::arg("cam_vid"), py::arg("dt") = -1.f,
-             "Render the scene");
+             "Render the scene")
+        .def("store_render_target", [](vzm::VzRenderer* renderer) {
+            std::vector<uint8_t> buffer;
+            uint32_t w = 0, h = 0;
+            bool result = renderer->StoreRenderTarget(buffer, &w, &h);
+            if (!result) {
+                throw std::runtime_error("Failed to store render target");
+            }
+            return py::make_tuple(py::bytes(reinterpret_cast<const char*>(buffer.data()), buffer.size()), w, h);
+        }, "Store render target to memory and return (bytes, width, height)")
+        .def("store_render_target_to_file", &vzm::VzRenderer::StoreRenderTargetInfoFile,
+             py::arg("filename"),
+             "Store render target to file");
 
     // Actor
     py::class_<vzm::VzActor, vzm::VzBaseComp>(m, "VzActor")
@@ -105,7 +127,10 @@ void bind_types(py::module& m) {
             vfloat3 vscale{scale[0], scale[1], scale[2]};
             actor->SetScale(vscale);
         }, py::arg("scale"),
-             "Set actor scale");
+             "Set actor scale")
+        .def("set_visible_layer_mask", &vzm::VzActor::SetVisibleLayerMask,
+             py::arg("mask"), py::arg("include_descendants") = false,
+             "Set visible layer mask for actor");
 
     // Geometry
     py::class_<vzm::VzGeometry, vzm::VzBaseComp>(m, "VzGeometry")
@@ -129,4 +154,41 @@ void bind_types(py::module& m) {
     py::class_<vzm::VzActorStaticMesh, vzm::VzActor>(m, "VzActorStaticMesh")
         .def("get_vid", &vzm::VzActorStaticMesh::GetVID)
         .def("get_name", &vzm::VzActorStaticMesh::GetName);
+
+    // Light Type Enum
+    py::enum_<vzm::VzLight::LightType>(m, "LightType")
+        .value("DIRECTIONAL", vzm::VzLight::LightType::DIRECTIONAL)
+        .value("POINT", vzm::VzLight::LightType::POINT)
+        .value("SPOT", vzm::VzLight::LightType::SPOT)
+        .export_values();
+
+    // Light
+    py::class_<vzm::VzLight, vzm::VzBaseComp>(m, "VzLight")
+        .def("get_vid", &vzm::VzLight::GetVID)
+        .def("get_name", &vzm::VzLight::GetName)
+        .def("set_light_type", &vzm::VzLight::SetLightType,
+             py::arg("type"),
+             "Set light type (DIRECTIONAL, POINT, or SPOT)")
+        .def("set_position", [](vzm::VzLight* light, const std::vector<float>& position) {
+            if (position.size() != 3) {
+                throw std::runtime_error("Position must have 3 elements");
+            }
+            vfloat3 vpos{position[0], position[1], position[2]};
+            light->SetPosition(vpos);
+        }, py::arg("position"),
+             "Set light position")
+        .def("set_range", &vzm::VzLight::SetRange,
+             py::arg("range"),
+             "Set light range")
+        .def("set_intensity", &vzm::VzLight::SetIntensity,
+             py::arg("intensity"),
+             "Set light intensity")
+        .def("set_color", [](vzm::VzLight* light, const std::vector<float>& color) {
+            if (color.size() != 3) {
+                throw std::runtime_error("Color must have 3 elements (RGB)");
+            }
+            vfloat3 vcol{color[0], color[1], color[2]};
+            light->SetColor(vcol);
+        }, py::arg("color"),
+             "Set light color (RGB)");
 }

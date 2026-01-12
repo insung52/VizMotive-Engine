@@ -25,6 +25,7 @@ print(f"Working directory: {os.getcwd()}")
 
 import pyvizmotive as vzm
 import dearpygui.dearpygui as dpg
+import numpy as np
 
 class VizMotiveViewer:
     def __init__(self):
@@ -32,6 +33,8 @@ class VizMotiveViewer:
         self.scene = None
         self.camera = None
         self.renderer = None
+        self.texture_tag = None
+        self.image_tag = None
 
     def init_engine(self):
         """Initialize VizMotive engine"""
@@ -79,6 +82,19 @@ class VizMotiveViewer:
             self.scene.append_child(cube)
             print("Cube created and added to scene!")
 
+            # Create a light
+            print("Creating light...")
+            light = vzm.new_light("main_light")
+            light.set_light_type(vzm.LightType.POINT)  # Set as point light
+            light.set_position([3.0, 5.0, 3.0])
+            light.set_color([1.0, 1.0, 1.0])  # White light
+            light.set_intensity(5.0)
+            light.set_range(20.0)
+
+            # Add light to scene
+            self.scene.append_child(light)
+            print("Light created and added to scene!")
+
         else:
             print("Engine initialization failed!")
             self.engine_initialized = False
@@ -106,7 +122,12 @@ class VizMotiveViewer:
             dpg.add_text("Render Info:")
             dpg.add_text("Not rendered", tag="render_info")
 
-        dpg.create_viewport(title="VizMotive Viewer", width=800, height=600)
+            dpg.add_separator()
+            dpg.add_text("Render Output:")
+            # Placeholder for render output image
+            # Will be created dynamically after first render
+
+        dpg.create_viewport(title="VizMotive Viewer", width=1024, height=768)
         dpg.setup_dearpygui()
         dpg.show_viewport()
         dpg.set_primary_window("main_window", True)
@@ -138,11 +159,58 @@ class VizMotiveViewer:
             print(f"Render result: {result}")
 
             if result:
-                dpg.set_value("render_info", "Rendered successfully!")
+                # Get canvas size
+                width, height, dpi = self.renderer.get_canvas()
+                print(f"Canvas size: {width}x{height}, DPI: {dpi}")
+
+                # Get render target data
+                print("Storing render target...")
+                data_bytes, _, _ = self.renderer.store_render_target()
+                print(f"Got render target: {width}x{height}, {len(data_bytes)} bytes")
+
+                # Convert bytes to numpy array (RGBA format)
+                img_data = np.frombuffer(data_bytes, dtype=np.uint8)
+                img_data = img_data.reshape((height, width, 4))
+
+                # Convert to float32 normalized [0, 1] for DearPyGui
+                img_data = img_data.astype(np.float32) / 255.0
+
+                # Flatten for DearPyGui
+                img_data = img_data.flatten()
+
+                # Create or update texture
+                if self.texture_tag is None:
+                    # First render - create texture and image
+                    print("Creating texture and image widget...")
+                    with dpg.texture_registry():
+                        self.texture_tag = dpg.add_raw_texture(
+                            width=width,
+                            height=height,
+                            default_value=img_data,
+                            format=dpg.mvFormat_Float_rgba
+                        )
+                    print(f"Texture created with tag: {self.texture_tag}")
+
+                    # Add image to main window
+                    self.image_tag = dpg.add_image(self.texture_tag, parent="main_window")
+                    print(f"Image widget added with tag: {self.image_tag}")
+                else:
+                    # Update existing texture
+                    print(f"Updating texture {self.texture_tag}...")
+                    dpg.set_value(self.texture_tag, img_data)
+                    print("Texture updated!")
+
+                # Also save to file for debugging
+                self.renderer.store_render_target_to_file("debug_render.png")
+                print("Saved debug_render.png")
+
+                dpg.set_value("render_info", f"Rendered successfully! ({width}x{height})")
             else:
                 dpg.set_value("render_info", "Render failed!")
         except Exception as e:
             print(f"Render error: {e}")
+            import traceback
+            traceback.print_exc()
             dpg.set_value("render_info", f"Error: {e}")
 
     def run(self):
