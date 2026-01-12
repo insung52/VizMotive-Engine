@@ -311,6 +311,9 @@ PythonBindings/*.egg-info/
 vz_mcp/Shaders/
 Examples/mcp_screenshots/
 
+# Assets junction (auto-created by vz_viewer_basic.py)
+/Assets/
+
 #shader files
 *.cso
 *.shadermeta

@@ -19,8 +19,18 @@ if hasattr(os, 'add_dll_directory'):
     os.add_dll_directory(dll_path)
     print(f"Added DLL directory: {dll_path}")
 
-# Change working directory to Examples (for Shaders and Assets)
+# Store directory paths
 examples_dir = os.path.dirname(script_dir)
+
+# Create Assets junction if it doesn't exist (for engine initialization)
+assets_junction = os.path.join(engine_root, "Assets")
+assets_source = os.path.join(engine_root, "Examples", "Assets")
+if not os.path.exists(assets_junction):
+    import subprocess
+    print(f"Creating Assets junction: {assets_junction} -> {assets_source}")
+    subprocess.run(["cmd", "/c", "mklink", "/J", assets_junction, assets_source], check=False)
+
+# Set working directory to Examples (for Shaders)
 os.chdir(examples_dir)
 print(f"Working directory: {os.getcwd()}")
 
@@ -239,6 +249,7 @@ class VizMotiveViewer:
             img_data = np.frombuffer(data_bytes, dtype=np.uint8)
             img_data = img_data.reshape((height, width, 4))
             img_data = img_data.astype(np.float32) / 255.0
+            img_data[:, :, 3] = 1.0  # Force alpha to 1.0 to prevent background blending
             img_data = img_data.flatten()
 
             # Create or update texture
