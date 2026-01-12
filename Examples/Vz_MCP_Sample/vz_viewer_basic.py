@@ -6,7 +6,7 @@ import os
 
 # Add pyvizmotive to path (relative to this file)
 script_dir = os.path.dirname(os.path.abspath(__file__))
-engine_root = os.path.dirname(script_dir)
+engine_root = os.path.dirname(os.path.dirname(script_dir))  # vz_mcp is now in Examples, so go up two levels
 pyvizmotive_path = os.path.join(engine_root, "PythonBindings", "out", "build", "x64-Debug")
 sys.path.insert(0, pyvizmotive_path)
 
@@ -19,8 +19,9 @@ if hasattr(os, 'add_dll_directory'):
     os.add_dll_directory(dll_path)
     print(f"Added DLL directory: {dll_path}")
 
-# Change working directory to vz_mcp (for shader paths)
-os.chdir(script_dir)
+# Change working directory to Examples (for Shaders and Assets)
+examples_dir = os.path.dirname(script_dir)
+os.chdir(examples_dir)
 print(f"Working directory: {os.getcwd()}")
 
 import pyvizmotive as vzm
@@ -35,6 +36,7 @@ class VizMotiveViewer:
         self.renderer = None
         self.texture_tag = None
         self.image_tag = None
+        self.canvas_initialized = False  # Track if canvas has been resized
 
     def init_engine(self):
         """Initialize VizMotive engine"""
@@ -138,7 +140,7 @@ class VizMotiveViewer:
                 dpg.add_text("Not Initialized", tag="engine_status", color=(255, 0, 0))
 
             dpg.add_button(label="Initialize Engine", callback=self.on_init_engine)
-            dpg.add_button(label="Render Scene", callback=self.on_render_scene)
+            dpg.add_button(label="Save Screenshot", callback=self.on_save_screenshot)
 
             dpg.add_separator()
             dpg.add_text("Scene Info:")
@@ -172,95 +174,43 @@ class VizMotiveViewer:
             dpg.set_value("engine_status", "Failed")
             dpg.configure_item("engine_status", color=(255, 0, 0))
             dpg.set_value("scene_info", "Engine initialization failed")
-
-    def on_render_scene(self):
-        """Button callback to render scene"""
+    
+    def on_save_screenshot(self):
+        """Button callback to save current frame to file (for MCP)"""
         if not self.engine_initialized:
             dpg.set_value("render_info", "Engine not initialized!")
             return
 
         try:
-            print("Rendering scene...")
+            import datetime, os
 
-            # IMPORTANT: Resize canvas before rendering (like Sample14 does)
-            print("Resizing canvas to 800x600...")
-            self.renderer.resize_canvas(800, 600, self.camera.get_vid())
+            # 스크린샷 저장 폴더 지정
+            folder = "mcp_screenshots"
+            os.makedirs(folder, exist_ok=True)  # 폴더 없으면 자동 생성
 
-            # First render to initialize all resources (envprobe, BVH, etc.)
-            result = self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
-            print(f"First render result: {result} (initializing resources)")
+            # 파일 이름 생성
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(folder, f"screenshot_{timestamp}.png")
 
-            # Second render to get actual output (resources are now ready)
-            result = self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
-            print(f"Second render result: {result} (actual rendering)")
+            # Save current render target to file
+            self.renderer.store_render_target_to_file(filename)
+            print(f"Screenshot saved: {filename}")
 
-            if result:
-                # Get canvas size
-                width, height, dpi = self.renderer.get_canvas()
-                print(f"Canvas size: {width}x{height}, DPI: {dpi}")
-
-                # Get render target data
-                print("Storing render target...")
-                data_bytes, _, _ = self.renderer.store_render_target()
-                print(f"Got render target: {width}x{height}, {len(data_bytes)} bytes")
-
-                # Convert bytes to numpy array (RGBA format)
-                img_data = np.frombuffer(data_bytes, dtype=np.uint8)
-                img_data = img_data.reshape((height, width, 4))
-
-                # Debug: Check if image has any non-zero pixels
-                non_zero = np.count_nonzero(img_data)
-                print(f"Non-zero pixels: {non_zero} out of {img_data.size}")
-                print(f"Min value: {img_data.min()}, Max value: {img_data.max()}")
-                print(f"Mean value: {img_data.mean()}")
-
-                # Convert to float32 normalized [0, 1] for DearPyGui
-                img_data = img_data.astype(np.float32) / 255.0
-
-                # Flatten for DearPyGui
-                img_data = img_data.flatten()
-
-                # Create or update texture
-                if self.texture_tag is None:
-                    # First render - create texture and image
-                    print("Creating texture and image widget...")
-                    with dpg.texture_registry():
-                        self.texture_tag = dpg.add_raw_texture(
-                            width=width,
-                            height=height,
-                            default_value=img_data,
-                            format=dpg.mvFormat_Float_rgba
-                        )
-                    print(f"Texture created with tag: {self.texture_tag}")
-
-                    # Add image to main window
-                    self.image_tag = dpg.add_image(self.texture_tag, parent="main_window")
-                    print(f"Image widget added with tag: {self.image_tag}")
-                else:
-                    # Update existing texture
-                    print(f"Updating texture {self.texture_tag}...")
-                    dpg.set_value(self.texture_tag, img_data)
-                    print("Texture updated!")
-
-                # Also save to file for debugging
-                self.renderer.store_render_target_to_file("debug_render.png")
-                print("Saved debug_render.png")
-
-                dpg.set_value("render_info", f"Rendered successfully! ({width}x{height})")
-            else:
-                dpg.set_value("render_info", "Render failed!")
+            dpg.set_value("render_info", f"Screenshot saved: {filename}")
         except Exception as e:
-            print(f"Render error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Screenshot error: {e}")
             dpg.set_value("render_info", f"Error: {e}")
 
     def run(self):
         """Main loop"""
         self.create_gui()
 
-        # Main loop
+        # Main loop - continuous rendering like Blender MCP
         while dpg.is_dearpygui_running():
+            # Render VizMotive scene every frame (if engine is initialized)
+            if self.engine_initialized:
+                self.update_render()
+
             dpg.render_dearpygui_frame()
 
         # Cleanup
@@ -268,6 +218,45 @@ class VizMotiveViewer:
             vzm.deinit_engine()
 
         dpg.destroy_context()
+
+    def update_render(self):
+        """Update rendering every frame (real-time preview)"""
+        try:
+            # Initialize canvas on first frame (after GUI is ready)
+            if not self.canvas_initialized:
+                print("First frame: Initializing canvas to 800x600...")
+                self.renderer.resize_canvas(800, 600, self.camera.get_vid())
+                self.canvas_initialized = True
+
+            # Render the scene
+            self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
+
+            # Update texture for display
+            width, height, dpi = self.renderer.get_canvas()
+            data_bytes, _, _ = self.renderer.store_render_target()
+
+            # Convert to numpy array
+            img_data = np.frombuffer(data_bytes, dtype=np.uint8)
+            img_data = img_data.reshape((height, width, 4))
+            img_data = img_data.astype(np.float32) / 255.0
+            img_data = img_data.flatten()
+
+            # Create or update texture
+            if self.texture_tag is None:
+                with dpg.texture_registry():
+                    self.texture_tag = dpg.add_raw_texture(
+                        width=width,
+                        height=height,
+                        default_value=img_data,
+                        format=dpg.mvFormat_Float_rgba
+                    )
+                self.image_tag = dpg.add_image(self.texture_tag, parent="main_window")
+            else:
+                dpg.set_value(self.texture_tag, img_data)
+
+        except Exception as e:
+            # Silently ignore errors in continuous rendering
+            pass
 
 if __name__ == "__main__":
     print("=" * 60)

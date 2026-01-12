@@ -309,6 +309,7 @@ PythonBindings/*.egg-info/
 
 # vz_mcp (MCP Integration)
 vz_mcp/Shaders/
+Examples/mcp_screenshots/
 
 #shader files
 *.cso
