@@ -51,6 +51,34 @@ class VizMotiveViewer:
             print(f"Scene: {self.scene}")
             print(f"Camera: {self.camera}")
             print(f"Renderer: {self.renderer}")
+
+            # Setup camera
+            pos = [0.0, 3.0, 6.0]
+            view = [-pos[0], -pos[1], -pos[2]]
+            up = [0.0, 1.0, 0.0]
+            self.camera.set_world_pose(pos, view, up)
+            self.camera.set_perspective_projection(0.01, 50.0, 60.0, 1.0)
+
+            # Setup renderer
+            self.renderer.set_canvas(800, 600, 96.0)
+            self.renderer.set_clear_color([0.2, 0.2, 0.3, 1.0])
+
+            # Create a cube
+            print("Creating cube geometry...")
+            geometry = vzm.new_geometry("cube_geometry")
+            vzm.generate_box_geometry(geometry.get_vid(), 1.0, 1.0, 1.0)
+
+            material = vzm.new_material("cube_material")
+            material.set_base_color([0.8, 0.3, 0.3, 1.0])
+
+            cube = vzm.new_actor_static_mesh("cube", geometry.get_vid(), material.get_vid())
+            cube.set_position([0.0, 0.0, 0.0])
+            cube.set_scale([1.0, 1.0, 1.0])
+
+            # Add cube to scene
+            self.scene.append_child(cube)
+            print("Cube created and added to scene!")
+
         else:
             print("Engine initialization failed!")
             self.engine_initialized = False
@@ -68,10 +96,15 @@ class VizMotiveViewer:
                 dpg.add_text("Not Initialized", tag="engine_status", color=(255, 0, 0))
 
             dpg.add_button(label="Initialize Engine", callback=self.on_init_engine)
+            dpg.add_button(label="Render Scene", callback=self.on_render_scene)
 
             dpg.add_separator()
             dpg.add_text("Scene Info:")
             dpg.add_text("No scene", tag="scene_info")
+
+            dpg.add_separator()
+            dpg.add_text("Render Info:")
+            dpg.add_text("Not rendered", tag="render_info")
 
         dpg.create_viewport(title="VizMotive Viewer", width=800, height=600)
         dpg.setup_dearpygui()
@@ -92,6 +125,25 @@ class VizMotiveViewer:
             dpg.set_value("engine_status", "Failed")
             dpg.configure_item("engine_status", color=(255, 0, 0))
             dpg.set_value("scene_info", "Engine initialization failed")
+
+    def on_render_scene(self):
+        """Button callback to render scene"""
+        if not self.engine_initialized:
+            dpg.set_value("render_info", "Engine not initialized!")
+            return
+
+        try:
+            print("Rendering scene...")
+            result = self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
+            print(f"Render result: {result}")
+
+            if result:
+                dpg.set_value("render_info", "Rendered successfully!")
+            else:
+                dpg.set_value("render_info", "Render failed!")
+        except Exception as e:
+            print(f"Render error: {e}")
+            dpg.set_value("render_info", f"Error: {e}")
 
     def run(self):
         """Main loop"""

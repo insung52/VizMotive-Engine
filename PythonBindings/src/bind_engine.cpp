@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include "vzm2/VzEngineAPIs.h"
+#include "vzm2/utils/GeometryGenerator.h"
 
 namespace py = pybind11;
 
@@ -35,6 +36,24 @@ void bind_engine(py::module& m) {
           "Create a new camera",
           py::return_value_policy::reference);
 
+    m.def("new_geometry", &vzm::NewGeometry,
+          py::arg("name"),
+          "Create a new geometry",
+          py::return_value_policy::reference);
+
+    m.def("new_material", &vzm::NewMaterial,
+          py::arg("name"),
+          "Create a new material",
+          py::return_value_policy::reference);
+
+    m.def("new_actor_static_mesh", &vzm::NewActorStaticMesh,
+          py::arg("name"),
+          py::arg("geometry_vid"),
+          py::arg("material_vid"),
+          py::arg("parent_vid") = 0u,
+          "Create a new static mesh actor",
+          py::return_value_policy::reference);
+
     // Component query functions
     m.def("get_first_vid_by_name", &vzm::GetFirstVidByName,
           py::arg("name"),
@@ -55,4 +74,26 @@ void bind_engine(py::module& m) {
           py::arg("vid"),
           py::arg("include_descendants") = false,
           "Remove a component by VID");
+
+    // Geometry Generation
+    m.def("generate_box_geometry", &vz::geogen::GenerateBoxGeometry,
+          py::arg("geometry_vid"),
+          py::arg("width"),
+          py::arg("height"),
+          py::arg("depth"),
+          py::arg("tessu") = 1,
+          py::arg("tessv") = 1,
+          py::arg("tessw") = 1,
+          "Generate a box geometry");
+
+    m.def("generate_sphere_geometry", &vz::geogen::GenerateSphereGeometry,
+          py::arg("geometry_vid"),
+          py::arg("radius") = 1.f,
+          py::arg("width_segments") = 32u,
+          py::arg("height_segments") = 16u,
+          py::arg("phi_start") = 0.f,
+          py::arg("phi_length") = 0.f,
+          py::arg("theta_start") = 0.f,
+          py::arg("theta_length") = 0.f,
+          "Generate a sphere geometry");
 }
