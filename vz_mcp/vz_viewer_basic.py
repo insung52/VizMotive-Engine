@@ -61,6 +61,7 @@ class VizMotiveViewer:
             up = [0.0, 1.0, 0.0]
             self.camera.set_world_pose(pos, view, up)
             self.camera.set_perspective_projection(0.01, 50.0, 60.0, 1.0)
+            self.camera.set_visible_layer_mask(0xF)  # Camera can see all layers
 
             # Setup renderer
             self.renderer.set_canvas(800, 600, 96.0)
@@ -77,6 +78,7 @@ class VizMotiveViewer:
             cube = vzm.new_actor_static_mesh("cube", geometry.get_vid(), material.get_vid())
             cube.set_position([0.0, 0.0, 0.0])
             cube.set_scale([1.0, 1.0, 1.0])
+            cube.set_visible_layer_mask(0xF, True)  # Make cube visible on layer 0xF
 
             # Add cube to scene
             self.scene.append_child(cube)
@@ -90,10 +92,34 @@ class VizMotiveViewer:
             light.set_color([1.0, 1.0, 1.0])  # White light
             light.set_intensity(5.0)
             light.set_range(20.0)
+            light.set_visible_layer_mask(0xF, True)  # Make light affect layer 0xF
 
             # Add light to scene
             self.scene.append_child(light)
             print("Light created and added to scene!")
+
+            # Debug: Test with Unlit material
+            print("\n=== Creating test Unlit cube ===")
+            test_geometry = vzm.new_geometry("test_cube_geometry")
+            vzm.generate_box_geometry(test_geometry.get_vid(), 0.5, 0.5, 0.5)
+
+            test_material = vzm.new_material("test_cube_material")
+            test_material.set_base_color([1.0, 1.0, 0.0, 1.0])  # Bright yellow
+
+            test_cube = vzm.new_actor_static_mesh("test_cube", test_geometry.get_vid(), test_material.get_vid())
+            test_cube.set_position([2.0, 0.0, 0.0])
+            test_cube.set_scale([1.0, 1.0, 1.0])
+            test_cube.set_visible_layer_mask(0xF, True)
+
+            # Make it unlit so it doesn't need lights
+            test_cube.enable_unlit(True, True)
+
+            self.scene.append_child(test_cube)
+            print("Test cube created (yellow, at position [2, 0, 0])")
+
+            # Also make the original cube unlit for testing
+            cube.enable_unlit(True, True)
+            print("Original red cube also set to unlit mode")
 
         else:
             print("Engine initialization failed!")
@@ -155,8 +181,18 @@ class VizMotiveViewer:
 
         try:
             print("Rendering scene...")
+
+            # IMPORTANT: Resize canvas before rendering (like Sample14 does)
+            print("Resizing canvas to 800x600...")
+            self.renderer.resize_canvas(800, 600, self.camera.get_vid())
+
+            # First render to initialize all resources (envprobe, BVH, etc.)
             result = self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
-            print(f"Render result: {result}")
+            print(f"First render result: {result} (initializing resources)")
+
+            # Second render to get actual output (resources are now ready)
+            result = self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
+            print(f"Second render result: {result} (actual rendering)")
 
             if result:
                 # Get canvas size
@@ -171,6 +207,12 @@ class VizMotiveViewer:
                 # Convert bytes to numpy array (RGBA format)
                 img_data = np.frombuffer(data_bytes, dtype=np.uint8)
                 img_data = img_data.reshape((height, width, 4))
+
+                # Debug: Check if image has any non-zero pixels
+                non_zero = np.count_nonzero(img_data)
+                print(f"Non-zero pixels: {non_zero} out of {img_data.size}")
+                print(f"Min value: {img_data.min()}, Max value: {img_data.max()}")
+                print(f"Mean value: {img_data.mean()}")
 
                 # Convert to float32 normalized [0, 1] for DearPyGui
                 img_data = img_data.astype(np.float32) / 255.0

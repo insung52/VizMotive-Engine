@@ -67,7 +67,7 @@ void bind_types(py::module& m) {
              py::arg("aspectRatio"), py::arg("isVertical") = true,
              "Set perspective projection parameters")
         .def("set_visible_layer_mask", &vzm::VzCamera::SetVisibleLayerMask,
-             py::arg("mask"),
+             py::arg("mask"), py::arg("include_descendants") = false,
              "Set visible layer mask for camera");
 
     // Renderer
@@ -77,6 +77,9 @@ void bind_types(py::module& m) {
         .def("set_canvas", &vzm::VzRenderer::SetCanvas,
              py::arg("w"), py::arg("h"), py::arg("dpi"), py::arg("window") = nullptr,
              "Set canvas size and DPI")
+        .def("resize_canvas", &vzm::VzRenderer::ResizeCanvas,
+             py::arg("w"), py::arg("h"), py::arg("cam_vid") = 0u,
+             "Resize canvas (preserves dpi and window handler)")
         .def("get_canvas", [](vzm::VzRenderer* renderer) {
             uint32_t w = 0, h = 0;
             float dpi = 0.0f;
@@ -130,7 +133,10 @@ void bind_types(py::module& m) {
              "Set actor scale")
         .def("set_visible_layer_mask", &vzm::VzActor::SetVisibleLayerMask,
              py::arg("mask"), py::arg("include_descendants") = false,
-             "Set visible layer mask for actor");
+             "Set visible layer mask for actor")
+        .def("enable_unlit", &vzm::VzActor::EnableUnlit,
+             py::arg("enabled"), py::arg("include_descendants") = true,
+             "Enable unlit rendering (no lighting)");
 
     // Geometry
     py::class_<vzm::VzGeometry, vzm::VzBaseComp>(m, "VzGeometry")
@@ -190,5 +196,8 @@ void bind_types(py::module& m) {
             vfloat3 vcol{color[0], color[1], color[2]};
             light->SetColor(vcol);
         }, py::arg("color"),
-             "Set light color (RGB)");
+             "Set light color (RGB)")
+        .def("set_visible_layer_mask", &vzm::VzLight::SetVisibleLayerMask,
+             py::arg("mask"), py::arg("include_descendants") = false,
+             "Set visible layer mask for light");
 }
