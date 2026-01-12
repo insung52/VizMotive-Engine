@@ -37,6 +37,8 @@ print(f"Working directory: {os.getcwd()}")
 import pyvizmotive as vzm
 import dearpygui.dearpygui as dpg
 import numpy as np
+from PIL import Image
+import io
 
 class VizMotiveViewer:
     def __init__(self):
@@ -102,7 +104,7 @@ class VizMotiveViewer:
             light.set_light_type(vzm.LightType.POINT)  # Set as point light
             light.set_position([3.0, 5.0, 3.0])
             light.set_color([1.0, 1.0, 1.0])  # White light
-            light.set_intensity(5.0)
+            light.set_intensity(30.0)
             light.set_range(20.0)
             light.set_visible_layer_mask(0xF, True)  # Make light affect layer 0xF
 
@@ -110,8 +112,8 @@ class VizMotiveViewer:
             self.scene.append_child(light)
             print("Light created and added to scene!")
 
-            # Debug: Test with Unlit material
-            print("\n=== Creating test Unlit cube ===")
+            # Second cube (yellow)
+            print("\n=== Creating yellow cube ===")
             test_geometry = vzm.new_geometry("test_cube_geometry")
             vzm.generate_box_geometry(test_geometry.get_vid(), 0.5, 0.5, 0.5)
 
@@ -123,15 +125,9 @@ class VizMotiveViewer:
             test_cube.set_scale([1.0, 1.0, 1.0])
             test_cube.set_visible_layer_mask(0xF, True)
 
-            # Make it unlit so it doesn't need lights
-            test_cube.enable_unlit(True, True)
-
             self.scene.append_child(test_cube)
-            print("Test cube created (yellow, at position [2, 0, 0])")
-
-            # Also make the original cube unlit for testing
-            cube.enable_unlit(True, True)
-            print("Original red cube also set to unlit mode")
+            print("Yellow cube created with lighting enabled (at position [2, 0, 0])")
+            print("Red cube also has lighting enabled")
 
         else:
             print("Engine initialization failed!")
@@ -241,15 +237,21 @@ class VizMotiveViewer:
             # Render the scene
             self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
 
-            # Update texture for display
-            width, height, dpi = self.renderer.get_canvas()
-            data_bytes, _, _ = self.renderer.store_render_target()
+            # TEST: Save to PNG and read back
+            temp_file = "mcp_screenshots/_temp_frame.png"
+            os.makedirs("mcp_screenshots", exist_ok=True)
+            self.renderer.store_render_target_to_file(temp_file)
 
-            # Convert to numpy array
-            img_data = np.frombuffer(data_bytes, dtype=np.uint8)
-            img_data = img_data.reshape((height, width, 4))
-            img_data = img_data.astype(np.float32) / 255.0
-            img_data[:, :, 3] = 1.0  # Force alpha to 1.0 to prevent background blending
+            # Read PNG with PIL
+            pil_img = Image.open(temp_file)
+            width, height = pil_img.size
+            img_data = np.array(pil_img).astype(np.float32) / 255.0
+
+            # Convert RGB to RGBA if needed
+            if img_data.shape[2] == 3:
+                alpha = np.ones((height, width, 1), dtype=np.float32)
+                img_data = np.concatenate([img_data, alpha], axis=2)
+
             img_data = img_data.flatten()
 
             # Create or update texture
