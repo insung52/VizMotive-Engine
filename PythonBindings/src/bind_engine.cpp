@@ -102,4 +102,10 @@ void bind_engine(py::module& m) {
           py::arg("theta_start") = 0.f,
           py::arg("theta_length") = 0.f,
           "Generate a sphere geometry");
+
+    m.def("generate_icosahedron_geometry", &vz::geogen::GenerateIcosahedronGeometry,
+          py::arg("geometry_vid"),
+          py::arg("radius") = 1.f,
+          py::arg("detail") = 0u,
+          "Generate an icosahedron geometry (sphere approximation)");
 }

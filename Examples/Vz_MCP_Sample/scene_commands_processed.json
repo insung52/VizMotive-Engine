@@ -1,1 +1,1 @@
-[{"type": "create_cube", "position": [0.0, 0.0, 0.0], "size": 1.0, "color": [1.0, 0.0, 0.0, 1.0]}]
+[{"type": "create_cube", "position": [-3.0, 3.0, 0.0], "size": 1.0, "color": [1.0, 0.0, 0.0, 1.0]}, {"type": "create_cube", "position": [0.0, 3.0, 0.0], "size": 1.0, "color": [0.0, 1.0, 0.0, 1.0]}, {"type": "create_cube", "position": [3.0, 3.0, 0.0], "size": 1.0, "color": [0.0, 0.0, 1.0, 1.0]}, {"type": "create_cube", "position": [-3.0, -3.0, 0.0], "size": 1.0, "color": [0.0, 1.0, 1.0, 1.0]}]
