@@ -311,6 +311,17 @@ PythonBindings/*.egg-info/
 vz_mcp/Shaders/
 Examples/mcp_screenshots/
 
+# MCP Sample files (communication & logs)
+Examples/Vz_MCP_Sample/mcp_screenshots/
+Examples/Vz_MCP_Sample/scene_commands.json
+Examples/Vz_MCP_Sample/scene_commands_processed.json
+Examples/Vz_MCP_Sample/scene_responses.json
+Examples/Vz_MCP_Sample/mcp_debug.log
+Examples/Vz_MCP_Sample/viewer_debug_*.log
+
+# Claude Code temp directories
+tmpclaude-*/
+
 # Assets junction (auto-created by vz_viewer_basic.py)
 /Assets/
 
@@ -320,3 +331,4 @@ Examples/mcp_screenshots/
 /CLAUDE.md
 /.claude
 /AGENTS.md
+
