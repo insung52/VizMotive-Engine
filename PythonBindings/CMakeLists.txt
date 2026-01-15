@@ -62,22 +62,21 @@ target_link_libraries(pyvizmotive PRIVATE
 
 # Copy DLL to output directory (Windows only)
 if(WIN32)
-    set(VIZMOTIVE_DLL_DEBUG "${VIZMOTIVE_INSTALL}/bin/debug_dll/VizEngined.dll")
-    set(VIZMOTIVE_DLL_RELEASE "${VIZMOTIVE_INSTALL}/bin/release_dll/VizEngine.dll")
+    # Use actual build output directory (bin/x64_Debug or bin/x64_Release)
+    set(VIZMOTIVE_BIN_DEBUG "${VIZMOTIVE_ROOT}/bin/x64_Debug")
+    set(VIZMOTIVE_BIN_RELEASE "${VIZMOTIVE_ROOT}/bin/x64_Release")
 
-    add_custom_command(TARGET pyvizmotive POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<$<CONFIG:Debug>:${VIZMOTIVE_DLL_DEBUG}>
-        $<$<CONFIG:Release>:${VIZMOTIVE_DLL_RELEASE}>
-        $<TARGET_FILE_DIR:pyvizmotive>
-        COMMENT "Copying VizEngine DLL to output directory"
+    # List of all required DLLs
+    set(REQUIRED_DLLS
+        VizEngined.dll
+        AssetIO.dll
+        GBackendDX12.dll
+        ShaderEngine.dll
+        dxcompiler.dll
+        dxil.dll
     )
 
-    # Copy other required DLLs
-    set(VIZMOTIVE_BIN_DEBUG "${VIZMOTIVE_INSTALL}/bin/debug_dll")
-    set(VIZMOTIVE_BIN_RELEASE "${VIZMOTIVE_INSTALL}/bin/release_dll")
-
-    foreach(dll_name AssetIO.dll GBackendDX12.dll ShaderEngine.dll dxcompiler.dll dxil.dll)
+    foreach(dll_name ${REQUIRED_DLLS})
         add_custom_command(TARGET pyvizmotive POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<$<CONFIG:Debug>:${VIZMOTIVE_BIN_DEBUG}/${dll_name}>

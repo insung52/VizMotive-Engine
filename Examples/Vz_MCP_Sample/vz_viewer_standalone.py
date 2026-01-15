@@ -60,6 +60,7 @@ logger.info(f"Log file: {log_filename}")
 # Command file path
 COMMAND_FILE = Path(script_dir) / "scene_commands.json"
 PROCESSED_FILE = Path(script_dir) / "scene_commands_processed.json"
+RESPONSE_FILE = Path(script_dir) / "scene_responses.json"
 
 class VizMotiveViewer:
     def __init__(self):
@@ -73,6 +74,24 @@ class VizMotiveViewer:
         self.object_counter = 0
         self.processed_commands = []
         self.created_objects = []  # Track VIDs of created objects for cleanup
+        self.responses = []  # Track responses to send back to MCP server
+
+    def write_response(self, cmd_id, success, **kwargs):
+        """Write response to response file for MCP server to read"""
+        response = {
+            '_id': cmd_id,
+            'success': success,
+            **kwargs
+        }
+        self.responses.append(response)
+
+        # Write all responses to file
+        try:
+            with open(RESPONSE_FILE, 'w') as f:
+                json.dump(self.responses, f, indent=2)
+            logger.debug(f"Response written: {response}")
+        except Exception as e:
+            logger.error(f"Failed to write response: {e}")
 
     def init_engine(self):
         """Initialize VizMotive engine"""
@@ -81,6 +100,8 @@ class VizMotiveViewer:
             COMMAND_FILE.unlink()
         if PROCESSED_FILE.exists():
             PROCESSED_FILE.unlink()
+        if RESPONSE_FILE.exists():
+            RESPONSE_FILE.unlink()
 
         result = vzm.init_engine()
 
@@ -116,53 +137,6 @@ class VizMotiveViewer:
 
             self.scene.append_child(light)
 
-            # DEBUG: Create 3 cubes at initialization to test if crash occurs
-            logger.info("DEBUG: Creating 3 test cubes at initialization")
-            self._create_test_cubes()
-
-    def _create_test_cubes(self):
-        """Create 3 test cubes during initialization (like sample14)"""
-        test_cubes = [
-            {"pos": [0.0, 0.0, 0.0], "color": [1.0, 0.0, 0.0, 1.0]},  # Red
-            {"pos": [3.0, 0.0, 0.0], "color": [0.0, 1.0, 0.0, 1.0]},  # Green
-            {"pos": [-3.0, 0.0, 0.0], "color": [0.0, 0.0, 1.0, 1.0]}, # Blue
-        ]
-
-        for i, cube_data in enumerate(test_cubes):
-            try:
-                self.object_counter += 1
-                name = f"init_cube_{self.object_counter}"
-                logger.debug(f"Creating initialization cube #{self.object_counter}: {name}")
-
-                geometry = vzm.new_geometry(f"{name}_geom")
-                logger.debug(f"Geometry created: VID={geometry.get_vid()}")
-                vzm.generate_box_geometry(geometry.get_vid(), 1.0, 1.0, 1.0)
-
-                material = vzm.new_material(f"{name}_mat")
-                logger.debug(f"Material created: VID={material.get_vid()}")
-                material.set_base_color(cube_data["color"])
-
-                cube = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
-                logger.debug(f"Actor created: VID={cube.get_vid()}")
-                cube.set_position(cube_data["pos"])
-                cube.set_scale([1.0, 1.0, 1.0])
-                cube.set_visible_layer_mask(0xF, True)
-
-                self.scene.append_child(cube)
-
-                self.created_objects.append({
-                    'vid': cube.get_vid(),
-                    'name': name,
-                    'type': 'cube'
-                })
-
-                logger.info(f"✓ Init cube #{self.object_counter} created at {cube_data['pos']}")
-
-            except Exception as e:
-                logger.error(f"Failed to create initialization cube #{i+1}: {e}", exc_info=True)
-
-        logger.info(f"DEBUG: Initialization complete with {len(self.created_objects)} cubes")
-
     def process_commands(self):
         """Read and process commands from file"""
         if not COMMAND_FILE.exists():
@@ -179,53 +153,75 @@ class VizMotiveViewer:
                 logger.info(f"Processing {len(new_commands)} new command(s)")
 
             for cmd in new_commands:
-                logger.info(f"Processing command: {cmd['type']}")
-                logger.debug(f"Command details: {cmd}")
+                cmd_id = cmd.get('_id', 'unknown')
+                logger.info(f"Processing command: {cmd['type']} (id: {cmd_id})")
 
-                if cmd['type'] == 'create_cube':
-                    self.create_cube_object(cmd['position'], cmd['size'], cmd['color'])
-                elif cmd['type'] == 'create_sphere':
-                    self.create_sphere_object(cmd['position'], cmd['radius'], cmd['color'])
-                elif cmd['type'] == 'screenshot':
-                    self.take_screenshot(cmd['filename'])
-                elif cmd['type'] == 'clear_scene':
-                    self.clear_scene()
+                try:
+                    if cmd['type'] == 'create_cube':
+                        self.create_cube_object(cmd_id, cmd['position'], cmd['size'], cmd['color'])
+                    elif cmd['type'] == 'create_sphere':
+                        self.create_sphere_object(cmd_id, cmd['position'], cmd['radius'], cmd['color'])
+                    elif cmd['type'] == 'screenshot':
+                        self.take_screenshot(cmd_id, cmd['filename'])
+                    elif cmd['type'] == 'clear_scene':
+                        self.clear_scene(cmd_id)
+                    elif cmd['type'] == 'set_camera':
+                        self.set_camera(cmd_id, cmd['position'], cmd['look_at'])
+                    elif cmd['type'] == 'get_camera_info':
+                        self.get_camera_info(cmd_id)
+                    elif cmd['type'] == 'create_light':
+                        self.create_light_object(cmd_id, cmd)
+                    elif cmd['type'] == 'set_light_properties':
+                        self.set_light_properties(cmd_id, cmd)
+                    elif cmd['type'] == 'set_object_color':
+                        self.set_object_color(cmd_id, cmd['name'], cmd['color'])
+                    elif cmd['type'] == 'set_material_properties':
+                        self.set_material_properties(cmd_id, cmd)
+                    elif cmd['type'] == 'set_object_position':
+                        self.set_object_position(cmd_id, cmd['name'], cmd['position'])
+                    elif cmd['type'] == 'set_object_scale':
+                        self.set_object_scale(cmd_id, cmd['name'], cmd['scale'])
+                    elif cmd['type'] == 'list_objects':
+                        self.list_objects(cmd_id)
+                    elif cmd['type'] == 'delete_object':
+                        self.delete_object(cmd_id, cmd['name'])
+                    elif cmd['type'] == 'load_model':
+                        self.load_model(cmd_id, cmd['filepath'], cmd.get('name'))
+                    elif cmd['type'] == 'set_render_settings':
+                        self.set_render_settings(cmd_id, cmd)
+                    else:
+                        self.write_response(cmd_id, False, error=f"Unknown command type: {cmd['type']}")
+                except Exception as e:
+                    logger.error(f"Command {cmd['type']} failed: {e}", exc_info=True)
+                    self.write_response(cmd_id, False, error=str(e))
 
                 self.processed_commands.append(cmd)
-                logger.debug(f"Command processed successfully. Total processed: {len(self.processed_commands)}")
 
             # Save processed state
             if len(new_commands) > 0:
                 with open(PROCESSED_FILE, 'w') as f:
                     json.dump(self.processed_commands, f)
-                logger.debug(f"Processed state saved")
 
         except Exception as e:
             logger.error(f"Error processing commands: {e}", exc_info=True)
 
-    def create_cube_object(self, position, size, color):
+    def create_cube_object(self, cmd_id, position, size, color):
         """Create a cube object in the scene"""
         if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
             return
 
         try:
             self.object_counter += 1
             name = f"mcp_cube_{self.object_counter}"
 
-            logger.debug(f"Creating cube #{self.object_counter}: {name}")
-
             geometry = vzm.new_geometry(f"{name}_geom")
-            logger.debug(f"Geometry created: VID={geometry.get_vid()}")
-
             vzm.generate_box_geometry(geometry.get_vid(), size, size, size)
-            logger.debug(f"Box geometry generated")
 
             material = vzm.new_material(f"{name}_mat")
-            logger.debug(f"Material created: VID={material.get_vid()}")
             material.set_base_color(color)
 
             cube = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
-            logger.debug(f"Actor created: VID={cube.get_vid()}")
             cube.set_position(position)
             cube.set_scale([1.0, 1.0, 1.0])
             cube.set_visible_layer_mask(0xF, True)
@@ -239,37 +235,32 @@ class VizMotiveViewer:
                 'type': 'cube'
             })
 
-            logger.info(f"✓ Cube #{self.object_counter} added successfully (Total objects: {self.object_counter})")
-            logger.debug(f"Scene now has {len(self.created_objects)} tracked objects")
+            logger.info(f"✓ Cube '{name}' created (Total: {len(self.created_objects)} objects)")
+            self.write_response(cmd_id, True, name=name, total_objects=len(self.created_objects))
 
         except Exception as e:
             logger.error(f"Failed to create cube: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
 
-    def create_sphere_object(self, position, radius, color):
+    def create_sphere_object(self, cmd_id, position, radius, color):
         """Create a sphere object in the scene (using icosahedron as sphere not implemented)"""
         if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
             return
 
         try:
             self.object_counter += 1
             name = f"mcp_sphere_{self.object_counter}"
 
-            logger.debug(f"Creating sphere #{self.object_counter}: {name}")
-
             geometry = vzm.new_geometry(f"{name}_geom")
-            logger.debug(f"Geometry created: VID={geometry.get_vid()}")
-
             # Note: GenerateSphereGeometry is not implemented in the engine
             # Using icosahedron as a workaround
             vzm.generate_icosahedron_geometry(geometry.get_vid(), radius, 2)  # detail=2 for smoother sphere
-            logger.debug(f"Icosahedron geometry generated")
 
             material = vzm.new_material(f"{name}_mat")
-            logger.debug(f"Material created: VID={material.get_vid()}")
             material.set_base_color(color)
 
             sphere = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
-            logger.debug(f"Actor created: VID={sphere.get_vid()}")
             sphere.set_position(position)
             sphere.set_scale([1.0, 1.0, 1.0])
             sphere.set_visible_layer_mask(0xF, True)
@@ -283,19 +274,22 @@ class VizMotiveViewer:
                 'type': 'sphere'
             })
 
-            logger.info(f"✓ Sphere #{self.object_counter} added successfully (Total objects: {self.object_counter})")
-            logger.debug(f"Scene now has {len(self.created_objects)} tracked objects")
+            logger.info(f"✓ Sphere '{name}' created (Total: {len(self.created_objects)} objects)")
+            self.write_response(cmd_id, True, name=name, total_objects=len(self.created_objects))
 
         except Exception as e:
             logger.error(f"Failed to create sphere: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
 
-    def clear_scene(self):
+    def clear_scene(self, cmd_id):
         """Clear all MCP-created objects"""
         if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
             return
 
         try:
-            logger.info(f"Clearing scene with {len(self.created_objects)} objects")
+            removed_count = len(self.created_objects)
+            logger.info(f"Clearing scene with {removed_count} objects")
 
             # Remove all tracked objects
             for obj in self.created_objects:
@@ -305,17 +299,376 @@ class VizMotiveViewer:
             self.created_objects.clear()
             self.object_counter = 0
             logger.info("✓ Scene cleared successfully")
+            self.write_response(cmd_id, True, removed_count=removed_count)
 
         except Exception as e:
             logger.error(f"Failed to clear scene: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
 
-    def take_screenshot(self, filename):
-        """Take a screenshot and save to file"""
-        if not self.engine_initialized:
+    def set_camera(self, cmd_id, position, look_at):
+        """Set camera position and look-at target"""
+        if not self.engine_initialized or not self.camera:
+            self.write_response(cmd_id, False, error="Engine or camera not initialized")
             return
 
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        self.renderer.store_render_target_to_file(filename)
+        try:
+            pos = position
+            # Calculate view direction from position to look_at
+            view = [look_at[0] - pos[0], look_at[1] - pos[1], look_at[2] - pos[2]]
+            up = [0.0, 1.0, 0.0]
+            self.camera.set_world_pose(pos, view, up)
+            logger.info(f"✓ Camera set to position {position} looking at {look_at}")
+            self.write_response(cmd_id, True, position=position, look_at=look_at)
+        except Exception as e:
+            logger.error(f"Failed to set camera: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def get_camera_info(self, cmd_id):
+        """Get current camera info"""
+        if not self.engine_initialized or not self.camera:
+            self.write_response(cmd_id, False, error="Engine or camera not initialized")
+            return
+
+        try:
+            pos, view, up = self.camera.get_world_pose()
+            logger.info(f"Camera Position: {pos}")
+            logger.info(f"Camera View: {view}")
+            logger.info(f"Camera Up: {up}")
+            self.write_response(cmd_id, True, position=list(pos), view=list(view), up=list(up))
+        except Exception as e:
+            logger.error(f"Failed to get camera info: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def create_light_object(self, cmd_id, cmd):
+        """Create a light in the scene"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            name = cmd['name']
+            light_type = cmd.get('light_type', 'point')
+            position = cmd.get('position', [0.0, 5.0, 0.0])
+            color = cmd.get('color', [1.0, 1.0, 1.0])
+            intensity = cmd.get('intensity', 10.0)
+            range_val = cmd.get('range', 20.0)
+
+            light = vzm.new_light(name)
+
+            # Set light type
+            if light_type == 'directional':
+                light.set_light_type(vzm.LightType.DIRECTIONAL)
+            elif light_type == 'spot':
+                light.set_light_type(vzm.LightType.SPOT)
+            else:
+                light.set_light_type(vzm.LightType.POINT)
+
+            light.set_position(position)
+            light.set_color(color)
+            light.set_intensity(intensity)
+            light.set_range(range_val)
+            light.set_visible_layer_mask(0xF, True)
+
+            self.scene.append_child(light)
+
+            self.created_objects.append({
+                'vid': light.get_vid(),
+                'name': name,
+                'type': 'light'
+            })
+
+            logger.info(f"✓ Light '{name}' ({light_type}) created at {position}")
+            self.write_response(cmd_id, True, name=name, light_type=light_type)
+
+        except Exception as e:
+            logger.error(f"Failed to create light: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def set_light_properties(self, cmd_id, cmd):
+        """Modify existing light properties"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            name = cmd['name']
+            vid = vzm.get_first_vid_by_name(name)
+            if vid == 0:
+                logger.warning(f"Light '{name}' not found")
+                self.write_response(cmd_id, False, error=f"Light '{name}' not found")
+                return
+
+            light = vzm.get_component(vid)
+            if light is None:
+                logger.warning(f"Could not get light component for '{name}'")
+                self.write_response(cmd_id, False, error=f"Could not get light component for '{name}'")
+                return
+
+            if cmd.get('intensity') is not None:
+                light.set_intensity(cmd['intensity'])
+            if cmd.get('color') is not None:
+                light.set_color(cmd['color'])
+            if cmd.get('cast_shadow') is not None:
+                light.enable_cast_shadow(cmd['cast_shadow'])
+
+            logger.info(f"✓ Light '{name}' properties updated")
+            self.write_response(cmd_id, True, name=name)
+
+        except Exception as e:
+            logger.error(f"Failed to set light properties: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def set_object_color(self, cmd_id, name, color):
+        """Set object material color"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            # Find the material by name (convention: object_name + "_mat")
+            mat_vid = vzm.get_first_vid_by_name(f"{name}_mat")
+            if mat_vid == 0:
+                # Try exact name match
+                mat_vid = vzm.get_first_vid_by_name(name)
+
+            if mat_vid == 0:
+                logger.warning(f"Material for '{name}' not found")
+                self.write_response(cmd_id, False, error=f"Material for '{name}' not found. Use list_objects() to see available objects.")
+                return
+
+            material = vzm.get_component(mat_vid)
+            if material:
+                material.set_base_color(color)
+                logger.info(f"✓ Color set for '{name}': RGBA{color}")
+                self.write_response(cmd_id, True, name=name, color=color)
+            else:
+                logger.warning(f"Could not get material component for '{name}'")
+                self.write_response(cmd_id, False, error=f"Could not get material component for '{name}'")
+
+        except Exception as e:
+            logger.error(f"Failed to set object color: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def set_material_properties(self, cmd_id, cmd):
+        """Set material rendering properties"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            name = cmd['name']
+            mat_vid = vzm.get_first_vid_by_name(f"{name}_mat")
+            if mat_vid == 0:
+                mat_vid = vzm.get_first_vid_by_name(name)
+
+            if mat_vid == 0:
+                logger.warning(f"Material for '{name}' not found")
+                self.write_response(cmd_id, False, error=f"Material for '{name}' not found")
+                return
+
+            material = vzm.get_component(mat_vid)
+            if material is None:
+                logger.warning(f"Could not get material component for '{name}'")
+                self.write_response(cmd_id, False, error=f"Could not get material component for '{name}'")
+                return
+
+            if cmd.get('wireframe') is not None:
+                material.set_wireframe(cmd['wireframe'])
+            if cmd.get('double_sided') is not None:
+                material.set_double_sided(cmd['double_sided'])
+            if cmd.get('shader_type') is not None:
+                shader_map = {
+                    'pbr': vzm.ShaderType.PBR,
+                    'phong': vzm.ShaderType.PHONG,
+                    'unlit': vzm.ShaderType.UNLIT
+                }
+                if cmd['shader_type'] in shader_map:
+                    material.set_shader_type(shader_map[cmd['shader_type']])
+
+            logger.info(f"✓ Material properties updated for '{name}'")
+            self.write_response(cmd_id, True, name=name)
+
+        except Exception as e:
+            logger.error(f"Failed to set material properties: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def set_object_position(self, cmd_id, name, position):
+        """Move an object to a new position"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            vid = vzm.get_first_vid_by_name(name)
+            if vid == 0:
+                logger.warning(f"Object '{name}' not found")
+                self.write_response(cmd_id, False, error=f"Object '{name}' not found. Use list_objects() to see available objects.")
+                return
+
+            obj = vzm.get_component(vid)
+            if obj and hasattr(obj, 'set_position'):
+                obj.set_position(position)
+                logger.info(f"✓ Object '{name}' moved to {position}")
+                self.write_response(cmd_id, True, name=name, position=position)
+            else:
+                logger.warning(f"Object '{name}' has no set_position method")
+                self.write_response(cmd_id, False, error=f"Object '{name}' cannot be moved (no set_position method)")
+
+        except Exception as e:
+            logger.error(f"Failed to set object position: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def set_object_scale(self, cmd_id, name, scale):
+        """Scale an object"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            vid = vzm.get_first_vid_by_name(name)
+            if vid == 0:
+                logger.warning(f"Object '{name}' not found")
+                self.write_response(cmd_id, False, error=f"Object '{name}' not found. Use list_objects() to see available objects.")
+                return
+
+            obj = vzm.get_component(vid)
+            if obj and hasattr(obj, 'set_scale'):
+                obj.set_scale(scale)
+                logger.info(f"✓ Object '{name}' scaled to {scale}")
+                self.write_response(cmd_id, True, name=name, scale=scale)
+            else:
+                logger.warning(f"Object '{name}' has no set_scale method")
+                self.write_response(cmd_id, False, error=f"Object '{name}' cannot be scaled (no set_scale method)")
+
+        except Exception as e:
+            logger.error(f"Failed to set object scale: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def list_objects(self, cmd_id):
+        """List all objects in the scene"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        logger.info("=== Scene Objects ===")
+        for i, obj in enumerate(self.created_objects):
+            logger.info(f"  [{i}] {obj['type']}: '{obj['name']}' (VID: {obj['vid']})")
+        logger.info(f"=== Total: {len(self.created_objects)} objects ===")
+
+        # Return object list in response
+        objects = [{'name': obj['name'], 'type': obj['type']} for obj in self.created_objects]
+        self.write_response(cmd_id, True, objects=objects, total=len(objects))
+
+    def delete_object(self, cmd_id, name):
+        """Delete an object from the scene"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            # Find in tracked objects
+            obj_to_remove = None
+            for obj in self.created_objects:
+                if obj['name'] == name:
+                    obj_to_remove = obj
+                    break
+
+            if obj_to_remove:
+                vzm.remove_component(obj_to_remove['vid'], True)
+                self.created_objects.remove(obj_to_remove)
+                logger.info(f"✓ Object '{name}' deleted")
+                self.write_response(cmd_id, True, name=name)
+            else:
+                # Try to find by VID directly
+                vid = vzm.get_first_vid_by_name(name)
+                if vid != 0:
+                    vzm.remove_component(vid, True)
+                    logger.info(f"✓ Object '{name}' deleted (not in tracked list)")
+                    self.write_response(cmd_id, True, name=name)
+                else:
+                    logger.warning(f"Object '{name}' not found")
+                    self.write_response(cmd_id, False, error=f"Object '{name}' not found. Use list_objects() to see available objects.")
+
+        except Exception as e:
+            logger.error(f"Failed to delete object: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def load_model(self, cmd_id, filepath, name=None):
+        """Load a 3D model file"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            logger.info(f"Loading model from: {filepath}")
+            actor = vzm.load_model_file(filepath)
+
+            if actor:
+                actor.set_visible_layer_mask(0xF, True)
+                self.scene.append_child(actor)
+
+                model_name = name or os.path.basename(filepath)
+                self.created_objects.append({
+                    'vid': actor.get_vid(),
+                    'name': model_name,
+                    'type': 'model'
+                })
+
+                logger.info(f"✓ Model '{model_name}' loaded successfully")
+                self.write_response(cmd_id, True, name=model_name, filepath=filepath)
+            else:
+                logger.error(f"Failed to load model: {filepath}")
+                self.write_response(cmd_id, False, error=f"Failed to load model from '{filepath}'")
+
+        except Exception as e:
+            logger.error(f"Failed to load model: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def set_render_settings(self, cmd_id, cmd):
+        """Configure render settings"""
+        if not self.engine_initialized or not self.renderer:
+            self.write_response(cmd_id, False, error="Engine or renderer not initialized")
+            return
+
+        try:
+            if cmd.get('clear_color') is not None:
+                self.renderer.set_clear_color(cmd['clear_color'])
+                logger.info(f"Clear color set to {cmd['clear_color']}")
+
+            if cmd.get('hdr') is not None:
+                self.renderer.set_allow_hdr(cmd['hdr'])
+                logger.info(f"HDR {'enabled' if cmd['hdr'] else 'disabled'}")
+
+            if cmd.get('tonemap') is not None:
+                tonemap_map = {
+                    'reinhard': vzm.Tonemap.Reinhard,
+                    'aces': vzm.Tonemap.ACES
+                }
+                if cmd['tonemap'] in tonemap_map:
+                    self.renderer.set_tonemap(tonemap_map[cmd['tonemap']])
+                    logger.info(f"Tonemap set to {cmd['tonemap']}")
+
+            logger.info("✓ Render settings updated")
+            self.write_response(cmd_id, True)
+
+        except Exception as e:
+            logger.error(f"Failed to set render settings: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def take_screenshot(self, cmd_id, filename):
+        """Take a screenshot and save to file"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+            self.renderer.store_render_target_to_file(filename)
+            logger.info(f"✓ Screenshot saved to {filename}")
+            self.write_response(cmd_id, True, filepath=filename)
+        except Exception as e:
+            logger.error(f"Failed to take screenshot: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
 
     def create_gui(self):
         """Create DearPyGui window"""
@@ -407,57 +760,41 @@ class VizMotiveViewer:
             if self.frame_count % 60 == 0:
                 logger.debug(f"Frame {self.frame_count}: Rendering scene with {len(self.created_objects)} objects")
 
-            # Detailed logging for debugging 3+ object crash
-            obj_count = len(self.created_objects)
-            if obj_count >= 3:
-                logger.debug(f"[RENDER START] Frame {self.frame_count}, Objects: {obj_count}")
-
             # Render the scene
-            logger.debug(f"Calling renderer.render() with scene VID={self.scene.get_vid()}, camera VID={self.camera.get_vid()}")
             self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
-            logger.debug(f"renderer.render() completed")
 
-            if obj_count >= 3:
-                logger.debug(f"[RENDER END] Frame {self.frame_count} completed successfully")
+            # Save to PNG and read back (workaround for store_render_target bug)
+            temp_file = "mcp_screenshots/_temp_frame.png"
+            os.makedirs("mcp_screenshots", exist_ok=True)
 
-            # TEMPORARILY DISABLED: PNG save/load to test if this causes the crash
-            # # Save to PNG and read back (workaround for store_render_target bug)
-            # temp_file = "mcp_screenshots/_temp_frame.png"
-            # os.makedirs("mcp_screenshots", exist_ok=True)
+            self.renderer.store_render_target_to_file(temp_file)
 
-            # logger.debug(f"Calling store_render_target_to_file()")
-            # self.renderer.store_render_target_to_file(temp_file)
-            # logger.debug(f"store_render_target_to_file() completed")
+            # Read PNG with PIL
+            pil_img = Image.open(temp_file)
+            width, height = pil_img.size
 
-            # # Read PNG with PIL
-            # logger.debug(f"Opening PNG file with PIL")
-            # pil_img = Image.open(temp_file)
-            # width, height = pil_img.size
-            # logger.debug(f"PNG loaded: {width}x{height}")
+            img_data = np.array(pil_img).astype(np.float32) / 255.0
 
-            # img_data = np.array(pil_img).astype(np.float32) / 255.0
+            # Convert RGB to RGBA if needed
+            if img_data.shape[2] == 3:
+                alpha = np.ones((height, width, 1), dtype=np.float32)
+                img_data = np.concatenate([img_data, alpha], axis=2)
 
-            # # Convert RGB to RGBA if needed
-            # if img_data.shape[2] == 3:
-            #     alpha = np.ones((height, width, 1), dtype=np.float32)
-            #     img_data = np.concatenate([img_data, alpha], axis=2)
+            img_data = img_data.flatten()
 
-            # img_data = img_data.flatten()
-
-            # # Create or update texture
-            # if self.texture_tag is None:
-            #     logger.debug(f"Creating new DearPyGui texture")
-            #     with dpg.texture_registry():
-            #         self.texture_tag = dpg.add_raw_texture(
-            #             width=width,
-            #             height=height,
-            #             default_value=img_data,
-            #             format=dpg.mvFormat_Float_rgba
-            #         )
-            #     self.image_tag = dpg.add_image(self.texture_tag, parent="main_window")
-            #     logger.debug(f"Texture created")
-            # else:
-            #     dpg.set_value(self.texture_tag, img_data)
+            # Create or update texture
+            if self.texture_tag is None:
+                with dpg.texture_registry():
+                    self.texture_tag = dpg.add_raw_texture(
+                        width=width,
+                        height=height,
+                        default_value=img_data,
+                        format=dpg.mvFormat_Float_rgba
+                    )
+                self.image_tag = dpg.add_image(self.texture_tag, parent="main_window")
+                logger.info(f"Display texture created: {width}x{height}")
+            else:
+                dpg.set_value(self.texture_tag, img_data)
 
         except Exception as e:
             logger.error(f"Render error on frame {getattr(self, 'frame_count', 0)}: {e}", exc_info=True)

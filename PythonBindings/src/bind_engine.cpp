@@ -60,6 +60,27 @@ void bind_engine(py::module& m) {
           "Create a new light",
           py::return_value_policy::reference);
 
+    m.def("new_texture", &vzm::NewTexture,
+          py::arg("name"),
+          "Create a new texture",
+          py::return_value_policy::reference);
+
+    m.def("new_volume", &vzm::NewVolume,
+          py::arg("name"),
+          "Create a new volume (3D texture)",
+          py::return_value_policy::reference);
+
+    m.def("new_archive", &vzm::NewArchive,
+          py::arg("name"),
+          "Create a new archive for serialization",
+          py::return_value_policy::reference);
+
+    // Model loading
+    m.def("load_model_file", &vzm::LoadModelFile,
+          py::arg("filename"),
+          "Load a 3D model file (OBJ, GLTF, etc.) and return root actor",
+          py::return_value_policy::reference);
+
     // Component query functions
     m.def("get_first_vid_by_name", &vzm::GetFirstVidByName,
           py::arg("name"),
