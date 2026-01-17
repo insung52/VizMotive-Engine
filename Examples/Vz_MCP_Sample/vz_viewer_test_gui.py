@@ -204,7 +204,6 @@ class TestViewer:
             self.renderer.set_canvas(self.render_width, self.render_height, 96.0)
             self.renderer.set_clear_color([0.15, 0.15, 0.2, 1.0])
 
-            self.create_default_light()
             self.create_floor()
 
             print("Engine initialized!")
@@ -218,18 +217,6 @@ class TestViewer:
         view = [target[0] - pos[0], target[1] - pos[1], target[2] - pos[2]]
         up = [0.0, 1.0, 0.0]
         self.camera.set_world_pose(pos, view, up)
-
-    def create_default_light(self):
-        """Create default directional light with shadows"""
-        light = vzm.new_light("main_light")
-        light.set_light_type(vzm.LightType.DIRECTIONAL)
-        light.set_position([5.0, 10.0, 5.0])
-        light.set_color([1.0, 1.0, 0.95])
-        light.set_intensity(3.0)
-        light.enable_cast_shadow(True)
-        light.set_visible_layer_mask(0xF, True)
-        self.scene.append_child(light)
-        self.lights.append({'vid': light.get_vid(), 'name': 'main_light', 'type': 'directional'})
 
     def create_floor(self):
         """Create floor plane"""
@@ -307,17 +294,71 @@ class TestViewer:
 
     def create_point_light(self):
         """Create point light"""
-        name = f"point_light_{len(self.lights)}"
+        self.object_counter += 1
+        name = f"point_light_{self.object_counter}"
+        pos = [random.uniform(-3, 3), random.uniform(2, 5), random.uniform(-3, 3)]
+        color = [1.0, 0.9, 0.8]
+        intensity = 15.0
+        range_val = 15.0
+
         light = vzm.new_light(name)
         light.set_light_type(vzm.LightType.POINT)
-        light.set_position([random.uniform(-3, 3), random.uniform(2, 5), random.uniform(-3, 3)])
-        light.set_color([1.0, 0.9, 0.8])
-        light.set_intensity(15.0)
-        light.set_range(15.0)
+        light.set_position(pos)
+        light.set_color(color)
+        light.set_intensity(intensity)
+        light.set_range(range_val)
         light.enable_cast_shadow(True)
         light.set_visible_layer_mask(0xF, True)
         self.scene.append_child(light)
-        self.lights.append({'vid': light.get_vid(), 'name': name, 'type': 'point'})
+
+        # Store light properties locally (engine API has no getters)
+        self.created_objects.append({
+            'vid': light.get_vid(),
+            'name': name,
+            'type': 'point_light',
+            'is_light': True,
+            'light_type': 'Point',
+            'color': color,
+            'intensity': intensity,
+            'range': range_val,
+            'cast_shadow': True,
+            'position': pos
+        })
+        self.update_object_list()
+        self.select_object(name)
+
+    def create_directional_light(self):
+        """Create directional light"""
+        self.object_counter += 1
+        name = f"dir_light_{self.object_counter}"
+        pos = [5.0, 10.0, 5.0]
+        color = [1.0, 1.0, 0.95]
+        intensity = 3.0
+
+        light = vzm.new_light(name)
+        light.set_light_type(vzm.LightType.DIRECTIONAL)
+        light.set_position(pos)
+        light.set_color(color)
+        light.set_intensity(intensity)
+        light.enable_cast_shadow(True)
+        light.set_visible_layer_mask(0xF, True)
+        self.scene.append_child(light)
+
+        # Store light properties locally (engine API has no getters)
+        self.created_objects.append({
+            'vid': light.get_vid(),
+            'name': name,
+            'type': 'directional_light',
+            'is_light': True,
+            'light_type': 'Directional',
+            'color': color,
+            'intensity': intensity,
+            'range': 15.0,  # Not used for directional but keep consistent
+            'cast_shadow': True,
+            'position': pos
+        })
+        self.update_object_list()
+        self.select_object(name)
 
     def select_object(self, name):
         """Select an object and update property panel"""
@@ -331,57 +372,92 @@ class TestViewer:
 
     def update_property_panel(self):
         """Update property panel with selected object"""
+        # Hide all optional sections first
+        dpg.configure_item("mesh_props_group", show=False)
+        dpg.configure_item("light_props_group", show=False)
+
         if self.selected_object is None:
             dpg.set_value("selected_name", "None")
             dpg.configure_item("prop_pos_x", enabled=False)
             dpg.configure_item("prop_pos_y", enabled=False)
             dpg.configure_item("prop_pos_z", enabled=False)
-            dpg.configure_item("prop_color", enabled=False)
-            dpg.configure_item("prop_shadow_cast", enabled=False)
-            dpg.configure_item("prop_shadow_receive", enabled=False)
             return
 
         obj = self.selected_object
+        is_light = obj.get('is_light', False)
         dpg.set_value("selected_name", f"{obj['name']} ({obj['type']})")
 
         # Get position
-        actor = vzm.get_component(obj['vid'])
-        if actor:
-            pos = actor.get_position()
+        if is_light and 'position' in obj:
+            # Use locally stored position for lights
+            pos = obj['position']
             dpg.set_value("prop_pos_x", pos[0])
             dpg.set_value("prop_pos_y", pos[1])
             dpg.set_value("prop_pos_z", pos[2])
-            dpg.configure_item("prop_pos_x", enabled=True)
-            dpg.configure_item("prop_pos_y", enabled=True)
-            dpg.configure_item("prop_pos_z", enabled=True)
+        else:
+            # Get position from engine for meshes
+            component = vzm.get_component(obj['vid'])
+            if component:
+                pos = component.get_position()
+                dpg.set_value("prop_pos_x", pos[0])
+                dpg.set_value("prop_pos_y", pos[1])
+                dpg.set_value("prop_pos_z", pos[2])
 
-        # Get material properties
-        if 'mat_vid' in obj:
-            mat = vzm.get_component(obj['mat_vid'])
-            if mat:
-                color = mat.get_base_color()
-                # Convert to 0-255 for color picker
-                dpg.set_value("prop_color", [int(color[0]*255), int(color[1]*255), int(color[2]*255), 255])
-                dpg.configure_item("prop_color", enabled=True)
+        dpg.configure_item("prop_pos_x", enabled=True)
+        dpg.configure_item("prop_pos_y", enabled=True)
+        dpg.configure_item("prop_pos_z", enabled=True)
 
-                dpg.set_value("prop_shadow_cast", mat.is_shadow_cast())
-                dpg.set_value("prop_shadow_receive", mat.is_shadow_receive())
-                dpg.configure_item("prop_shadow_cast", enabled=True)
-                dpg.configure_item("prop_shadow_receive", enabled=True)
+        if is_light:
+            # Show light properties (read from local storage since API has no getters)
+            dpg.configure_item("light_props_group", show=True)
+
+            # Light type
+            light_type_str = obj.get('light_type', 'Point')
+            dpg.set_value("prop_light_type", light_type_str)
+
+            # Color (color_edit set_value expects 0-255 integers)
+            color = obj.get('color', [1.0, 1.0, 1.0])
+            dpg.set_value("prop_light_color", [int(color[0]*255), int(color[1]*255), int(color[2]*255), 255])
+
+            # Intensity
+            dpg.set_value("prop_light_intensity", obj.get('intensity', 3.0))
+
+            # Range (only enabled for point lights)
+            dpg.set_value("prop_light_range", obj.get('range', 15.0))
+            dpg.configure_item("prop_light_range", enabled=(light_type_str == 'Point'))
+
+            # Cast shadow
+            dpg.set_value("prop_light_shadow", obj.get('cast_shadow', True))
+
+        else:
+            # Show mesh material properties
+            if 'mat_vid' in obj:
+                dpg.configure_item("mesh_props_group", show=True)
+                mat = vzm.get_component(obj['mat_vid'])
+                if mat:
+                    # color_edit set_value expects 0-255 integers, but callback returns 0-1 floats
+                    color = mat.get_base_color()
+                    dpg.set_value("prop_color", [int(color[0]*255), int(color[1]*255), int(color[2]*255), 255])
+                    dpg.set_value("prop_shadow_cast", mat.is_shadow_cast())
+                    dpg.set_value("prop_shadow_receive", mat.is_shadow_receive())
 
     def apply_position(self):
         """Apply position to selected object"""
         if self.selected_object is None:
             return
 
-        actor = vzm.get_component(self.selected_object['vid'])
-        if actor:
-            pos = [
-                dpg.get_value("prop_pos_x"),
-                dpg.get_value("prop_pos_y"),
-                dpg.get_value("prop_pos_z")
-            ]
-            actor.set_position(pos)
+        pos = [
+            dpg.get_value("prop_pos_x"),
+            dpg.get_value("prop_pos_y"),
+            dpg.get_value("prop_pos_z")
+        ]
+
+        component = vzm.get_component(self.selected_object['vid'])
+        if component:
+            component.set_position(pos)
+            # Update local storage for lights
+            if self.selected_object.get('is_light'):
+                self.selected_object['position'] = pos
 
     def apply_color(self, sender, app_data):
         """Apply color to selected object"""
@@ -390,8 +466,8 @@ class TestViewer:
 
         mat = vzm.get_component(self.selected_object['mat_vid'])
         if mat:
-            # app_data is [r, g, b, a] in 0-255 range
-            color = [app_data[0]/255.0, app_data[1]/255.0, app_data[2]/255.0, 1.0]
+            # app_data is [r, g, b, a] in 0-1 float range from color_edit
+            color = [app_data[0], app_data[1], app_data[2], 1.0]
             mat.set_base_color(color)
 
     def apply_shadow_cast(self, sender, value):
@@ -409,6 +485,59 @@ class TestViewer:
         mat = vzm.get_component(self.selected_object['mat_vid'])
         if mat:
             mat.set_shadow_receive(value)
+
+    def apply_light_type(self, sender, value):
+        """Apply light type"""
+        if self.selected_object is None or not self.selected_object.get('is_light'):
+            return
+        light = vzm.get_component(self.selected_object['vid'])
+        if light:
+            light_type = vzm.LightType.DIRECTIONAL if value == "Directional" else vzm.LightType.POINT
+            light.set_light_type(light_type)
+            # Update local storage
+            self.selected_object['type'] = 'directional_light' if value == "Directional" else 'point_light'
+            self.selected_object['light_type'] = value
+            self.update_object_list()
+            # Update range enabled state
+            dpg.configure_item("prop_light_range", enabled=(value == "Point"))
+
+    def apply_light_color(self, sender, app_data):
+        """Apply light color"""
+        if self.selected_object is None or not self.selected_object.get('is_light'):
+            return
+        light = vzm.get_component(self.selected_object['vid'])
+        if light:
+            # app_data is [r, g, b, a] in 0-1 float range from color_edit
+            color = [app_data[0], app_data[1], app_data[2]]
+            light.set_color(color)
+            self.selected_object['color'] = color
+
+    def apply_light_intensity(self, sender, value):
+        """Apply light intensity"""
+        if self.selected_object is None or not self.selected_object.get('is_light'):
+            return
+        light = vzm.get_component(self.selected_object['vid'])
+        if light:
+            light.set_intensity(value)
+            self.selected_object['intensity'] = value
+
+    def apply_light_range(self, sender, value):
+        """Apply light range"""
+        if self.selected_object is None or not self.selected_object.get('is_light'):
+            return
+        light = vzm.get_component(self.selected_object['vid'])
+        if light:
+            light.set_range(value)
+            self.selected_object['range'] = value
+
+    def apply_light_shadow(self, sender, value):
+        """Apply light cast shadow setting"""
+        if self.selected_object is None or not self.selected_object.get('is_light'):
+            return
+        light = vzm.get_component(self.selected_object['vid'])
+        if light:
+            light.enable_cast_shadow(value)
+            self.selected_object['cast_shadow'] = value
 
     def delete_selected(self):
         """Delete selected object"""
@@ -448,20 +577,6 @@ class TestViewer:
         if value and self.scene:
             self.scene.set_option_value_array('DDGI_GRID', [32.0, 8.0, 32.0])
 
-    def set_light_intensity(self, sender, value):
-        """Set main light intensity"""
-        if self.lights:
-            light = vzm.get_component(self.lights[0]['vid'])
-            if light:
-                light.set_intensity(value)
-
-    def set_light_shadow(self, sender, value):
-        """Toggle main light shadow"""
-        if self.lights:
-            light = vzm.get_component(self.lights[0]['vid'])
-            if light:
-                light.enable_cast_shadow(value)
-
     def take_screenshot(self):
         """Take screenshot"""
         import datetime
@@ -470,8 +585,54 @@ class TestViewer:
         self.renderer.store_render_target_to_file(filename)
         print(f"Screenshot: {filename}")
 
+    def pick_object_at_screen(self, screen_x, screen_y):
+        """Pick object at screen position"""
+        if not self.engine_initialized or not self.renderer:
+            return
+
+        # Get render image position to calculate relative coordinates
+        if not dpg.does_item_exist("render_image"):
+            return
+
+        img_pos = dpg.get_item_pos("render_image")
+        # Calculate position relative to render image
+        rel_x = screen_x - img_pos[0]
+        rel_y = screen_y - img_pos[1]
+
+        # Check if within render bounds
+        if rel_x < 0 or rel_y < 0 or rel_x >= self.render_width or rel_y >= self.render_height:
+            return
+
+        # Perform picking
+        try:
+            # filterFlags: MESH_OPAQUE=1, MESH_TRANSPARENT=2, RENDERABLE_ALL includes meshes
+            filter_flags = 0x3  # MESH_OPAQUE | MESH_TRANSPARENT
+            result = self.renderer.picking(
+                self.scene.get_vid(),
+                self.camera.get_vid(),
+                [rel_x, rel_y],
+                filter_flags,
+                0.0  # tolerance radius
+            )
+
+            hit, world_pos, actor_vid, primitive_id, mask_value = result
+
+            if hit and actor_vid != 0:
+                print(f"Picked VID: {actor_vid}, stored VIDs: {[(o['name'], o['vid']) for o in self.created_objects]}")
+                # Find object by VID
+                for obj in self.created_objects:
+                    if obj['vid'] == actor_vid:
+                        self.select_object(obj['name'])
+                        # Also update listbox selection
+                        if dpg.does_item_exist("object_list"):
+                            dpg.set_value("object_list", obj['name'])
+                        return
+                print(f"VID {actor_vid} not found in created_objects")
+        except Exception as e:
+            print(f"Picking error: {e}")
+
     def handle_mouse(self):
-        """Handle mouse input for camera control"""
+        """Handle mouse input for camera control and object picking"""
         # Check if render panel is hovered (render_image may not exist yet)
         panel_hovered = dpg.does_item_exist("render_panel") and dpg.is_item_hovered("render_panel")
         image_hovered = dpg.does_item_exist("render_image") and dpg.is_item_hovered("render_image")
@@ -479,6 +640,10 @@ class TestViewer:
             return
 
         mouse_pos = dpg.get_mouse_pos()
+
+        # Left mouse click - Object picking
+        if dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
+            self.pick_object_at_screen(mouse_pos[0], mouse_pos[1])
 
         # Middle mouse - Orbit or Pan
         if dpg.is_mouse_button_down(dpg.mvMouseButton_Middle):
@@ -531,11 +696,13 @@ class TestViewer:
                 # Left panel - Controls
                 with dpg.child_window(width=280, height=-1):
                     # Object Creation
-                    dpg.add_text("=== Create Objects ===")
+                    dpg.add_text("=== Create ===")
                     with dpg.group(horizontal=True):
-                        dpg.add_button(label="Cube", callback=lambda: self.create_cube(), width=80)
-                        dpg.add_button(label="Sphere", callback=lambda: self.create_sphere(), width=80)
-                        dpg.add_button(label="Light", callback=lambda: self.create_point_light(), width=80)
+                        dpg.add_button(label="Cube", callback=lambda: self.create_cube(), width=62)
+                        dpg.add_button(label="Sphere", callback=lambda: self.create_sphere(), width=62)
+                    with dpg.group(horizontal=True):
+                        dpg.add_button(label="Point Light", callback=lambda: self.create_point_light(), width=90)
+                        dpg.add_button(label="Dir Light", callback=lambda: self.create_directional_light(), width=90)
                     dpg.add_separator()
 
                     # Object List
@@ -560,23 +727,31 @@ class TestViewer:
                         dpg.add_input_float(tag="prop_pos_z", width=80, step=0.1,
                                            callback=lambda s,a: self.apply_position(), enabled=False)
 
-                    dpg.add_text("Color:")
-                    dpg.add_color_edit(tag="prop_color", no_alpha=True, width=-1,
-                                      callback=self.apply_color, enabled=False)
+                    # Mesh properties (shown for mesh objects)
+                    with dpg.group(tag="mesh_props_group", show=False):
+                        dpg.add_text("--- Material ---", color=[150, 200, 150])
+                        dpg.add_color_edit(tag="prop_color", no_alpha=True, width=-1,
+                                          callback=self.apply_color, label="Color")
+                        dpg.add_checkbox(label="Shadow Cast", tag="prop_shadow_cast",
+                                        callback=self.apply_shadow_cast)
+                        dpg.add_checkbox(label="Shadow Receive", tag="prop_shadow_receive",
+                                        callback=self.apply_shadow_receive)
 
-                    dpg.add_checkbox(label="Shadow Cast", tag="prop_shadow_cast",
-                                    callback=self.apply_shadow_cast, enabled=False)
-                    dpg.add_checkbox(label="Shadow Receive", tag="prop_shadow_receive",
-                                    callback=self.apply_shadow_receive, enabled=False)
-                    dpg.add_separator()
-
-                    # Lighting
-                    dpg.add_text("=== Main Light ===")
-                    dpg.add_checkbox(label="Cast Shadow", default_value=True,
-                                    callback=self.set_light_shadow)
-                    dpg.add_slider_float(label="Intensity", default_value=3.0,
-                                        min_value=0.1, max_value=20.0,
-                                        callback=self.set_light_intensity)
+                    # Light properties (shown for light objects)
+                    with dpg.group(tag="light_props_group", show=False):
+                        dpg.add_text("--- Light ---", color=[200, 200, 150])
+                        dpg.add_combo(["Directional", "Point"], tag="prop_light_type",
+                                     callback=self.apply_light_type, label="Type", width=120)
+                        dpg.add_color_edit(tag="prop_light_color", no_alpha=True, width=-1,
+                                          callback=self.apply_light_color, label="Color")
+                        dpg.add_slider_float(tag="prop_light_intensity", label="Intensity",
+                                            min_value=0.1, max_value=50.0, default_value=3.0,
+                                            callback=self.apply_light_intensity)
+                        dpg.add_slider_float(tag="prop_light_range", label="Range",
+                                            min_value=1.0, max_value=100.0, default_value=15.0,
+                                            callback=self.apply_light_range)
+                        dpg.add_checkbox(label="Cast Shadow", tag="prop_light_shadow",
+                                        callback=self.apply_light_shadow)
                     dpg.add_separator()
 
                     # Rendering
@@ -587,6 +762,7 @@ class TestViewer:
 
                     # Info
                     dpg.add_text("=== Controls ===")
+                    dpg.add_text("LMB: Select object", color=[150, 150, 150])
                     dpg.add_text("RMB/MMB: Orbit", color=[150, 150, 150])
                     dpg.add_text("Shift+MMB: Pan", color=[150, 150, 150])
                     dpg.add_text("Scroll: Zoom", color=[150, 150, 150])
