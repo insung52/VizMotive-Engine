@@ -178,6 +178,14 @@ class TestViewer:
         # Render settings
         self.render_width = 800
         self.render_height = 600
+        self.min_render_size = 200
+        self.max_render_size = 1920
+
+        # Resize handle state
+        self.resizing = False
+        self.resize_start_pos = [0, 0]
+        self.resize_start_size = [800, 600]
+        self.texture_size = [0, 0]  # Track current texture size
 
         # Selected object
         self.selected_object = None
@@ -589,7 +597,7 @@ class TestViewer:
         print(f"Screenshot: {filename}")
 
     def pick_object_at_screen(self, screen_x, screen_y):
-        """Pick object at screen position"""
+        """Pick object at screen position (viewport coordinates)"""
         if not self.engine_initialized or not self.renderer:
             return
 
@@ -597,7 +605,8 @@ class TestViewer:
         if not dpg.does_item_exist("render_image"):
             return
 
-        img_pos = dpg.get_item_pos("render_image")
+        # Use viewport coordinates for consistency
+        img_pos = dpg.get_item_rect_min("render_image")
         # Calculate position relative to render image
         rel_x = screen_x - img_pos[0]
         rel_y = screen_y - img_pos[1]
@@ -643,11 +652,12 @@ class TestViewer:
         if not panel_hovered and not image_hovered:
             return
 
-        mouse_pos = dpg.get_mouse_pos()
+        mouse_pos = dpg.get_mouse_pos()  # Local coordinates for camera delta
+        mouse_pos_global = dpg.get_mouse_pos(local=False)  # Viewport coordinates for picking
 
         # Left mouse click - Object picking
         if dpg.is_mouse_button_clicked(dpg.mvMouseButton_Left):
-            self.pick_object_at_screen(mouse_pos[0], mouse_pos[1])
+            self.pick_object_at_screen(mouse_pos_global[0], mouse_pos_global[1])
 
         # Middle mouse - Orbit or Pan
         if dpg.is_mouse_button_down(dpg.mvMouseButton_Middle):
@@ -686,6 +696,132 @@ class TestViewer:
         """Handle mouse wheel for zoom"""
         self.orbit_cam.zoom(app_data)
         self.update_camera()
+
+    def is_over_resize_handle(self, mouse_x, mouse_y):
+        """Check if mouse is over the resize handle"""
+        if not dpg.does_item_exist("render_image"):
+            return False
+
+        # Use get_item_rect_min for absolute viewport coordinates
+        img_pos = dpg.get_item_rect_min("render_image")
+        handle_size = 20
+        handle_x = img_pos[0] + self.render_width - handle_size
+        handle_y = img_pos[1] + self.render_height - handle_size
+
+        return (mouse_x >= handle_x and mouse_x <= img_pos[0] + self.render_width and
+                mouse_y >= handle_y and mouse_y <= img_pos[1] + self.render_height)
+
+    def handle_resize(self):
+        """Handle render resolution resize via drag"""
+        mouse_pos = dpg.get_mouse_pos(local=False)  # Viewport coordinates
+
+        # Check for resize handle hover/drag
+        if dpg.is_mouse_button_down(dpg.mvMouseButton_Left):
+            if not self.resizing:
+                # Start resize if over handle
+                if self.is_over_resize_handle(mouse_pos[0], mouse_pos[1]):
+                    self.resizing = True
+                    self.resize_start_pos = mouse_pos
+                    self.resize_start_size = [self.render_width, self.render_height]
+            else:
+                # Continue resizing - just update preview text, don't apply yet
+                dx = mouse_pos[0] - self.resize_start_pos[0]
+                dy = mouse_pos[1] - self.resize_start_pos[1]
+
+                new_width = int(self.resize_start_size[0] + dx)
+                new_height = int(self.resize_start_size[1] + dy)
+
+                # Clamp to valid range
+                new_width = max(self.min_render_size, min(self.max_render_size, new_width))
+                new_height = max(self.min_render_size, min(self.max_render_size, new_height))
+
+                # Preview - show what size will be applied
+                if dpg.does_item_exist("resolution_text"):
+                    dpg.set_value("resolution_text", f"Resolution: {new_width}x{new_height} (resizing...)")
+        else:
+            if self.resizing:
+                # Mouse released - apply the final size
+                dx = mouse_pos[0] - self.resize_start_pos[0]
+                dy = mouse_pos[1] - self.resize_start_pos[1]
+
+                new_width = int(self.resize_start_size[0] + dx)
+                new_height = int(self.resize_start_size[1] + dy)
+
+                # Clamp to valid range
+                new_width = max(self.min_render_size, min(self.max_render_size, new_width))
+                new_height = max(self.min_render_size, min(self.max_render_size, new_height))
+
+                # Apply new size
+                if new_width != self.render_width or new_height != self.render_height:
+                    self.render_width = new_width
+                    self.render_height = new_height
+                    self.canvas_initialized = False  # Force canvas resize
+                    # Update resolution text
+                    if dpg.does_item_exist("resolution_text"):
+                        dpg.set_value("resolution_text", f"Resolution: {self.render_width}x{self.render_height}")
+
+            self.resizing = False
+
+    def draw_resize_handle(self):
+        """Draw resize handle on render image"""
+        if not dpg.does_item_exist("render_image") or not dpg.does_item_exist("viewport_drawlist"):
+            return
+
+        # Use get_item_rect_min for absolute viewport coordinates
+        img_pos = dpg.get_item_rect_min("render_image")
+        handle_size = 20
+
+        # Current render area corner
+        x2 = img_pos[0] + self.render_width
+        y2 = img_pos[1] + self.render_height
+
+        # Clear previous drawings
+        dpg.delete_item("viewport_drawlist", children_only=True)
+
+        # Check if hovered (use viewport coordinates)
+        mouse_pos = dpg.get_mouse_pos(local=False)
+        is_hovered = self.is_over_resize_handle(mouse_pos[0], mouse_pos[1]) or self.resizing
+
+        # Color based on state
+        color = [255, 200, 100, 255] if is_hovered else [180, 180, 180, 200]
+
+        with dpg.draw_layer(parent="viewport_drawlist"):
+            # If resizing, draw preview rectangle
+            if self.resizing:
+                dx = mouse_pos[0] - self.resize_start_pos[0]
+                dy = mouse_pos[1] - self.resize_start_pos[1]
+                preview_width = max(self.min_render_size, min(self.max_render_size, int(self.resize_start_size[0] + dx)))
+                preview_height = max(self.min_render_size, min(self.max_render_size, int(self.resize_start_size[1] + dy)))
+
+                # Draw preview rectangle outline
+                dpg.draw_rectangle(
+                    (img_pos[0], img_pos[1]),
+                    (img_pos[0] + preview_width, img_pos[1] + preview_height),
+                    color=[255, 200, 100, 200], thickness=2
+                )
+
+                # Update corner position for handle
+                x2 = img_pos[0] + preview_width
+                y2 = img_pos[1] + preview_height
+
+            # Draw 3 diagonal lines as resize indicator
+            line_color = color
+            for i in range(3):
+                offset = 4 + i * 5
+                dpg.draw_line(
+                    (x2 - offset, y2 - 2),
+                    (x2 - 2, y2 - offset),
+                    color=line_color, thickness=2
+                )
+
+            # Draw a small triangle indicator if hovered/resizing
+            if is_hovered:
+                dpg.draw_triangle(
+                    (x2 - handle_size, y2),
+                    (x2, y2 - handle_size),
+                    (x2, y2),
+                    color=[255, 200, 100, 100], fill=[255, 200, 100, 50]
+                )
 
     def create_gui(self):
         """Create GUI"""
@@ -770,12 +906,18 @@ class TestViewer:
                     dpg.add_text("RMB/MMB: Orbit", color=[150, 150, 150])
                     dpg.add_text("Shift+MMB: Pan", color=[150, 150, 150])
                     dpg.add_text("Scroll: Zoom", color=[150, 150, 150])
+                    dpg.add_text("Drag corner: Resize", color=[150, 150, 150])
                     dpg.add_separator()
                     dpg.add_text("FPS: 0", tag="fps_text")
+                    dpg.add_text(f"Resolution: {self.render_width}x{self.render_height}", tag="resolution_text")
 
                 # Right panel - Render view
                 with dpg.child_window(tag="render_panel", width=-1, height=-1):
                     pass  # Image will be added here
+
+        # Viewport drawlist for resize handle overlay
+        with dpg.viewport_drawlist(front=True, tag="viewport_drawlist"):
+            pass
 
         dpg.create_viewport(title="VizMotive Test Viewer", width=1300, height=850)
         dpg.setup_dearpygui()
@@ -791,6 +933,9 @@ class TestViewer:
             if not self.canvas_initialized:
                 self.renderer.resize_canvas(self.render_width, self.render_height, self.camera.get_vid())
                 self.canvas_initialized = True
+                # Update camera aspect ratio
+                aspect = self.render_width / self.render_height
+                self.camera.set_perspective_projection(0.01, 100.0, 45.0, aspect)
 
             # Render
             self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
@@ -817,7 +962,21 @@ class TestViewer:
             # Decode R11G11B10_FLOAT directly to float32 RGBA (reuses buffer)
             img_data = decode_r11g11b10_to_float_rgba(buffer_data, width, height)
 
-            if self.texture_tag is None:
+            # Check if we need to recreate the texture (size changed)
+            need_recreate = (self.texture_tag is None or
+                            self.texture_size[0] != width or
+                            self.texture_size[1] != height)
+
+            if need_recreate:
+                # Delete old texture and image if they exist
+                if self.texture_tag is not None:
+                    if dpg.does_item_exist("render_image"):
+                        dpg.delete_item("render_image")
+                    dpg.delete_item(self.texture_tag)
+                    self.texture_tag = None
+                    self.image_tag = None
+
+                # Create new texture with correct size
                 with dpg.texture_registry():
                     self.texture_tag = dpg.add_raw_texture(
                         width=width, height=height,
@@ -825,6 +984,7 @@ class TestViewer:
                         format=dpg.mvFormat_Float_rgba
                     )
                 self.image_tag = dpg.add_image(self.texture_tag, parent="render_panel", tag="render_image")
+                self.texture_size = [width, height]
             else:
                 dpg.set_value(self.texture_tag, img_data)
 
@@ -849,8 +1009,11 @@ class TestViewer:
         self.update_object_list()
 
         while dpg.is_dearpygui_running():
-            self.handle_mouse()
+            self.handle_resize()  # Handle resize first (before mouse picking)
+            if not self.resizing:
+                self.handle_mouse()
             self.update_render()
+            self.draw_resize_handle()
             dpg.render_dearpygui_frame()
 
         if self.engine_initialized:
@@ -861,9 +1024,11 @@ class TestViewer:
 if __name__ == "__main__":
     print("=" * 50)
     print("VizMotive Test Viewer")
+    print("  LMB: Select object")
     print("  RMB/MMB: Orbit camera")
     print("  Shift+MMB: Pan camera")
     print("  Scroll: Zoom")
+    print("  Drag corner: Resize render")
     print("=" * 50)
 
     viewer = TestViewer()
