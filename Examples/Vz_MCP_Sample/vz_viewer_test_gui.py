@@ -37,86 +37,72 @@ import numpy as np
 import random
 
 
-def decode_r11g11b10_float(data, width, height):
-    """
-    Decode R11G11B10_FLOAT format to RGBA8.
-    R11G11B10_FLOAT packs RGB into 32 bits:
-    - R: bits 0-10 (11 bits, 5-bit exponent, 6-bit mantissa)
-    - G: bits 11-21 (11 bits, 5-bit exponent, 6-bit mantissa)
-    - B: bits 22-31 (10 bits, 5-bit exponent, 5-bit mantissa)
-    """
-    # Interpret as uint32
-    uint32_data = np.frombuffer(data, dtype=np.uint32).reshape((height, width))
-
-    # Extract components
-    r_bits = uint32_data & 0x7FF  # bits 0-10
-    g_bits = (uint32_data >> 11) & 0x7FF  # bits 11-21
-    b_bits = (uint32_data >> 22) & 0x3FF  # bits 22-31
-
-    def decode_11bit_float(bits):
-        """Decode 11-bit float (5-bit exponent, 6-bit mantissa, no sign)"""
+# Pre-compute lookup tables for R11G11B10_FLOAT decoding (computed once at import)
+# Output as float32 (0.0-1.0) to avoid conversion later
+def _build_11bit_lut_float():
+    """Build lookup table for 11-bit float to float32"""
+    lut = np.zeros(2048, dtype=np.float32)
+    for bits in range(2048):
         exponent = (bits >> 6) & 0x1F
         mantissa = bits & 0x3F
+        if exponent == 0:
+            val = (mantissa / 64.0) * (2.0 ** -14) if mantissa else 0.0
+        elif exponent == 31:
+            val = 1.0
+        else:
+            val = (1.0 + mantissa / 64.0) * (2.0 ** (exponent - 15))
+        lut[bits] = min(1.0, max(0.0, val))
+    return lut
 
-        result = np.zeros_like(bits, dtype=np.float32)
-
-        # Handle special cases
-        zero_mask = (exponent == 0) & (mantissa == 0)
-        denorm_mask = (exponent == 0) & (mantissa != 0)
-        inf_mask = (exponent == 31) & (mantissa == 0)
-        nan_mask = (exponent == 31) & (mantissa != 0)
-        normal_mask = ~(zero_mask | denorm_mask | inf_mask | nan_mask)
-
-        # Denormalized
-        result[denorm_mask] = (mantissa[denorm_mask] / 64.0) * (2.0 ** -14)
-
-        # Normalized
-        result[normal_mask] = (1.0 + mantissa[normal_mask] / 64.0) * (2.0 ** (exponent[normal_mask].astype(np.float32) - 15))
-
-        # Infinity
-        result[inf_mask] = np.inf
-
-        return result
-
-    def decode_10bit_float(bits):
-        """Decode 10-bit float (5-bit exponent, 5-bit mantissa, no sign)"""
+def _build_10bit_lut_float():
+    """Build lookup table for 10-bit float to float32"""
+    lut = np.zeros(1024, dtype=np.float32)
+    for bits in range(1024):
         exponent = (bits >> 5) & 0x1F
         mantissa = bits & 0x1F
+        if exponent == 0:
+            val = (mantissa / 32.0) * (2.0 ** -14) if mantissa else 0.0
+        elif exponent == 31:
+            val = 1.0
+        else:
+            val = (1.0 + mantissa / 32.0) * (2.0 ** (exponent - 15))
+        lut[bits] = min(1.0, max(0.0, val))
+    return lut
 
-        result = np.zeros_like(bits, dtype=np.float32)
+# Build lookup tables once at module load
+_LUT_11BIT = _build_11bit_lut_float()
+_LUT_10BIT = _build_10bit_lut_float()
 
-        zero_mask = (exponent == 0) & (mantissa == 0)
-        denorm_mask = (exponent == 0) & (mantissa != 0)
-        inf_mask = (exponent == 31) & (mantissa == 0)
-        nan_mask = (exponent == 31) & (mantissa != 0)
-        normal_mask = ~(zero_mask | denorm_mask | inf_mask | nan_mask)
+# Reusable buffer for output (will be resized as needed)
+_output_buffer = None
+_output_size = (0, 0)
 
-        # Denormalized
-        result[denorm_mask] = (mantissa[denorm_mask] / 32.0) * (2.0 ** -14)
 
-        # Normalized
-        result[normal_mask] = (1.0 + mantissa[normal_mask] / 32.0) * (2.0 ** (exponent[normal_mask].astype(np.float32) - 15))
+def decode_r11g11b10_to_float_rgba(data, width, height):
+    """
+    Decode R11G11B10_FLOAT format directly to flat float32 RGBA array.
+    Reuses buffer to avoid allocation overhead.
+    """
+    global _output_buffer, _output_size
 
-        # Infinity
-        result[inf_mask] = np.inf
+    # Reuse or allocate buffer
+    if _output_size != (width, height):
+        _output_buffer = np.empty(height * width * 4, dtype=np.float32)
+        _output_size = (width, height)
 
-        return result
+    # Interpret as uint32
+    uint32_data = np.frombuffer(data, dtype=np.uint32)
 
-    # Decode to float
-    r_float = decode_11bit_float(r_bits)
-    g_float = decode_11bit_float(g_bits)
-    b_float = decode_10bit_float(b_bits)
+    # Reshape output buffer for easier indexing
+    out = _output_buffer.reshape((height * width, 4))
 
-    # Simple tone mapping (clamp to 0-1 range) and convert to uint8
-    r_uint8 = np.clip(r_float * 255, 0, 255).astype(np.uint8)
-    g_uint8 = np.clip(g_float * 255, 0, 255).astype(np.uint8)
-    b_uint8 = np.clip(b_float * 255, 0, 255).astype(np.uint8)
-    a_uint8 = np.full_like(r_uint8, 255)
+    # Extract and convert using lookup tables
+    out[:, 0] = _LUT_11BIT[uint32_data & 0x7FF]
+    out[:, 1] = _LUT_11BIT[(uint32_data >> 11) & 0x7FF]
+    out[:, 2] = _LUT_10BIT[(uint32_data >> 22) & 0x3FF]
+    out[:, 3] = 1.0
 
-    # Stack to RGBA
-    rgba = np.stack([r_uint8, g_uint8, b_uint8, a_uint8], axis=-1)
-
-    return rgba
+    return _output_buffer
 
 class OrbitCamera:
     """Orbit camera controller (Blender-style)"""
@@ -648,11 +634,8 @@ class TestViewer:
                 height = int(math.sqrt(total_pixels / aspect))
                 width = total_pixels // height
 
-            # Decode R11G11B10_FLOAT format to RGBA8
-            img_array = decode_r11g11b10_float(buffer_data, width, height)
-
-            img_data = img_array.astype(np.float32) / 255.0
-            img_data = img_data.flatten()
+            # Decode R11G11B10_FLOAT directly to float32 RGBA (reuses buffer)
+            img_data = decode_r11g11b10_to_float_rgba(buffer_data, width, height)
 
             if self.texture_tag is None:
                 with dpg.texture_registry():
