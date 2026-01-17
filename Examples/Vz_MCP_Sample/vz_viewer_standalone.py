@@ -189,6 +189,14 @@ class VizMotiveViewer:
                         self.load_model(cmd_id, cmd['filepath'], cmd.get('name'))
                     elif cmd['type'] == 'set_render_settings':
                         self.set_render_settings(cmd_id, cmd)
+                    elif cmd['type'] == 'set_object_rotation':
+                        self.set_object_rotation(cmd_id, cmd['name'], cmd['rotation'])
+                    elif cmd['type'] == 'get_object_transform':
+                        self.get_object_transform(cmd_id, cmd['name'])
+                    elif cmd['type'] == 'set_render_resolution':
+                        self.set_render_resolution(cmd_id, cmd['width'], cmd['height'])
+                    elif cmd['type'] == 'enable_ddgi':
+                        self.enable_ddgi(cmd_id, cmd['enabled'], cmd.get('grid', [32, 8, 32]))
                     else:
                         self.write_response(cmd_id, False, error=f"Unknown command type: {cmd['type']}")
                 except Exception as e:
@@ -220,6 +228,8 @@ class VizMotiveViewer:
 
             material = vzm.new_material(f"{name}_mat")
             material.set_base_color(color)
+            material.set_shadow_cast(True)
+            material.set_shadow_receive(True)
 
             cube = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
             cube.set_position(position)
@@ -259,6 +269,8 @@ class VizMotiveViewer:
 
             material = vzm.new_material(f"{name}_mat")
             material.set_base_color(color)
+            material.set_shadow_cast(True)
+            material.set_shadow_receive(True)
 
             sphere = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
             sphere.set_position(position)
@@ -484,6 +496,10 @@ class VizMotiveViewer:
                 }
                 if cmd['shader_type'] in shader_map:
                     material.set_shader_type(shader_map[cmd['shader_type']])
+            if cmd.get('shadow_cast') is not None:
+                material.set_shadow_cast(cmd['shadow_cast'])
+            if cmd.get('shadow_receive') is not None:
+                material.set_shadow_receive(cmd['shadow_receive'])
 
             logger.info(f"✓ Material properties updated for '{name}'")
             self.write_response(cmd_id, True, name=name)
@@ -542,6 +558,131 @@ class VizMotiveViewer:
 
         except Exception as e:
             logger.error(f"Failed to set object scale: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def set_object_rotation(self, cmd_id, name, rotation):
+        """Set object rotation using euler angles (roll, pitch, yaw in degrees)"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            vid = vzm.get_first_vid_by_name(name)
+            if vid == 0:
+                logger.warning(f"Object '{name}' not found")
+                self.write_response(cmd_id, False, error=f"Object '{name}' not found. Use list_objects() to see available objects.")
+                return
+
+            obj = vzm.get_component(vid)
+            if obj and hasattr(obj, 'set_rotation'):
+                obj.set_rotation(rotation)
+                logger.info(f"✓ Object '{name}' rotated to {rotation} degrees (roll, pitch, yaw)")
+                self.write_response(cmd_id, True, name=name, rotation=rotation)
+            else:
+                logger.warning(f"Object '{name}' has no set_rotation method")
+                self.write_response(cmd_id, False, error=f"Object '{name}' cannot be rotated (no set_rotation method)")
+
+        except Exception as e:
+            logger.error(f"Failed to set object rotation: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def get_object_transform(self, cmd_id, name):
+        """Get object's full transform (position, rotation, scale)"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            vid = vzm.get_first_vid_by_name(name)
+            if vid == 0:
+                logger.warning(f"Object '{name}' not found")
+                self.write_response(cmd_id, False, error=f"Object '{name}' not found. Use list_objects() to see available objects.")
+                return
+
+            obj = vzm.get_component(vid)
+            if obj is None:
+                self.write_response(cmd_id, False, error=f"Could not get component for '{name}'")
+                return
+
+            # Get local transform
+            position = list(obj.get_position()) if hasattr(obj, 'get_position') else None
+            rotation = list(obj.get_rotation()) if hasattr(obj, 'get_rotation') else None
+            scale = list(obj.get_scale()) if hasattr(obj, 'get_scale') else None
+
+            # Get world transform if available
+            world_position = list(obj.get_world_position()) if hasattr(obj, 'get_world_position') else None
+            world_rotation = list(obj.get_world_rotation()) if hasattr(obj, 'get_world_rotation') else None
+            world_scale = list(obj.get_world_scale()) if hasattr(obj, 'get_world_scale') else None
+
+            logger.info(f"✓ Transform for '{name}':")
+            logger.info(f"  Position: {position}")
+            logger.info(f"  Rotation (quaternion): {rotation}")
+            logger.info(f"  Scale: {scale}")
+
+            self.write_response(cmd_id, True,
+                              name=name,
+                              position=position,
+                              rotation=rotation,
+                              scale=scale,
+                              world_position=world_position,
+                              world_rotation=world_rotation,
+                              world_scale=world_scale)
+
+        except Exception as e:
+            logger.error(f"Failed to get object transform: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def set_render_resolution(self, cmd_id, width, height):
+        """Set render canvas resolution"""
+        if not self.engine_initialized or not self.renderer:
+            self.write_response(cmd_id, False, error="Engine or renderer not initialized")
+            return
+
+        try:
+            # Resize renderer canvas
+            if self.camera:
+                self.renderer.resize_canvas(width, height, self.camera.get_vid())
+
+            # Reset texture so it gets recreated with new size on next frame
+            if self.texture_tag is not None:
+                try:
+                    dpg.delete_item(self.image_tag)
+                    dpg.delete_item(self.texture_tag)
+                except:
+                    pass
+                self.texture_tag = None
+                self.image_tag = None
+
+            logger.info(f"✓ Render resolution set to {width}x{height}")
+            self.write_response(cmd_id, True, width=width, height=height)
+
+        except Exception as e:
+            logger.error(f"Failed to set render resolution: {e}", exc_info=True)
+            self.write_response(cmd_id, False, error=str(e))
+
+    def enable_ddgi(self, cmd_id, enabled, grid):
+        """Enable/disable DDGI (Dynamic Diffuse Global Illumination)"""
+        if not self.engine_initialized:
+            self.write_response(cmd_id, False, error="Engine not initialized")
+            return
+
+        try:
+            # Set DDGI enabled in engine config (this is the only required call)
+            vzm.set_configure({'DDGI_ENABLED': enabled})
+
+            # Set DDGI grid if scene exists and DDGI is enabled
+            if self.scene and enabled:
+                # Convert grid to float array as required by engine
+                grid_float = [float(g) for g in grid]
+                self.scene.set_option_value_array('DDGI_GRID', grid_float)
+                logger.info(f"✓ DDGI enabled with grid {grid}")
+            else:
+                logger.info("✓ DDGI disabled")
+
+            self.write_response(cmd_id, True, enabled=enabled, grid=grid if enabled else None)
+
+        except Exception as e:
+            logger.error(f"Failed to configure DDGI: {e}", exc_info=True)
             self.write_response(cmd_id, False, error=str(e))
 
     def list_objects(self, cmd_id):

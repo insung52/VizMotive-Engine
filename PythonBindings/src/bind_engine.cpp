@@ -129,4 +129,14 @@ void bind_engine(py::module& m) {
           py::arg("radius") = 1.f,
           py::arg("detail") = 0u,
           "Generate an icosahedron geometry (sphere approximation)");
+
+    // Engine configuration (for DDGI, etc.)
+    m.def("set_configure", [](const std::map<std::string, bool>& bool_options, const std::string& section) {
+        vzm::ParamMap<std::string> config;
+        for (const auto& [key, value] : bool_options) {
+            config.SetParam(key, value);
+        }
+        vzm::SetConfigure(config, section);
+    }, py::arg("options"), py::arg("section") = "SHADER_ENGINE_SETTINGS",
+       "Set engine configuration options (e.g., DDGI_ENABLED)");
 }

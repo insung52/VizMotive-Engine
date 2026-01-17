@@ -360,7 +360,8 @@ def set_object_color(name: str, r: float, g: float, b: float, a: float = 1.0) ->
 
 @mcp.tool()
 def set_material_properties(name: str, wireframe: bool = None, double_sided: bool = None,
-                            shader_type: str = None) -> str:
+                            shader_type: str = None, shadow_cast: bool = None,
+                            shadow_receive: bool = None) -> str:
     """
     Set material rendering properties
 
@@ -369,13 +370,17 @@ def set_material_properties(name: str, wireframe: bool = None, double_sided: boo
         wireframe: Enable wireframe mode
         double_sided: Enable double-sided rendering
         shader_type: "pbr", "phong", or "unlit"
+        shadow_cast: Enable shadow casting from this object
+        shadow_receive: Enable shadow receiving on this object
     """
     cmd = {
         'type': 'set_material_properties',
         'name': name,
         'wireframe': wireframe,
         'double_sided': double_sided,
-        'shader_type': shader_type
+        'shader_type': shader_type,
+        'shadow_cast': shadow_cast,
+        'shadow_receive': shadow_receive
     }
     resp = write_command_and_wait(cmd)
 
@@ -529,6 +534,110 @@ def set_render_settings(hdr: bool = None, tonemap: str = None, clear_color: list
         return f"✗ Failed to update render settings: {resp.get('error')}"
     else:
         return "Render settings update requested"
+
+# ============ Rotation Tools ============
+
+@mcp.tool()
+def set_object_rotation(name: str, roll: float, pitch: float, yaw: float) -> str:
+    """
+    Rotate an object using Euler angles in degrees
+
+    Args:
+        name: Object name (e.g., 'mcp_cube_1')
+        roll: Rotation around Z axis (degrees)
+        pitch: Rotation around X axis (degrees)
+        yaw: Rotation around Y axis (degrees)
+    """
+    cmd = {
+        'type': 'set_object_rotation',
+        'name': name,
+        'rotation': [roll, pitch, yaw]
+    }
+    resp = write_command_and_wait(cmd)
+
+    if resp and resp.get('success'):
+        return f"✓ Object '{name}' rotated to (roll={roll}°, pitch={pitch}°, yaw={yaw}°)"
+    elif resp and resp.get('error'):
+        return f"✗ Object '{name}' not found: {resp.get('error')}"
+    else:
+        return f"Rotation requested for '{name}'"
+
+@mcp.tool()
+def get_object_transform(name: str) -> str:
+    """
+    Get object's position, rotation, and scale
+
+    Args:
+        name: Object name
+    """
+    cmd = {
+        'type': 'get_object_transform',
+        'name': name
+    }
+    resp = write_command_and_wait(cmd)
+
+    if resp and resp.get('success'):
+        pos = resp.get('position', [0, 0, 0])
+        rot = resp.get('rotation', [0, 0, 0, 1])
+        scale = resp.get('scale', [1, 1, 1])
+        return f"Object '{name}':\n  Position: ({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f})\n  Rotation (quat): ({rot[0]:.3f}, {rot[1]:.3f}, {rot[2]:.3f}, {rot[3]:.3f})\n  Scale: ({scale[0]:.2f}, {scale[1]:.2f}, {scale[2]:.2f})"
+    elif resp and resp.get('error'):
+        return f"✗ Object '{name}' not found: {resp.get('error')}"
+    else:
+        return f"Transform query timed out for '{name}'"
+
+# ============ Resolution & DDGI ============
+
+@mcp.tool()
+def set_render_resolution(width: int, height: int) -> str:
+    """
+    Set render resolution
+
+    Args:
+        width: Render width in pixels
+        height: Render height in pixels
+    """
+    cmd = {
+        'type': 'set_render_resolution',
+        'width': width,
+        'height': height
+    }
+    resp = write_command_and_wait(cmd)
+
+    if resp and resp.get('success'):
+        return f"✓ Render resolution set to {width}x{height}"
+    elif resp and resp.get('error'):
+        return f"✗ Failed to set resolution: {resp.get('error')}"
+    else:
+        return f"Resolution change requested: {width}x{height}"
+
+@mcp.tool()
+def enable_ddgi(enabled: bool, grid_x: int = 32, grid_y: int = 8, grid_z: int = 32) -> str:
+    """
+    Enable/disable DDGI (Dynamic Diffuse Global Illumination)
+
+    Args:
+        enabled: True to enable, False to disable
+        grid_x: DDGI grid X resolution (default 32)
+        grid_y: DDGI grid Y resolution (default 8)
+        grid_z: DDGI grid Z resolution (default 32)
+    """
+    cmd = {
+        'type': 'enable_ddgi',
+        'enabled': enabled,
+        'grid': [grid_x, grid_y, grid_z]
+    }
+    resp = write_command_and_wait(cmd)
+
+    if resp and resp.get('success'):
+        status = "enabled" if enabled else "disabled"
+        if enabled:
+            return f"✓ DDGI {status} with grid ({grid_x}, {grid_y}, {grid_z})"
+        return f"✓ DDGI {status}"
+    elif resp and resp.get('error'):
+        return f"✗ Failed to configure DDGI: {resp.get('error')}"
+    else:
+        return f"DDGI configuration requested"
 
 if __name__ == "__main__":
     # Run the MCP server (stdio mode)

@@ -74,7 +74,10 @@ void bind_types(py::module& m) {
         .def("get_name", &vzm::VzScene::GetName)
         .def("append_child", &vzm::VzScene::AppendChild,
              py::arg("child"),
-             "Append a child actor to the scene");
+             "Append a child actor to the scene")
+        .def("set_option_value_array", &vzm::VzScene::SetOptionValueArray,
+             py::arg("option_name"), py::arg("values"),
+             "Set scene option values (e.g., DDGI_GRID)");
 
     // Camera
     py::class_<vzm::VzCamera, vzm::VzBaseComp>(m, "VzCamera")
@@ -376,6 +379,52 @@ void bind_types(py::module& m) {
             actor->SetScale(vscale);
         }, py::arg("scale"),
              "Set actor scale")
+        .def("set_rotation", [](vzm::VzActor* actor, const std::vector<float>& euler_degrees) {
+            if (euler_degrees.size() != 3) {
+                throw std::runtime_error("Euler angles must have 3 elements (roll, pitch, yaw in degrees)");
+            }
+            vfloat3 euler{euler_degrees[0], euler_degrees[1], euler_degrees[2]};
+            actor->SetEulerAngleZXYInDegree(euler);
+        }, py::arg("euler_degrees"),
+             "Set actor rotation using Euler angles in degrees (roll, pitch, yaw)")
+        .def("set_rotation_quaternion", [](vzm::VzActor* actor, const std::vector<float>& quat) {
+            if (quat.size() != 4) {
+                throw std::runtime_error("Quaternion must have 4 elements (x, y, z, w)");
+            }
+            vfloat4 q{quat[0], quat[1], quat[2], quat[3]};
+            actor->SetQuaternion(q);
+        }, py::arg("quaternion"),
+             "Set actor rotation using quaternion (x, y, z, w)")
+        .def("get_position", [](vzm::VzActor* actor) {
+            vfloat3 pos;
+            actor->GetPosition(pos);
+            return py::make_tuple(pos.x, pos.y, pos.z);
+        }, "Get actor local position")
+        .def("get_rotation", [](vzm::VzActor* actor) {
+            vfloat4 rot;
+            actor->GetRotation(rot);
+            return py::make_tuple(rot.x, rot.y, rot.z, rot.w);
+        }, "Get actor local rotation as quaternion (x, y, z, w)")
+        .def("get_scale", [](vzm::VzActor* actor) {
+            vfloat3 scale;
+            actor->GetScale(scale);
+            return py::make_tuple(scale.x, scale.y, scale.z);
+        }, "Get actor local scale")
+        .def("get_world_position", [](vzm::VzActor* actor) {
+            vfloat3 pos;
+            actor->GetWorldPosition(pos);
+            return py::make_tuple(pos.x, pos.y, pos.z);
+        }, "Get actor world position")
+        .def("get_world_rotation", [](vzm::VzActor* actor) {
+            vfloat4 rot;
+            actor->GetWorldRotation(rot);
+            return py::make_tuple(rot.x, rot.y, rot.z, rot.w);
+        }, "Get actor world rotation as quaternion (x, y, z, w)")
+        .def("get_world_scale", [](vzm::VzActor* actor) {
+            vfloat3 scale;
+            actor->GetWorldScale(scale);
+            return py::make_tuple(scale.x, scale.y, scale.z);
+        }, "Get actor world scale")
         .def("set_visible_layer_mask", &vzm::VzActor::SetVisibleLayerMask,
              py::arg("mask"), py::arg("include_descendants") = false,
              "Set visible layer mask for actor")
