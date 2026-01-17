@@ -178,4 +178,16 @@ namespace vzm
 		posMin = *(vfloat3*)&aabb._min;
 		posMax = *(vfloat3*)&aabb._max;
 	}
+
+	void VzGeometry::UpdateBVH(const bool enabled)
+	{
+		GET_GEO_COMP(geometry, );
+		geometry->UpdateBVH(enabled);
+	}
+
+	bool VzGeometry::HasBVH() const
+	{
+		GET_GEO_COMP(geometry, false);
+		return geometry->HasBVH();
+	}
 }

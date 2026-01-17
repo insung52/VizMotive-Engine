@@ -435,7 +435,12 @@ void bind_types(py::module& m) {
     // Geometry
     py::class_<vzm::VzGeometry, vzm::VzBaseComp>(m, "VzGeometry")
         .def("get_vid", &vzm::VzGeometry::GetVID)
-        .def("get_name", &vzm::VzGeometry::GetName);
+        .def("get_name", &vzm::VzGeometry::GetName)
+        .def("update_bvh", &vzm::VzGeometry::UpdateBVH,
+             py::arg("enabled") = true,
+             "Update BVH for picking support")
+        .def("has_bvh", &vzm::VzGeometry::HasBVH,
+             "Check if geometry has BVH");
 
     // Material TextureSlot enum
     py::enum_<vzm::VzMaterial::TextureSlot>(m, "TextureSlot")

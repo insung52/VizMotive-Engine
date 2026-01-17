@@ -24,5 +24,9 @@ namespace vzm
 		size_t GetMemoryUsageCPU() const;
 
 		void GetAABB(vfloat3& posMin, vfloat3& posMax) const;
+
+		// BVH for picking support
+		void UpdateBVH(const bool enabled = true);
+		bool HasBVH() const;
 	};
 }

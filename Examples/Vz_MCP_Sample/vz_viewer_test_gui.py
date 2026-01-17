@@ -222,6 +222,7 @@ class TestViewer:
         """Create floor plane"""
         geometry = vzm.new_geometry("floor_geom")
         vzm.generate_box_geometry(geometry.get_vid(), 20.0, 0.1, 20.0)
+        geometry.update_bvh()  # Enable picking support
 
         material = vzm.new_material("floor_mat")
         material.set_base_color([0.4, 0.4, 0.45, 1.0])
@@ -243,6 +244,7 @@ class TestViewer:
 
         geometry = vzm.new_geometry(f"{name}_geom")
         vzm.generate_box_geometry(geometry.get_vid(), 1.0, 1.0, 1.0)
+        geometry.update_bvh()  # Enable picking support
 
         material = vzm.new_material(f"{name}_mat")
         material.set_base_color(color)
@@ -272,6 +274,7 @@ class TestViewer:
 
         geometry = vzm.new_geometry(f"{name}_geom")
         vzm.generate_icosahedron_geometry(geometry.get_vid(), 0.5, 3)
+        geometry.update_bvh()  # Enable picking support
 
         material = vzm.new_material(f"{name}_mat")
         material.set_base_color(color)
@@ -605,8 +608,8 @@ class TestViewer:
 
         # Perform picking
         try:
-            # filterFlags: MESH_OPAQUE=1, MESH_TRANSPARENT=2, RENDERABLE_ALL includes meshes
-            filter_flags = 0x3  # MESH_OPAQUE | MESH_TRANSPARENT
+            # Use mesh filters only (avoid COLLIDER which causes assertion)
+            filter_flags = int(vzm.ActorFilter.MESH_OPAQUE) | int(vzm.ActorFilter.MESH_TRANSPARENT)
             result = self.renderer.picking(
                 self.scene.get_vid(),
                 self.camera.get_vid(),
@@ -616,6 +619,7 @@ class TestViewer:
             )
 
             hit, world_pos, actor_vid, primitive_id, mask_value = result
+            print(f"Pick at ({rel_x:.0f}, {rel_y:.0f}): hit={hit}, vid={actor_vid}, world_pos={world_pos}")
 
             if hit and actor_vid != 0:
                 print(f"Picked VID: {actor_vid}, stored VIDs: {[(o['name'], o['vid']) for o in self.created_objects]}")
@@ -654,7 +658,7 @@ class TestViewer:
                 dx = mouse_pos[0] - self.last_mouse_pos[0]
                 dy = mouse_pos[1] - self.last_mouse_pos[1]
 
-                if dpg.is_key_down(dpg.mvKey_Shift):
+                if dpg.is_key_down(dpg.mvKey_LShift) or dpg.is_key_down(dpg.mvKey_RShift):
                     self.orbit_cam.pan(dx, dy)
                 else:
                     self.orbit_cam.orbit(dx, dy)
