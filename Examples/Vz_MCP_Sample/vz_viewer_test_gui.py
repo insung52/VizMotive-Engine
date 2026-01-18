@@ -37,72 +37,30 @@ import numpy as np
 import random
 
 
-# Pre-compute lookup tables for R11G11B10_FLOAT decoding (computed once at import)
-# Output as float32 (0.0-1.0) to avoid conversion later
-def _build_11bit_lut_float():
-    """Build lookup table for 11-bit float to float32"""
-    lut = np.zeros(2048, dtype=np.float32)
-    for bits in range(2048):
-        exponent = (bits >> 6) & 0x1F
-        mantissa = bits & 0x3F
-        if exponent == 0:
-            val = (mantissa / 64.0) * (2.0 ** -14) if mantissa else 0.0
-        elif exponent == 31:
-            val = 1.0
-        else:
-            val = (1.0 + mantissa / 64.0) * (2.0 ** (exponent - 15))
-        lut[bits] = min(1.0, max(0.0, val))
-    return lut
-
-def _build_10bit_lut_float():
-    """Build lookup table for 10-bit float to float32"""
-    lut = np.zeros(1024, dtype=np.float32)
-    for bits in range(1024):
-        exponent = (bits >> 5) & 0x1F
-        mantissa = bits & 0x1F
-        if exponent == 0:
-            val = (mantissa / 32.0) * (2.0 ** -14) if mantissa else 0.0
-        elif exponent == 31:
-            val = 1.0
-        else:
-            val = (1.0 + mantissa / 32.0) * (2.0 ** (exponent - 15))
-        lut[bits] = min(1.0, max(0.0, val))
-    return lut
-
-# Build lookup tables once at module load
-_LUT_11BIT = _build_11bit_lut_float()
-_LUT_10BIT = _build_10bit_lut_float()
-
-# Reusable buffer for output (will be resized as needed)
-_output_buffer = None
-_output_size = (0, 0)
+# Reusable buffer for RGBA8 to float conversion
+_float_buffer = None
+_float_buffer_size = (0, 0)
 
 
-def decode_r11g11b10_to_float_rgba(data, width, height):
+def rgba8_to_float(data, width, height):
     """
-    Decode R11G11B10_FLOAT format directly to flat float32 RGBA array.
-    Reuses buffer to avoid allocation overhead.
+    Convert RGBA8 data to float32 RGBA array for DearPyGui.
+    Simple and fast - just divide by 255.
     """
-    global _output_buffer, _output_size
+    global _float_buffer, _float_buffer_size
 
     # Reuse or allocate buffer
-    if _output_size != (width, height):
-        _output_buffer = np.empty(height * width * 4, dtype=np.float32)
-        _output_size = (width, height)
+    if _float_buffer_size != (width, height):
+        _float_buffer = np.empty(height * width * 4, dtype=np.float32)
+        _float_buffer_size = (width, height)
 
-    # Interpret as uint32
-    uint32_data = np.frombuffer(data, dtype=np.uint32)
+    # Convert uint8 to float32 (0-255 -> 0.0-1.0)
+    uint8_data = np.frombuffer(data, dtype=np.uint8)
+    np.divide(uint8_data, 255.0, out=_float_buffer)
+    
+    # np.multiply(uint8_data, 1.0 / 255.0, out=_float_buffer, casting="unsafe")
 
-    # Reshape output buffer for easier indexing
-    out = _output_buffer.reshape((height * width, 4))
-
-    # Extract and convert using lookup tables
-    out[:, 0] = _LUT_11BIT[uint32_data & 0x7FF]
-    out[:, 1] = _LUT_11BIT[(uint32_data >> 11) & 0x7FF]
-    out[:, 2] = _LUT_10BIT[(uint32_data >> 22) & 0x3FF]
-    out[:, 3] = 1.0
-
-    return _output_buffer
+    return _float_buffer
 
 class OrbitCamera:
     """Orbit camera controller (Blender-style)"""
@@ -940,27 +898,15 @@ class TestViewer:
             # Render
             self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
 
-            # Get render buffer directly
-            buffer_data, w, h = self.renderer.store_render_target()
+            # Get render buffer as RGBA8 (conversion done in C++ for performance)
+            buffer_data, w, h = self.renderer.store_render_target_rgba8()
 
             # Use known dimensions if returned ones are invalid
             width = w if w > 0 else self.render_width
             height = h if h > 0 else self.render_height
 
-            # Convert bytes to numpy array
-            expected_size = width * height * 4
-            actual_size = len(buffer_data)
-
-            if actual_size != expected_size:
-                # Try to calculate dimensions from buffer size
-                total_pixels = actual_size // 4
-                # Assume aspect ratio matches our render settings
-                aspect = self.render_width / self.render_height
-                height = int(math.sqrt(total_pixels / aspect))
-                width = total_pixels // height
-
-            # Decode R11G11B10_FLOAT directly to float32 RGBA (reuses buffer)
-            img_data = decode_r11g11b10_to_float_rgba(buffer_data, width, height)
+            # Convert RGBA8 to float32 for DearPyGui (simple division by 255)
+            img_data = rgba8_to_float(buffer_data, width, height)
 
             # Check if we need to recreate the texture (size changed)
             need_recreate = (self.texture_tag is None or

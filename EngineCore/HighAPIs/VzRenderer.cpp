@@ -434,7 +434,68 @@ namespace vzm
 		{
 			return false;
 		}
+		if (w) *w = rt->GetDesc().width;
+		if (h) *h = rt->GetDesc().height;
 		return helper2::saveTextureToMemory(*rt, rawBuffer);
+	}
+
+	bool VzRenderer::StoreRenderTargetRGBA8(std::vector<uint8_t>& rgbaBuffer, uint32_t* w, uint32_t* h)
+	{
+		GET_RENDERPATH(renderer, false);
+
+		const graphics::Texture* rt = renderer->GetLastProcessRT();
+		if (rt == nullptr || !rt->IsValid())
+		{
+			return false;
+		}
+
+		graphics::TextureDesc desc = rt->GetDesc();
+		if (w) *w = desc.width;
+		if (h) *h = desc.height;
+
+		// Read raw texture data
+		std::vector<uint8_t> rawBuffer;
+		if (!helper2::saveTextureToMemory(*rt, rawBuffer))
+		{
+			return false;
+		}
+
+		// Convert R11G11B10_FLOAT to RGBA8
+		if (desc.format == graphics::Format::R11G11B10_FLOAT)
+		{
+			uint32_t pixelCount = desc.width * desc.height;
+			rgbaBuffer.resize(pixelCount * 4);
+
+			XMFLOAT3PK* dataSrc = (XMFLOAT3PK*)rawBuffer.data();
+			uint32_t* dataDst = (uint32_t*)rgbaBuffer.data();
+
+			for (uint32_t i = 0; i < pixelCount; ++i)
+			{
+				XMFLOAT3PK pixel = dataSrc[i];
+				XMVECTOR V = XMLoadFloat3PK(&pixel);
+				XMFLOAT3 pixel3;
+				XMStoreFloat3(&pixel3, V);
+
+				float r = std::max(0.0f, std::min(pixel3.x, 1.0f));
+				float g = std::max(0.0f, std::min(pixel3.y, 1.0f));
+				float b = std::max(0.0f, std::min(pixel3.z, 1.0f));
+
+				uint32_t rgba8 = 0;
+				rgba8 |= (uint32_t)(r * 255.0f) << 0;
+				rgba8 |= (uint32_t)(g * 255.0f) << 8;
+				rgba8 |= (uint32_t)(b * 255.0f) << 16;
+				rgba8 |= 255u << 24;  // Alpha = 255
+
+				dataDst[i] = rgba8;
+			}
+		}
+		else
+		{
+			// For other formats, just copy the raw buffer
+			rgbaBuffer = std::move(rawBuffer);
+		}
+
+		return true;
 	}
 
 	bool VzRenderer::StoreRenderTargetInfoFile(const std::string& fileName)

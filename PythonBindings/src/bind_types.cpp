@@ -345,6 +345,15 @@ void bind_types(py::module& m) {
             }
             return py::make_tuple(py::bytes(reinterpret_cast<const char*>(buffer.data()), buffer.size()), w, h);
         }, "Store render target to memory and return (bytes, width, height)")
+        .def("store_render_target_rgba8", [](vzm::VzRenderer* renderer) {
+            std::vector<uint8_t> buffer;
+            uint32_t w = 0, h = 0;
+            bool result = renderer->StoreRenderTargetRGBA8(buffer, &w, &h);
+            if (!result) {
+                throw std::runtime_error("Failed to store render target as RGBA8");
+            }
+            return py::make_tuple(py::bytes(reinterpret_cast<const char*>(buffer.data()), buffer.size()), w, h);
+        }, "Store render target as RGBA8 - faster for display (conversion done in C++)")
         .def("store_render_target_to_file", &vzm::VzRenderer::StoreRenderTargetInfoFile,
              py::arg("filename"),
              "Store render target to file")
