@@ -6,7 +6,7 @@ namespace vz
 	namespace graphics
 	{
 		constexpr Format formatDepthbufferMain = graphics::Format::D32_FLOAT_S8X24_UINT;
-		constexpr Format formatRendertargetMain = graphics::Format::R11G11B10_FLOAT;
+		constexpr Format formatRendertargetMain = graphics::Format::R8G8B8A8_UNORM;
 		constexpr Format formatIdbuffer = graphics::Format::R32_UINT;
 		constexpr Format formatRendertargetShadowmap = graphics::Format::R16G16B16A16_FLOAT;
 		constexpr Format formatDepthbufferShadowmap = graphics::Format::D16_UNORM;
