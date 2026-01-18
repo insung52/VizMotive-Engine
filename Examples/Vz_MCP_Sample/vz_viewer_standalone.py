@@ -211,12 +211,14 @@ class StandaloneViewer:
             self._set_object_color(cmd_id, cmd)
         elif cmd_type == 'set_object_scale':
             self._set_object_scale(cmd_id, cmd)
+        elif cmd_type == 'set_object_rotation':
+            self._set_object_rotation(cmd_id, cmd)
         elif cmd_type == 'delete_object':
             self._delete_object(cmd_id, cmd)
         elif cmd_type == 'list_objects':
             self._list_objects(cmd_id)
         elif cmd_type == 'clear_scene':
-            self._clear_scene(cmd_id)
+            self._clear_scene(cmd_id, cmd.get('include_floor', True))
         elif cmd_type == 'enable_ddgi':
             self._enable_ddgi(cmd_id, cmd)
         elif cmd_type == 'set_render_resolution':
@@ -389,6 +391,31 @@ class StandaloneViewer:
 
         self.write_response(cmd_id, False, error=f"Object '{name}' not found")
 
+    def _set_object_rotation(self, cmd_id, cmd):
+        """오브젝트 회전 변경 (Euler angles in degrees)"""
+        name = cmd.get('name')
+        rotation = cmd.get('rotation')  # [roll, pitch, yaw] in degrees
+
+        if not name:
+            self.write_response(cmd_id, False, error="Object name is required")
+            return
+
+        if not rotation or not isinstance(rotation, list) or len(rotation) != 3:
+            self.write_response(cmd_id, False, error=f"Invalid rotation format. Expected [roll, pitch, yaw], got: {rotation}")
+            return
+
+        for obj in self.object_panel.created_objects:
+            if obj['name'] == name:
+                component = vzm.get_component(obj['vid'])
+                if component and hasattr(component, 'set_rotation'):
+                    # Engine expects [roll, pitch, yaw] in degrees - pass directly
+                    component.set_rotation(rotation)
+                    obj['rotation_euler'] = [rotation[1], rotation[2], rotation[0]]  # Store as [x, y, z] for GUI
+                    self.write_response(cmd_id, True, name=name, rotation=rotation)
+                    return
+
+        self.write_response(cmd_id, False, error=f"Object '{name}' not found")
+
     def _delete_object(self, cmd_id, cmd):
         """오브젝트 삭제"""
         name = cmd['name']
@@ -409,16 +436,28 @@ class StandaloneViewer:
                    for obj in self.object_panel.created_objects]
         self.write_response(cmd_id, True, objects=objects)
 
-    def _clear_scene(self, cmd_id):
+    def _clear_scene(self, cmd_id, include_floor=True):
         """씬 클리어"""
         count = 0
-        for obj in self.object_panel.created_objects[:]:
-            if obj['name'] != 'floor':
+        objects_to_remove = []
+
+        # 삭제할 오브젝트 목록 수집
+        for obj in self.object_panel.created_objects:
+            should_delete = include_floor or obj.get('name') != 'floor'
+            if should_delete:
+                objects_to_remove.append(obj)
+
+        # 오브젝트 삭제
+        for obj in objects_to_remove:
+            try:
                 vzm.remove_component(obj['vid'], True)
                 self.object_panel.created_objects.remove(obj)
                 count += 1
+            except Exception as e:
+                print(f"Failed to remove {obj.get('name')}: {e}")
 
         self.object_panel._update_list()
+        self.object_panel.selected_object = None
         self.mcp_object_counter = 0
         self.write_response(cmd_id, True, removed_count=count)
 
@@ -430,6 +469,10 @@ class StandaloneViewer:
         vzm.set_configure({'DDGI_ENABLED': enabled})
         if enabled and self.scene:
             self.scene.set_option_value_array('DDGI_GRID', [float(g) for g in grid])
+
+        # GUI 토글 상태 동기화
+        if dpg.does_item_exist("ddgi_checkbox"):
+            dpg.set_value("ddgi_checkbox", enabled)
 
         self.write_response(cmd_id, True, enabled=enabled)
 
@@ -444,9 +487,11 @@ class StandaloneViewer:
     def _take_screenshot(self, cmd_id, cmd):
         """스크린샷 저장"""
         filename = cmd.get('filename', 'mcp_screenshots/screenshot.png')
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        self.renderer.store_render_target_to_file(filename)
-        self.write_response(cmd_id, True, filepath=filename)
+        # 절대 경로로 변환
+        abs_path = str(Path(filename).resolve())
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        self.renderer.store_render_target_to_file(abs_path)
+        self.write_response(cmd_id, True, filepath=abs_path)
 
     def _set_camera(self, cmd_id, cmd):
         """카메라 설정"""

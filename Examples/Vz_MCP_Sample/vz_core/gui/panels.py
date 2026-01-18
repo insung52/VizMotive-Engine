@@ -248,8 +248,8 @@ class ObjectPanel:
         return False
 
     def delete_selected(self):
-        """선택된 오브젝트 삭제"""
-        if self.selected_object is None or self.selected_object['name'] == 'floor':
+        """선택된 오브젝트 삭제 (floor 포함)"""
+        if self.selected_object is None:
             return
 
         vzm.remove_component(self.selected_object['vid'], True)
@@ -262,11 +262,10 @@ class ObjectPanel:
             self.on_object_deleted(deleted)
 
     def clear_objects(self):
-        """Floor 제외 모든 오브젝트 삭제"""
+        """모든 오브젝트 삭제 (floor 포함)"""
         for obj in self.created_objects[:]:
-            if obj['name'] != 'floor':
-                vzm.remove_component(obj['vid'], True)
-                self.created_objects.remove(obj)
+            vzm.remove_component(obj['vid'], True)
+            self.created_objects.remove(obj)
         self.object_counter = 0
         self.selected_object = None
         self._update_list()
@@ -316,6 +315,17 @@ class PropertyPanel:
                 dpg.add_input_float(tag="prop_pos_z", width=80, step=0.1,
                                    callback=lambda s,a: self._apply_position(), enabled=False)
 
+            # Rotation (for meshes only, lights use direction)
+            with dpg.group(tag="rotation_group", show=False):
+                dpg.add_text("Rotation (degrees):")
+                with dpg.group(horizontal=True):
+                    dpg.add_input_float(tag="prop_rot_x", width=80, step=5.0, label="X",
+                                       callback=lambda s,a: self._apply_rotation(), enabled=True)
+                    dpg.add_input_float(tag="prop_rot_y", width=80, step=5.0, label="Y",
+                                       callback=lambda s,a: self._apply_rotation(), enabled=True)
+                    dpg.add_input_float(tag="prop_rot_z", width=80, step=5.0, label="Z",
+                                       callback=lambda s,a: self._apply_rotation(), enabled=True)
+
             # Mesh properties
             with dpg.group(tag="mesh_props_group", show=False):
                 dpg.add_text("--- Material ---", color=[150, 200, 150])
@@ -349,6 +359,7 @@ class PropertyPanel:
 
         dpg.configure_item("mesh_props_group", show=False)
         dpg.configure_item("light_props_group", show=False)
+        dpg.configure_item("rotation_group", show=False)
 
         if obj is None:
             dpg.set_value("selected_name", "None")
@@ -385,6 +396,14 @@ class PropertyPanel:
             dpg.set_value("prop_light_shadow", obj.get('cast_shadow', True))
         elif 'mat_vid' in obj:
             dpg.configure_item("mesh_props_group", show=True)
+            dpg.configure_item("rotation_group", show=True)
+
+            # Set rotation values
+            rot = obj.get('rotation_euler', [0.0, 0.0, 0.0])
+            dpg.set_value("prop_rot_x", rot[0])
+            dpg.set_value("prop_rot_y", rot[1])
+            dpg.set_value("prop_rot_z", rot[2])
+
             mat = vzm.get_component(obj['mat_vid'])
             if mat:
                 color = mat.get_base_color()
@@ -401,6 +420,23 @@ class PropertyPanel:
             component.set_position(pos)
             if self.current_object.get('is_light'):
                 self.current_object['position'] = pos
+
+    def _apply_rotation(self):
+        """회전 적용 (Euler angles in degrees)"""
+        if not self.current_object or self.current_object.get('is_light'):
+            return
+
+        rot_x = dpg.get_value("prop_rot_x")  # pitch (X축)
+        rot_y = dpg.get_value("prop_rot_y")  # yaw (Y축)
+        rot_z = dpg.get_value("prop_rot_z")  # roll (Z축)
+
+        # Store euler angles for later retrieval
+        self.current_object['rotation_euler'] = [rot_x, rot_y, rot_z]
+
+        # Engine expects [roll, pitch, yaw] in degrees
+        component = vzm.get_component(self.current_object['vid'])
+        if component and hasattr(component, 'set_rotation'):
+            component.set_rotation([rot_z, rot_x, rot_y])  # roll, pitch, yaw
 
     def _apply_color(self, sender, app_data):
         if not self.current_object or 'mat_vid' not in self.current_object:
@@ -489,7 +525,7 @@ class ControlPanel:
         """패널 UI 생성"""
         with dpg.group(parent=parent):
             dpg.add_text("=== Rendering ===")
-            dpg.add_checkbox(label="Enable DDGI", callback=self._toggle_ddgi)
+            dpg.add_checkbox(label="Enable DDGI", tag="ddgi_checkbox", callback=self._toggle_ddgi)
             dpg.add_button(label="Screenshot", callback=self._take_screenshot, width=-1)
             dpg.add_separator()
 

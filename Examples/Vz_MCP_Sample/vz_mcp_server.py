@@ -276,6 +276,33 @@ def set_object_scale(name: str, sx: float, sy: float, sz: float) -> str:
 
 
 @mcp.tool()
+def set_object_rotation(name: str, pitch: float = 0.0, yaw: float = 0.0, roll: float = 0.0) -> str:
+    """
+    Rotate an object using Euler angles in degrees.
+
+    Args:
+        name: Object name (e.g., 'mcp_cube_1', 'mcp_sphere_2')
+        pitch: X-axis rotation in degrees (tilts forward/backward)
+        yaw: Y-axis rotation in degrees (turns left/right)
+        roll: Z-axis rotation in degrees (tilts sideways)
+
+    Example: set_object_rotation("mcp_cube_1", pitch=45, yaw=30, roll=0)
+    """
+    cmd = {
+        'type': 'set_object_rotation',
+        'name': name,
+        'rotation': [roll, pitch, yaw]  # Internal order: roll, pitch, yaw
+    }
+    resp = write_command_and_wait(cmd)
+
+    if resp and resp.get('success'):
+        return f"Object '{name}' rotated: pitch={pitch}deg, yaw={yaw}deg, roll={roll}deg"
+    elif resp and resp.get('error'):
+        return f"Failed: {resp.get('error')}"
+    return f"Rotation requested"
+
+
+@mcp.tool()
 def delete_object(name: str) -> str:
     """오브젝트 삭제"""
     cmd = {
@@ -314,9 +341,14 @@ def list_objects() -> str:
 
 
 @mcp.tool()
-def clear_scene() -> str:
-    """씬의 모든 오브젝트 삭제 (floor 제외)"""
-    cmd = {'type': 'clear_scene'}
+def clear_scene(include_floor: bool = True) -> str:
+    """
+    씬의 모든 오브젝트 삭제
+
+    Args:
+        include_floor: True면 floor도 삭제 (기본값: True)
+    """
+    cmd = {'type': 'clear_scene', 'include_floor': include_floor}
     resp = write_command_and_wait(cmd)
 
     if resp and resp.get('success'):
@@ -377,7 +409,9 @@ def render_screenshot(filename: str = None) -> str:
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"screenshot_{timestamp}.png"
 
-    filepath = f"mcp_screenshots/{filename}"
+    # 절대 경로로 변환
+    screenshots_dir = SCRIPT_DIR / "mcp_screenshots"
+    filepath = str(screenshots_dir / filename)
 
     cmd = {
         'type': 'screenshot',
