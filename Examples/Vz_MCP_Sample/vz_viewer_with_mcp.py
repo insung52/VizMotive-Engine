@@ -1,74 +1,67 @@
 """
-VizMotive Viewer with MCP Server - Integrated viewer and MCP server
+VizMotive Viewer with MCP Server
+================================
+MCP 서버와 통합된 GUI 뷰어
+
+Features:
+- 전체 GUI (오브젝트 생성/편집, 속성 패널, DDGI 등)
+- MCP를 통한 원격 오브젝트 생성
+- 최적화된 RGBA8 렌더링
 """
 import sys
 import os
 import threading
 import queue
+import time
 
-# Add pyvizmotive to path (relative to this file)
-script_dir = os.path.dirname(os.path.abspath(__file__))
-engine_root = os.path.dirname(os.path.dirname(script_dir))  # vz_mcp is now in Examples, so go up two levels
-pyvizmotive_path = os.path.join(engine_root, "PythonBindings", "out", "build", "x64-Debug")
-sys.path.insert(0, pyvizmotive_path)
+# vz_core 모듈 사용
+from vz_core import vzm, init_engine, deinit_engine
+from vz_core.camera import OrbitCamera
+from vz_core.gui import RenderView, ObjectPanel, PropertyPanel, ControlPanel, MouseHandler
 
-# Add DLL path to PATH environment variable
-dll_path = pyvizmotive_path
-os.environ["PATH"] = dll_path + os.pathsep + os.environ.get("PATH", "")
-
-# Also try to add DLL directory for Python 3.8+
-if hasattr(os, 'add_dll_directory'):
-    os.add_dll_directory(dll_path)
-    print(f"Added DLL directory: {dll_path}")
-
-# Store directory paths
-examples_dir = os.path.dirname(script_dir)
-
-# Create Assets junction if it doesn't exist (for engine initialization)
-assets_junction = os.path.join(engine_root, "Assets")
-assets_source = os.path.join(engine_root, "Examples", "Assets")
-if not os.path.exists(assets_junction):
-    import subprocess
-    print(f"Creating Assets junction: {assets_junction} -> {assets_source}")
-    subprocess.run(["cmd", "/c", "mklink", "/J", assets_junction, assets_source], check=False)
-
-# Set working directory to Examples (for Shaders)
-os.chdir(examples_dir)
-print(f"Working directory: {os.getcwd()}")
-
-import pyvizmotive as vzm
 import dearpygui.dearpygui as dpg
-import numpy as np
-from PIL import Image
-import io
 from fastmcp import FastMCP
+
 
 # Global scene state (shared between viewer and MCP)
 class SceneState:
     def __init__(self):
-        self.viewer = None  # Will be set to VizMotiveViewer instance
+        self.viewer = None  # Will be set to MCPViewer instance
         self.command_queue = queue.Queue()  # Commands from MCP to viewer
+        self.response_queue = queue.Queue()  # Responses from viewer to MCP
         self.lock = threading.Lock()
 
 scene_state = SceneState()
 
+
 # Initialize FastMCP server
 mcp = FastMCP("VizMotive Engine")
+
 
 @mcp.tool()
 def ping() -> str:
     """Test tool to verify MCP server is working"""
     return "pong"
 
+
 @mcp.tool()
 def get_scene_info() -> dict:
-    """Get current scene information"""
+    """Get current scene information including list of objects"""
     with scene_state.lock:
         if scene_state.viewer and scene_state.viewer.engine_initialized:
+            objects = []
+            if scene_state.viewer.object_panel:
+                for obj in scene_state.viewer.object_panel.get_objects():
+                    objects.append({
+                        'name': obj['name'],
+                        'type': obj['type'],
+                        'vid': obj['vid']
+                    })
             return {
                 "status": "ready",
                 "scene": "main_scene",
-                "engine": "initialized"
+                "engine": "initialized",
+                "objects": objects
             }
         else:
             return {
@@ -76,8 +69,10 @@ def get_scene_info() -> dict:
                 "engine": "not_initialized"
             }
 
+
 @mcp.tool()
-def create_cube(x: float, y: float, z: float, size: float = 1.0, color_r: float = 1.0, color_g: float = 0.0, color_b: float = 0.0) -> str:
+def create_cube(x: float, y: float, z: float, size: float = 1.0,
+                color_r: float = 1.0, color_g: float = 0.0, color_b: float = 0.0) -> str:
     """
     Create a cube in the scene
 
@@ -93,7 +88,6 @@ def create_cube(x: float, y: float, z: float, size: float = 1.0, color_r: float 
     Returns:
         Success message with cube details
     """
-    # Queue command for viewer thread to execute
     cmd = {
         'type': 'create_cube',
         'position': [x, y, z],
@@ -101,10 +95,12 @@ def create_cube(x: float, y: float, z: float, size: float = 1.0, color_r: float 
         'color': [color_r, color_g, color_b, 1.0]
     }
     scene_state.command_queue.put(cmd)
-    return f"Cube queued at position ({x}, {y}, {z}) with size {size} and color RGB({color_r}, {color_g}, {color_b})"
+    return f"Cube created at position ({x}, {y}, {z}) with size {size} and color RGB({color_r}, {color_g}, {color_b})"
+
 
 @mcp.tool()
-def create_sphere(x: float, y: float, z: float, radius: float = 1.0, color_r: float = 0.0, color_g: float = 1.0, color_b: float = 0.0) -> str:
+def create_sphere(x: float, y: float, z: float, radius: float = 0.5,
+                  color_r: float = 0.0, color_g: float = 1.0, color_b: float = 0.0) -> str:
     """
     Create a sphere in the scene
 
@@ -112,7 +108,7 @@ def create_sphere(x: float, y: float, z: float, radius: float = 1.0, color_r: fl
         x: X position
         y: Y position
         z: Z position
-        radius: Sphere radius (default 1.0)
+        radius: Sphere radius (default 0.5)
         color_r: Red component (0.0-1.0)
         color_g: Green component (0.0-1.0)
         color_b: Blue component (0.0-1.0)
@@ -127,7 +123,60 @@ def create_sphere(x: float, y: float, z: float, radius: float = 1.0, color_r: fl
         'color': [color_r, color_g, color_b, 1.0]
     }
     scene_state.command_queue.put(cmd)
-    return f"Sphere queued at position ({x}, {y}, {z}) with radius {radius} and color RGB({color_r}, {color_g}, {color_b})"
+    return f"Sphere created at position ({x}, {y}, {z}) with radius {radius} and color RGB({color_r}, {color_g}, {color_b})"
+
+
+@mcp.tool()
+def create_light(x: float, y: float, z: float, light_type: str = "point",
+                 color_r: float = 1.0, color_g: float = 1.0, color_b: float = 1.0,
+                 intensity: float = 15.0, range_val: float = 15.0) -> str:
+    """
+    Create a light in the scene
+
+    Args:
+        x: X position
+        y: Y position
+        z: Z position
+        light_type: "point" or "directional"
+        color_r: Red component (0.0-1.0)
+        color_g: Green component (0.0-1.0)
+        color_b: Blue component (0.0-1.0)
+        intensity: Light intensity
+        range_val: Light range (for point lights)
+
+    Returns:
+        Success message
+    """
+    cmd = {
+        'type': 'create_light',
+        'position': [x, y, z],
+        'light_type': light_type,
+        'color': [color_r, color_g, color_b],
+        'intensity': intensity,
+        'range': range_val
+    }
+    scene_state.command_queue.put(cmd)
+    return f"{light_type.capitalize()} light created at ({x}, {y}, {z})"
+
+
+@mcp.tool()
+def set_ddgi(enabled: bool) -> str:
+    """
+    Enable or disable DDGI (Dynamic Diffuse Global Illumination)
+
+    Args:
+        enabled: True to enable, False to disable
+
+    Returns:
+        Status message
+    """
+    cmd = {
+        'type': 'set_ddgi',
+        'enabled': enabled
+    }
+    scene_state.command_queue.put(cmd)
+    return f"DDGI {'enabled' if enabled else 'disabled'}"
+
 
 @mcp.tool()
 def render_screenshot() -> str:
@@ -146,251 +195,354 @@ def render_screenshot() -> str:
         'filename': filename
     }
     scene_state.command_queue.put(cmd)
-
-    # Wait a bit for the screenshot to be taken
-    import time
-    time.sleep(0.5)
-
+    time.sleep(0.3)  # Wait for screenshot
     return f"Screenshot saved to: {filename}"
 
 
-# Viewer class (same as before but with command processing)
-class VizMotiveViewer:
+@mcp.tool()
+def clear_scene() -> str:
+    """
+    Clear all objects from the scene (except floor)
+
+    Returns:
+        Status message
+    """
+    cmd = {'type': 'clear_scene'}
+    scene_state.command_queue.put(cmd)
+    return "Scene cleared"
+
+
+class MCPViewer:
+    """
+    MCP 서버와 통합된 GUI 뷰어
+    """
+
     def __init__(self):
         self.engine_initialized = False
         self.scene = None
         self.camera = None
         self.renderer = None
-        self.texture_tag = None
-        self.image_tag = None
-        self.canvas_initialized = False
-        self.object_counter = 0  # For unique object names
 
-    def init_engine(self):
-        """Initialize VizMotive engine"""
-        print("Initializing VizMotive engine...")
-        result = vzm.init_engine()
-        print(f"init_engine() returned: {result}")
+        # Components
+        self.orbit_cam = OrbitCamera()
+        self.render_view = None
+        self.object_panel = None
+        self.property_panel = None
+        self.control_panel = None
+        self.mouse_handler = None
 
-        if result:
-            self.engine_initialized = True
-            print("Engine initialized successfully!")
+        # MCP object counter
+        self.mcp_object_counter = 0
 
-            # Create basic components
-            self.scene = vzm.new_scene("main_scene")
-            self.camera = vzm.new_camera("main_camera")
-            self.renderer = vzm.new_renderer("main_renderer")
+    def init_engine(self) -> bool:
+        """엔진 초기화"""
+        if not init_engine():
+            return False
 
-            print(f"Scene: {self.scene}")
-            print(f"Camera: {self.camera}")
-            print(f"Renderer: {self.renderer}")
+        self.engine_initialized = True
 
-            # Setup camera
-            pos = [0.0, 3.0, 6.0]
-            view = [-pos[0], -pos[1], -pos[2]]
-            up = [0.0, 1.0, 0.0]
-            self.camera.set_world_pose(pos, view, up)
-            self.camera.set_perspective_projection(0.01, 50.0, 60.0, 1.0)
-            self.camera.set_visible_layer_mask(0xF)
+        # 씬, 카메라, 렌더러 생성
+        self.scene = vzm.new_scene("main_scene")
+        self.camera = vzm.new_camera("main_camera")
+        self.renderer = vzm.new_renderer("main_renderer")
 
-            # Setup renderer
-            self.renderer.set_canvas(800, 600, 96.0)
-            self.renderer.set_clear_color([0.2, 0.2, 0.3, 1.0])
+        # 카메라 설정
+        self.orbit_cam.apply_to_camera(self.camera)
+        self.camera.set_perspective_projection(0.01, 100.0, 45.0, 1.0)
+        self.camera.set_visible_layer_mask(0xF)
 
-            # Create a light
-            print("Creating light...")
-            light = vzm.new_light("main_light")
-            light.set_light_type(vzm.LightType.POINT)
-            light.set_position([3.0, 5.0, 3.0])
-            light.set_color([1.0, 1.0, 1.0])
-            light.set_intensity(30.0)
-            light.set_range(20.0)
-            light.set_visible_layer_mask(0xF, True)
+        # 렌더러 설정
+        self.renderer.set_canvas(800, 600, 96.0)
+        self.renderer.set_clear_color([0.15, 0.15, 0.2, 1.0])
 
-            self.scene.append_child(light)
-            print("Light created and added to scene!")
-
-        else:
-            print("Engine initialization failed!")
-            self.engine_initialized = False
-
-    def process_mcp_commands(self):
-        """Process commands from MCP server"""
-        while not scene_state.command_queue.empty():
-            try:
-                cmd = scene_state.command_queue.get_nowait()
-
-                if cmd['type'] == 'create_cube':
-                    self.create_cube_object(cmd['position'], cmd['size'], cmd['color'])
-                elif cmd['type'] == 'create_sphere':
-                    self.create_sphere_object(cmd['position'], cmd['radius'], cmd['color'])
-                elif cmd['type'] == 'screenshot':
-                    self.take_screenshot(cmd['filename'])
-
-            except queue.Empty:
-                break
-
-    def create_cube_object(self, position, size, color):
-        """Create a cube object in the scene"""
-        if not self.engine_initialized:
-            return
-
-        self.object_counter += 1
-        name = f"mcp_cube_{self.object_counter}"
-
-        geometry = vzm.new_geometry(f"{name}_geom")
-        vzm.generate_box_geometry(geometry.get_vid(), size, size, size)
-
-        material = vzm.new_material(f"{name}_mat")
-        material.set_base_color(color)
-
-        cube = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
-        cube.set_position(position)
-        cube.set_scale([1.0, 1.0, 1.0])
-        cube.set_visible_layer_mask(0xF, True)
-
-        self.scene.append_child(cube)
-        print(f"Created {name} at {position}")
-
-    def create_sphere_object(self, position, radius, color):
-        """Create a sphere object in the scene"""
-        if not self.engine_initialized:
-            return
-
-        self.object_counter += 1
-        name = f"mcp_sphere_{self.object_counter}"
-
-        geometry = vzm.new_geometry(f"{name}_geom")
-        vzm.generate_sphere_geometry(geometry.get_vid(), radius)
-
-        material = vzm.new_material(f"{name}_mat")
-        material.set_base_color(color)
-
-        sphere = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
-        sphere.set_position(position)
-        sphere.set_scale([1.0, 1.0, 1.0])
-        sphere.set_visible_layer_mask(0xF, True)
-
-        self.scene.append_child(sphere)
-        print(f"Created {name} at {position}")
-
-    def take_screenshot(self, filename):
-        """Take a screenshot and save to file"""
-        if not self.engine_initialized:
-            return
-
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        self.renderer.store_render_target_to_file(filename)
-        print(f"Screenshot saved: {filename}")
+        print("Engine initialized!")
+        return True
 
     def create_gui(self):
-        """Create DearPyGui window"""
+        """GUI 생성"""
         dpg.create_context()
 
-        with dpg.window(label="VizMotive Viewer with MCP", tag="main_window", width=800, height=600):
-            dpg.add_text("VizMotive Engine Viewer with MCP Server")
-            dpg.add_separator()
+        # 컴포넌트 초기화
+        self.render_view = RenderView(parent="render_panel", width=800, height=600)
+        self.object_panel = ObjectPanel(
+            scene=self.scene,
+            on_object_selected=self._on_object_selected
+        )
+        self.property_panel = PropertyPanel()
+        self.control_panel = ControlPanel(
+            scene=self.scene,
+            renderer=self.renderer
+        )
+        self.mouse_handler = MouseHandler(
+            orbit_camera=self.orbit_cam,
+            renderer=self.renderer,
+            scene=self.scene,
+            camera=self.camera
+        )
+        self.mouse_handler.on_object_picked = self._on_object_picked
+        self.mouse_handler.register_scroll_handler()
 
+        # 메인 윈도우
+        with dpg.window(label="VizMotive MCP Viewer", tag="main_window", width=1280, height=800):
             with dpg.group(horizontal=True):
-                dpg.add_text("Engine Status: ")
-                dpg.add_text("Initialized" if self.engine_initialized else "Not Initialized",
-                           tag="engine_status",
-                           color=(0, 255, 0) if self.engine_initialized else (255, 0, 0))
+                # 좌측 패널 - 컨트롤
+                with dpg.child_window(tag="control_panel", width=280, height=-1):
+                    # MCP 상태 표시
+                    dpg.add_text("=== MCP Server ===")
+                    dpg.add_text("Status: Running", tag="mcp_status", color=[100, 255, 100])
+                    dpg.add_text("Commands: 0", tag="mcp_commands")
+                    dpg.add_separator()
 
-            dpg.add_separator()
-            dpg.add_text("MCP Server: Running on stdio")
-            dpg.add_text("Use Claude Desktop to control the scene!")
+                    # 패널들을 순서대로 생성
+                    self.object_panel.create(parent="control_panel")
+                    self.property_panel.create(parent="control_panel")
+                    self.control_panel.create(parent="control_panel")
 
-        dpg.create_viewport(title="VizMotive Viewer with MCP", width=1024, height=768)
+                # 우측 패널 - 렌더 뷰
+                with dpg.child_window(tag="render_panel", width=-1, height=-1):
+                    pass
+
+        # 리사이즈 핸들 오버레이
+        with dpg.viewport_drawlist(front=True, tag="viewport_drawlist"):
+            pass
+
+        # Floor 생성
+        self.object_panel.create_floor()
+
+        dpg.create_viewport(title="VizMotive MCP Viewer", width=1300, height=850)
         dpg.setup_dearpygui()
         dpg.show_viewport()
         dpg.set_primary_window("main_window", True)
 
+    def _on_object_selected(self, obj):
+        """오브젝트 선택 콜백"""
+        self.property_panel.update(obj)
+
+    def _on_object_picked(self, vid):
+        """피킹으로 오브젝트 선택"""
+        if self.object_panel.select_object_by_vid(vid):
+            self.property_panel.update(self.object_panel.get_selected())
+
+    def process_mcp_commands(self):
+        """MCP 명령 처리"""
+        commands_processed = 0
+        while not scene_state.command_queue.empty():
+            try:
+                cmd = scene_state.command_queue.get_nowait()
+                self._execute_command(cmd)
+                commands_processed += 1
+            except queue.Empty:
+                break
+
+        # MCP 명령 카운터 업데이트
+        if commands_processed > 0 and dpg.does_item_exist("mcp_commands"):
+            self.mcp_object_counter += commands_processed
+            dpg.set_value("mcp_commands", f"Commands: {self.mcp_object_counter}")
+
+    def _execute_command(self, cmd):
+        """MCP 명령 실행"""
+        cmd_type = cmd.get('type')
+
+        if cmd_type == 'create_cube':
+            self._create_mcp_cube(cmd)
+        elif cmd_type == 'create_sphere':
+            self._create_mcp_sphere(cmd)
+        elif cmd_type == 'create_light':
+            self._create_mcp_light(cmd)
+        elif cmd_type == 'set_ddgi':
+            self._set_ddgi(cmd)
+        elif cmd_type == 'screenshot':
+            self._take_screenshot(cmd)
+        elif cmd_type == 'clear_scene':
+            self.object_panel.clear_objects()
+
+    def _create_mcp_cube(self, cmd):
+        """MCP로 큐브 생성"""
+        pos = cmd['position']
+        size = cmd.get('size', 1.0)
+        color = cmd.get('color', [1.0, 0.0, 0.0, 1.0])
+
+        name = f"mcp_cube_{self.mcp_object_counter}"
+
+        geometry = vzm.new_geometry(f"{name}_geom")
+        vzm.generate_box_geometry(geometry.get_vid(), size, size, size)
+        geometry.update_bvh()
+
+        material = vzm.new_material(f"{name}_mat")
+        material.set_base_color(color)
+        material.set_shadow_cast(True)
+        material.set_shadow_receive(True)
+
+        cube = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
+        cube.set_position(pos)
+        cube.set_visible_layer_mask(0xF, True)
+        self.scene.append_child(cube)
+
+        # ObjectPanel에 등록
+        obj_data = {
+            'vid': cube.get_vid(),
+            'name': name,
+            'type': 'mcp_cube',
+            'mat_vid': material.get_vid()
+        }
+        self.object_panel.created_objects.append(obj_data)
+        self.object_panel._update_list()
+
+        print(f"MCP: Created {name} at {pos}")
+
+    def _create_mcp_sphere(self, cmd):
+        """MCP로 구 생성"""
+        pos = cmd['position']
+        radius = cmd.get('radius', 0.5)
+        color = cmd.get('color', [0.0, 1.0, 0.0, 1.0])
+
+        name = f"mcp_sphere_{self.mcp_object_counter}"
+
+        geometry = vzm.new_geometry(f"{name}_geom")
+        vzm.generate_icosahedron_geometry(geometry.get_vid(), radius, 3)
+        geometry.update_bvh()
+
+        material = vzm.new_material(f"{name}_mat")
+        material.set_base_color(color)
+        material.set_shadow_cast(True)
+        material.set_shadow_receive(True)
+
+        sphere = vzm.new_actor_static_mesh(name, geometry.get_vid(), material.get_vid())
+        sphere.set_position(pos)
+        sphere.set_visible_layer_mask(0xF, True)
+        self.scene.append_child(sphere)
+
+        # ObjectPanel에 등록
+        obj_data = {
+            'vid': sphere.get_vid(),
+            'name': name,
+            'type': 'mcp_sphere',
+            'mat_vid': material.get_vid()
+        }
+        self.object_panel.created_objects.append(obj_data)
+        self.object_panel._update_list()
+
+        print(f"MCP: Created {name} at {pos}")
+
+    def _create_mcp_light(self, cmd):
+        """MCP로 조명 생성"""
+        pos = cmd['position']
+        light_type = cmd.get('light_type', 'point')
+        color = cmd.get('color', [1.0, 1.0, 1.0])
+        intensity = cmd.get('intensity', 15.0)
+        range_val = cmd.get('range', 15.0)
+
+        name = f"mcp_light_{self.mcp_object_counter}"
+
+        light = vzm.new_light(name)
+        if light_type == 'directional':
+            light.set_light_type(vzm.LightType.DIRECTIONAL)
+        else:
+            light.set_light_type(vzm.LightType.POINT)
+
+        light.set_position(pos)
+        light.set_color(color)
+        light.set_intensity(intensity)
+        light.set_range(range_val)
+        light.enable_cast_shadow(True)
+        light.set_visible_layer_mask(0xF, True)
+        self.scene.append_child(light)
+
+        # ObjectPanel에 등록
+        obj_data = {
+            'vid': light.get_vid(),
+            'name': name,
+            'type': f'mcp_{light_type}_light',
+            'is_light': True,
+            'light_type': 'Directional' if light_type == 'directional' else 'Point',
+            'color': color,
+            'intensity': intensity,
+            'range': range_val,
+            'cast_shadow': True,
+            'position': pos
+        }
+        self.object_panel.created_objects.append(obj_data)
+        self.object_panel._update_list()
+
+        print(f"MCP: Created {name} at {pos}")
+
+    def _set_ddgi(self, cmd):
+        """DDGI 설정"""
+        enabled = cmd.get('enabled', False)
+        vzm.set_configure({'DDGI_ENABLED': enabled})
+        if enabled and self.scene:
+            self.scene.set_option_value_array('DDGI_GRID', [32.0, 8.0, 32.0])
+        print(f"MCP: DDGI {'enabled' if enabled else 'disabled'}")
+
+    def _take_screenshot(self, cmd):
+        """스크린샷 저장"""
+        filename = cmd.get('filename', 'mcp_screenshots/screenshot.png')
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        self.renderer.store_render_target_to_file(filename)
+        print(f"MCP: Screenshot saved to {filename}")
+
     def run(self):
-        """Main loop"""
+        """메인 루프"""
         self.create_gui()
 
-        # Main loop - continuous rendering
         while dpg.is_dearpygui_running():
-            if self.engine_initialized:
-                # Process MCP commands
-                self.process_mcp_commands()
+            # MCP 명령 처리
+            self.process_mcp_commands()
 
-                # Update render
-                self.update_render()
+            # 리사이즈 처리
+            is_resizing = self.render_view.handle_resize_drag()
+
+            # 마우스 처리 (리사이즈 중이 아닐 때만)
+            if not is_resizing:
+                self.mouse_handler.update(check_hover_items=["render_panel", "render_image"])
+
+            # 렌더링
+            if self.engine_initialized:
+                # 카메라 aspect ratio 업데이트
+                w, h = self.render_view.get_resolution()
+                self.camera.set_perspective_projection(0.01, 100.0, 45.0, w / h)
+
+                # 렌더링 수행
+                self.render_view.update(self.renderer, self.scene.get_vid(), self.camera.get_vid())
+
+            # 리사이즈 핸들 그리기
+            self.render_view.draw_resize_handle()
+
+            # UI 업데이트
+            self.control_panel.update_fps(self.render_view.get_fps())
+            w, h = self.render_view.get_resolution()
+            self.control_panel.update_resolution(w, h, is_resizing)
 
             dpg.render_dearpygui_frame()
 
-        # Cleanup
+        # 정리
         if self.engine_initialized:
-            vzm.deinit_engine()
-
+            deinit_engine()
         dpg.destroy_context()
-
-    def update_render(self):
-        """Update rendering every frame (real-time preview)"""
-        try:
-            # Initialize canvas on first frame (after GUI is ready)
-            if not self.canvas_initialized:
-                print("First frame: Initializing canvas to 800x600...")
-                self.renderer.resize_canvas(800, 600, self.camera.get_vid())
-                self.canvas_initialized = True
-
-            # Render the scene
-            self.renderer.render(self.scene.get_vid(), self.camera.get_vid())
-
-            # TEST: Save to PNG and read back
-            temp_file = "mcp_screenshots/_temp_frame.png"
-            os.makedirs("mcp_screenshots", exist_ok=True)
-            self.renderer.store_render_target_to_file(temp_file)
-
-            # Read PNG with PIL
-            pil_img = Image.open(temp_file)
-            width, height = pil_img.size
-            img_data = np.array(pil_img).astype(np.float32) / 255.0
-
-            # Convert RGB to RGBA if needed
-            if img_data.shape[2] == 3:
-                alpha = np.ones((height, width, 1), dtype=np.float32)
-                img_data = np.concatenate([img_data, alpha], axis=2)
-
-            img_data = img_data.flatten()
-
-            # Create or update texture
-            if self.texture_tag is None:
-                with dpg.texture_registry():
-                    self.texture_tag = dpg.add_raw_texture(
-                        width=width,
-                        height=height,
-                        default_value=img_data,
-                        format=dpg.mvFormat_Float_rgba
-                    )
-                self.image_tag = dpg.add_image(self.texture_tag, parent="main_window")
-            else:
-                dpg.set_value(self.texture_tag, img_data)
-
-        except Exception as e:
-            # Silently ignore errors in continuous rendering
-            pass
 
 
 def run_mcp_server():
     """Run MCP server in a separate thread"""
-    print("Starting MCP server thread...")
+    print("Starting MCP server...")
     mcp.run()
 
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("VizMotive Viewer with MCP Server")
+    print("VizMotive MCP Viewer")
+    print("  - Full GUI with object creation and editing")
+    print("  - MCP server for remote control")
+    print("  - Connect via Claude Desktop or MCP client")
     print("=" * 60)
 
     # Create viewer
-    viewer = VizMotiveViewer()
+    viewer = MCPViewer()
     scene_state.viewer = viewer
 
     # Initialize engine
-    viewer.init_engine()
+    if not viewer.init_engine():
+        print("Failed to initialize engine!")
+        sys.exit(1)
 
     # Start MCP server in a separate thread
     mcp_thread = threading.Thread(target=run_mcp_server, daemon=True)
