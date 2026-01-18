@@ -55,10 +55,9 @@ def rgba8_to_float(data, width, height):
         _float_buffer_size = (width, height)
 
     # Convert uint8 to float32 (0-255 -> 0.0-1.0)
+    # Using multiply (faster than divide)
     uint8_data = np.frombuffer(data, dtype=np.uint8)
-    np.divide(uint8_data, 255.0, out=_float_buffer)
-    
-    # np.multiply(uint8_data, 1.0 / 255.0, out=_float_buffer, casting="unsafe")
+    np.multiply(uint8_data, 1.0 / 255.0, out=_float_buffer, casting="unsafe")
 
     return _float_buffer
 

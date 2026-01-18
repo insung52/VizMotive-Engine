@@ -460,38 +460,100 @@ namespace vzm
 			return false;
 		}
 
-		// Convert R11G11B10_FLOAT to RGBA8
-		if (desc.format == graphics::Format::R11G11B10_FLOAT)
+		// Handle format conversion
+		if (desc.format == graphics::Format::R8G8B8A8_UNORM ||
+			desc.format == graphics::Format::R8G8B8A8_UNORM_SRGB)
 		{
+			// Already RGBA8 - direct move, no conversion needed
+			rgbaBuffer = std::move(rawBuffer);
+		}
+		else if (desc.format == graphics::Format::R11G11B10_FLOAT)
+		{
+			// Convert R11G11B10_FLOAT to RGBA8 using SIMD
 			uint32_t pixelCount = desc.width * desc.height;
 			rgbaBuffer.resize(pixelCount * 4);
 
-			XMFLOAT3PK* dataSrc = (XMFLOAT3PK*)rawBuffer.data();
+			const uint32_t* dataSrc = (const uint32_t*)rawBuffer.data();
 			uint32_t* dataDst = (uint32_t*)rgbaBuffer.data();
+
+			// SIMD constants
+			const XMVECTOR scale255 = XMVectorReplicate(255.0f);
+			const XMVECTOR alphaFF = XMVectorSetW(XMVectorZero(), 255.0f);
+
+			// Process 4 pixels at a time for better cache utilization
+			uint32_t i = 0;
+			for (; i + 3 < pixelCount; i += 4)
+			{
+				// Load and convert 4 pixels
+				XMFLOAT3PK pk0, pk1, pk2, pk3;
+				pk0.v = dataSrc[i + 0];
+				pk1.v = dataSrc[i + 1];
+				pk2.v = dataSrc[i + 2];
+				pk3.v = dataSrc[i + 3];
+
+				XMVECTOR v0 = XMVectorSaturate(XMLoadFloat3PK(&pk0));
+				XMVECTOR v1 = XMVectorSaturate(XMLoadFloat3PK(&pk1));
+				XMVECTOR v2 = XMVectorSaturate(XMLoadFloat3PK(&pk2));
+				XMVECTOR v3 = XMVectorSaturate(XMLoadFloat3PK(&pk3));
+
+				// Scale to 0-255 and add alpha
+				v0 = XMVectorAdd(XMVectorMultiply(v0, scale255), alphaFF);
+				v1 = XMVectorAdd(XMVectorMultiply(v1, scale255), alphaFF);
+				v2 = XMVectorAdd(XMVectorMultiply(v2, scale255), alphaFF);
+				v3 = XMVectorAdd(XMVectorMultiply(v3, scale255), alphaFF);
+
+				// Convert to uint and pack
+				XMUINT4 u0, u1, u2, u3;
+				XMStoreUInt4(&u0, v0);
+				XMStoreUInt4(&u1, v1);
+				XMStoreUInt4(&u2, v2);
+				XMStoreUInt4(&u3, v3);
+
+				dataDst[i + 0] = u0.x | (u0.y << 8) | (u0.z << 16) | (u0.w << 24);
+				dataDst[i + 1] = u1.x | (u1.y << 8) | (u1.z << 16) | (u1.w << 24);
+				dataDst[i + 2] = u2.x | (u2.y << 8) | (u2.z << 16) | (u2.w << 24);
+				dataDst[i + 3] = u3.x | (u3.y << 8) | (u3.z << 16) | (u3.w << 24);
+			}
+
+			// Handle remaining pixels
+			for (; i < pixelCount; ++i)
+			{
+				XMFLOAT3PK pk;
+				pk.v = dataSrc[i];
+				XMVECTOR V = XMVectorSaturate(XMLoadFloat3PK(&pk));
+				V = XMVectorAdd(XMVectorMultiply(V, scale255), alphaFF);
+				XMUINT4 u;
+				XMStoreUInt4(&u, V);
+				dataDst[i] = u.x | (u.y << 8) | (u.z << 16) | (u.w << 24);
+			}
+		}
+		else if (desc.format == graphics::Format::R10G10B10A2_UNORM)
+		{
+			// Convert R10G10B10A2_UNORM to RGBA8
+			uint32_t pixelCount = desc.width * desc.height;
+			rgbaBuffer.resize(pixelCount * 4);
+
+			const uint32_t* dataSrc = (const uint32_t*)rawBuffer.data();
+			uint8_t* dataDst = rgbaBuffer.data();
 
 			for (uint32_t i = 0; i < pixelCount; ++i)
 			{
-				XMFLOAT3PK pixel = dataSrc[i];
-				XMVECTOR V = XMLoadFloat3PK(&pixel);
-				XMFLOAT3 pixel3;
-				XMStoreFloat3(&pixel3, V);
+				uint32_t pixel = dataSrc[i];
+				// R10G10B10A2: 10 bits R, 10 bits G, 10 bits B, 2 bits A
+				uint32_t r10 = (pixel >> 0) & 0x3FF;
+				uint32_t g10 = (pixel >> 10) & 0x3FF;
+				uint32_t b10 = (pixel >> 20) & 0x3FF;
+				uint32_t a2 = (pixel >> 30) & 0x3;
 
-				float r = std::max(0.0f, std::min(pixel3.x, 1.0f));
-				float g = std::max(0.0f, std::min(pixel3.y, 1.0f));
-				float b = std::max(0.0f, std::min(pixel3.z, 1.0f));
-
-				uint32_t rgba8 = 0;
-				rgba8 |= (uint32_t)(r * 255.0f) << 0;
-				rgba8 |= (uint32_t)(g * 255.0f) << 8;
-				rgba8 |= (uint32_t)(b * 255.0f) << 16;
-				rgba8 |= 255u << 24;  // Alpha = 255
-
-				dataDst[i] = rgba8;
+				dataDst[i * 4 + 0] = (uint8_t)(r10 >> 2);  // 10 bit to 8 bit
+				dataDst[i * 4 + 1] = (uint8_t)(g10 >> 2);
+				dataDst[i * 4 + 2] = (uint8_t)(b10 >> 2);
+				dataDst[i * 4 + 3] = (uint8_t)(a2 * 85);   // 2 bit to 8 bit (0,1,2,3 -> 0,85,170,255)
 			}
 		}
 		else
 		{
-			// For other formats, just copy the raw buffer
+			// For other formats, just copy the raw buffer (may not display correctly)
 			rgbaBuffer = std::move(rawBuffer);
 		}
 
