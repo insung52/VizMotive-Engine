@@ -172,6 +172,7 @@ class ObjectPanel:
         pos = [5.0, 10.0, 5.0]
         color = [1.0, 1.0, 0.95]
         intensity = 3.0
+        direction_euler = [45.0, 45.0, 0.0]  # pitch=45, yaw=45 (햇빛처럼 비스듬히)
 
         light = vzm.new_light(name)
         light.set_light_type(vzm.LightType.DIRECTIONAL)
@@ -180,6 +181,9 @@ class ObjectPanel:
         light.set_intensity(intensity)
         light.enable_cast_shadow(True)
         light.set_visible_layer_mask(0xF, True)
+        # 방향 설정
+        if hasattr(light, 'set_direction'):
+            light.set_direction(direction_euler)
         self.scene.append_child(light)
 
         obj_data = {
@@ -192,7 +196,8 @@ class ObjectPanel:
             'intensity': intensity,
             'range': 15.0,
             'cast_shadow': True,
-            'position': pos
+            'position': pos,
+            'direction_euler': direction_euler
         }
         self.created_objects.append(obj_data)
         self._update_list()
@@ -351,6 +356,15 @@ class PropertyPanel:
                                     callback=self._apply_light_range)
                 dpg.add_checkbox(label="Cast Shadow", tag="prop_light_shadow",
                                 callback=self._apply_light_shadow)
+
+                # Directional light direction controls
+                with dpg.group(tag="light_direction_group", show=False):
+                    dpg.add_text("Direction (degrees):", color=[180, 180, 150])
+                    with dpg.group(horizontal=True):
+                        dpg.add_input_float(tag="prop_light_pitch", width=75, step=5.0, label="Pitch",
+                                           callback=lambda s,a: self._apply_light_direction())
+                        dpg.add_input_float(tag="prop_light_yaw", width=75, step=5.0, label="Yaw",
+                                           callback=lambda s,a: self._apply_light_direction())
             dpg.add_separator()
 
     def update(self, obj):
@@ -387,13 +401,22 @@ class PropertyPanel:
 
         if is_light:
             dpg.configure_item("light_props_group", show=True)
-            dpg.set_value("prop_light_type", obj.get('light_type', 'Point'))
+            light_type = obj.get('light_type', 'Point')
+            dpg.set_value("prop_light_type", light_type)
             color = obj.get('color', [1.0, 1.0, 1.0])
             dpg.set_value("prop_light_color", [int(c*255) for c in color] + [255])
             dpg.set_value("prop_light_intensity", obj.get('intensity', 3.0))
             dpg.set_value("prop_light_range", obj.get('range', 15.0))
-            dpg.configure_item("prop_light_range", enabled=(obj.get('light_type') == 'Point'))
+            dpg.configure_item("prop_light_range", enabled=(light_type == 'Point'))
             dpg.set_value("prop_light_shadow", obj.get('cast_shadow', True))
+
+            # Show direction controls only for directional lights
+            is_directional = (light_type == 'Directional')
+            dpg.configure_item("light_direction_group", show=is_directional)
+            if is_directional:
+                direction = obj.get('direction_euler', [45.0, 45.0, 0.0])  # default: pitch=45, yaw=45
+                dpg.set_value("prop_light_pitch", direction[0])
+                dpg.set_value("prop_light_yaw", direction[1])
         elif 'mat_vid' in obj:
             dpg.configure_item("mesh_props_group", show=True)
             dpg.configure_item("rotation_group", show=True)
@@ -468,6 +491,8 @@ class PropertyPanel:
             light.set_light_type(light_type)
             self.current_object['light_type'] = value
             dpg.configure_item("prop_light_range", enabled=(value == "Point"))
+            # Show/hide direction controls
+            dpg.configure_item("light_direction_group", show=(value == "Directional"))
 
     def _apply_light_color(self, sender, app_data):
         if not self.current_object or not self.current_object.get('is_light'):
@@ -501,6 +526,23 @@ class PropertyPanel:
         if light:
             light.enable_cast_shadow(value)
             self.current_object['cast_shadow'] = value
+
+    def _apply_light_direction(self):
+        """Directional light 방향 적용"""
+        if not self.current_object or not self.current_object.get('is_light'):
+            return
+        if self.current_object.get('light_type') != 'Directional':
+            return
+
+        pitch = dpg.get_value("prop_light_pitch")  # X축 회전 (상하)
+        yaw = dpg.get_value("prop_light_yaw")      # Y축 회전 (좌우)
+
+        # Store for later retrieval
+        self.current_object['direction_euler'] = [pitch, yaw, 0.0]
+
+        light = vzm.get_component(self.current_object['vid'])
+        if light and hasattr(light, 'set_direction'):
+            light.set_direction([pitch, yaw, 0.0])
 
 
 class ControlPanel:

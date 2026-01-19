@@ -610,7 +610,27 @@ void bind_types(py::module& m) {
         // Layer mask
         .def("set_visible_layer_mask", &vzm::VzLight::SetVisibleLayerMask,
              py::arg("mask"), py::arg("include_descendants") = false,
-             "Set visible layer mask for light");
+             "Set visible layer mask for light")
+        // Direction (for directional lights) - uses euler angles
+        .def("set_direction", [](vzm::VzLight* light, const std::vector<float>& euler_degrees) {
+            if (euler_degrees.size() != 3) {
+                throw std::runtime_error("Direction euler angles must have 3 elements (pitch, yaw, roll in degrees)");
+            }
+            // euler_degrees: [pitch (X), yaw (Y), roll (Z)] in degrees
+            // Engine expects ZXY order (roll, pitch, yaw)
+            vfloat3 euler{euler_degrees[2], euler_degrees[0], euler_degrees[1]};  // roll, pitch, yaw
+            light->SetEulerAngleZXYInDegree(euler);
+        }, py::arg("euler_degrees"),
+             "Set light direction using euler angles [pitch, yaw, roll] in degrees.\n"
+             "Pitch: rotation around X axis (up/down)\n"
+             "Yaw: rotation around Y axis (left/right)\n"
+             "Roll: rotation around Z axis (tilt)")
+        // Get direction (returns forward vector)
+        .def("get_direction", [](vzm::VzLight* light) {
+            vfloat3 forward;
+            light->GetWorldForward(forward);
+            return std::vector<float>{forward.x, forward.y, forward.z};
+        }, "Get light direction as forward vector [x, y, z]");
 
     // Texture Format enum
     py::enum_<vzm::VzTexture::TextureFormat>(m, "TextureFormat")
