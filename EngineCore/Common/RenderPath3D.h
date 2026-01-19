@@ -5,8 +5,11 @@ namespace vz
 {
 	namespace graphics
 	{
+		// NOTE: These are default format constants for reference.
+		// The actual render target format (FORMAT_rendertargetMain) is runtime configurable
+		// via vz::renderer::SetRenderTargetFormat() in EngineShaders/ShaderEngine/Renderer.h
+		// Default: R11G11B10_FLOAT (HDR), can be set to R8G8B8A8_UNORM for Python viewer
 		constexpr Format formatDepthbufferMain = graphics::Format::D32_FLOAT_S8X24_UINT;
-		constexpr Format formatRendertargetMain = graphics::Format::R8G8B8A8_UNORM;
 		constexpr Format formatIdbuffer = graphics::Format::R32_UINT;
 		constexpr Format formatRendertargetShadowmap = graphics::Format::R16G16B16A16_FLOAT;
 		constexpr Format formatDepthbufferShadowmap = graphics::Format::D16_UNORM;

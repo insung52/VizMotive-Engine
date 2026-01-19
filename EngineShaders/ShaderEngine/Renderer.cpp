@@ -968,6 +968,11 @@ namespace vz::renderer
 			device->CreateTexture(&desc, nullptr, &rtMain);
 			device->SetName(&rtMain, "rtMain");
 
+			// Log render target format for debugging
+			std::string formatName = (FORMAT_rendertargetMain == Format::R8G8B8A8_UNORM) ? "R8G8B8A8_UNORM" :
+			                         (FORMAT_rendertargetMain == Format::R11G11B10_FLOAT) ? "R11G11B10_FLOAT" : "Unknown";
+			backlog::post("[RenderTarget] Created rtMain (" + std::to_string(desc.width) + "x" + std::to_string(desc.height) + ") format: " + formatName, backlog::LogLevel::Info);
+
 			if (msaaSampleCount > 1)
 			{
 				desc.sample_count = msaaSampleCount;

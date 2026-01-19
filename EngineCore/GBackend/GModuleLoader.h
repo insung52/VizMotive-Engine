@@ -54,6 +54,7 @@ namespace vz
 
 		typedef bool(*PI_LoadRenderer)();
 		typedef bool(*PI_ApplyConfiguration)();
+		typedef void(*PI_SetRenderTargetFormatPreInit)(int format);
 
 		typedef GRenderPath3D* (*PI_NewGRenderPath3D)(graphics::SwapChain& swapChain, graphics::Texture& rtRenderFinal);
 		typedef GScene* (*PI_NewGScene)(Scene* scene);
@@ -76,6 +77,7 @@ namespace vz
 		PI_Deinitializer pluginDeinitializer = nullptr;
 		PI_LoadRenderer pluginLoadRenderer = nullptr;
 		PI_ApplyConfiguration pluginApplyConfiguration = nullptr;
+		PI_SetRenderTargetFormatPreInit pluginSetRenderTargetFormatPreInit = nullptr;
 		PI_NewGRenderPath3D pluginNewGRenderPath3D = nullptr;
 		PI_NewGScene pluginNewGScene = nullptr;
 		PI_LoadShader pluginLoadShader = nullptr;
@@ -100,6 +102,7 @@ namespace vz
 
 			pluginLoadRenderer = platform::LoadModule<PI_LoadRenderer>(moduleName, "LoadRenderer", importedModules);
 			pluginApplyConfiguration = platform::LoadModule<PI_ApplyConfiguration>(moduleName, "ApplyConfiguration", importedModules);
+			pluginSetRenderTargetFormatPreInit = platform::LoadModule<PI_SetRenderTargetFormatPreInit>(moduleName, "SetRenderTargetFormatPreInit", importedModules);
 			
 			pluginNewGRenderPath3D = platform::LoadModule<PI_NewGRenderPath3D>(moduleName, "NewGRenderPath", importedModules);
 			pluginNewGScene = platform::LoadModule<PI_NewGScene>(moduleName, "NewGScene", importedModules);

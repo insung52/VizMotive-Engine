@@ -7,11 +7,34 @@ namespace py = pybind11;
 
 void bind_engine(py::module& m) {
     // Engine initialization and deinitialization
-    // Wrapper for init_engine without arguments
-    m.def("init_engine", []() {
-        vzm::ParamMap<std::string> empty_args;
-        return vzm::InitEngineLib(empty_args);
-    }, "Initialize the VizMotive engine");
+    // Wrapper for init_engine with optional render target format
+    // format: 0 = R11G11B10_FLOAT (default, HDR), 1 = R8G8B8A8_UNORM (for Python viewer)
+    m.def("init_engine", [](int render_target_format) {
+        const char* formatName = (render_target_format == 1) ? "R8G8B8A8_UNORM (Python viewer)" : "R11G11B10_FLOAT (HDR)";
+        py::print("[pyvizmotive] init_engine with RENDERTARGET_FORMAT =", render_target_format, "(" + std::string(formatName) + ")");
+        vzm::ParamMap<std::string> args;
+        args.SetParam("RENDERTARGET_FORMAT", render_target_format);
+        bool result = vzm::InitEngineLib(args);
+        if (result) {
+            py::print("[pyvizmotive] Engine initialized successfully!");
+        }
+        return result;
+    }, py::arg("render_target_format") = 0,
+       "Initialize the VizMotive engine.\n"
+       "Args:\n"
+       "  render_target_format: 0=R11G11B10_FLOAT (HDR, default), 1=R8G8B8A8_UNORM (for Python viewer)");
+
+    // Convenience wrapper for Python viewer initialization (uses R8G8B8A8)
+    m.def("init_engine_for_python_viewer", []() {
+        py::print("[pyvizmotive] init_engine_for_python_viewer - using R8G8B8A8_UNORM format");
+        vzm::ParamMap<std::string> args;
+        args.SetParam("RENDERTARGET_FORMAT", 1);  // R8G8B8A8_UNORM
+        bool result = vzm::InitEngineLib(args);
+        if (result) {
+            py::print("[pyvizmotive] Engine initialized successfully!");
+        }
+        return result;
+    }, "Initialize the VizMotive engine with R8G8B8A8_UNORM format (optimized for Python viewer)");
 
     m.def("deinit_engine", &vzm::DeinitEngineLib,
           "Deinitialize the VizMotive engine");

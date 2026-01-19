@@ -46,20 +46,22 @@ EXAMPLES_DIR = _examples_dir
 SAMPLE_DIR = _sample_dir
 
 
-def init_engine(headless: bool = False) -> bool:
+def init_engine(headless: bool = False, use_rgba8: bool = True) -> bool:
     """
     VizMotive 엔진 초기화
 
     Args:
-        headless: True면 헤드리스 모드로 초기화
+        headless: True면 헤드리스 모드로 초기화 (현재 미구현)
+        use_rgba8: True면 R8G8B8A8_UNORM 포맷 사용 (Python 뷰어용, GPU->CPU 복사 최적화)
+                   False면 R11G11B10_FLOAT 포맷 사용 (HDR, 기본 C++ 샘플용)
 
     Returns:
         성공 여부
     """
-    if headless:
-        return vzm.init_engine_as_headless()
-    else:
-        return vzm.init_engine()
+    # Python 뷰어에서는 R8G8B8A8 사용 (변환 없이 바로 표시 가능)
+    # C++ 샘플에서는 R11G11B10_FLOAT 사용 (HDR 지원)
+    render_target_format = 1 if use_rgba8 else 0
+    return vzm.init_engine(render_target_format)
 
 
 def deinit_engine():

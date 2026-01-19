@@ -37,7 +37,10 @@ namespace vz::renderer
 	// global resources //
 	//	will be used across different combinations of scenes and cameras
 	constexpr Format FORMAT_depthbufferMain = Format::D32_FLOAT_S8X24_UINT;
-	constexpr Format FORMAT_rendertargetMain = Format::R8G8B8A8_UNORM;
+	// Runtime configurable render target format (default: R11G11B10_FLOAT for HDR, can be set to R8G8B8A8_UNORM for Python viewer)
+	extern Format FORMAT_rendertargetMain;
+	void SetRenderTargetFormat(Format format);
+	Format GetRenderTargetFormat();
 	constexpr Format FORMAT_idbuffer = Format::R32_UINT;
 	constexpr Format FORMAT_rendertargetShadowmap = Format::R16G16B16A16_FLOAT;
 	constexpr Format FORMAT_depthbufferShadowmap = Format::D16_UNORM;

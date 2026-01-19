@@ -640,6 +640,28 @@ namespace vzm
 			}
 		}
 
+		// Set render target format BEFORE InitializeComponentsAsync (which loads shaders)
+		// RENDERTARGET_FORMAT: 0 = R11G11B10_FLOAT (default, HDR), 1 = R8G8B8A8_UNORM (for Python viewer)
+		int rtFormat = 0; // default: R11G11B10_FLOAT
+		if (arguments.FindParam("RENDERTARGET_FORMAT"))
+		{
+			rtFormat = arguments.GetParam("RENDERTARGET_FORMAT", 0);
+		}
+		else
+		{
+			config::Section& section = configFile.GetSection(ems_string_c);
+			if (section.Has("RENDERTARGET_FORMAT"))
+			{
+				rtFormat = section.GetInt("RENDERTARGET_FORMAT");
+			}
+		}
+		vzlog("[InitEngineLib] RENDERTARGET_FORMAT = %d (%s)", rtFormat,
+			rtFormat == 1 ? "R8G8B8A8_UNORM - Python viewer mode" : "R11G11B10_FLOAT - HDR mode");
+		if (shaderEngine.pluginSetRenderTargetFormatPreInit)
+		{
+			shaderEngine.pluginSetRenderTargetFormatPreInit(rtFormat);
+		}
+
 		initializer::SetMaxThreadCount(num_max_threads);
 		initializer::InitializeComponentsAsync();	// involving jobsystem initializer
 

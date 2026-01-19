@@ -57,6 +57,21 @@ namespace vz::renderer
 
 	bool isDebugShapeEnabled = true;
 	bool isDebugShapeCleanStart = true;
+
+	// Runtime configurable render target format
+	// Default: R11G11B10_FLOAT (HDR, better color quality)
+	// Python viewer: R8G8B8A8_UNORM (no GPU->CPU conversion needed)
+	Format FORMAT_rendertargetMain = Format::R11G11B10_FLOAT;
+
+	void SetRenderTargetFormat(Format format)
+	{
+		FORMAT_rendertargetMain = format;
+	}
+
+	Format GetRenderTargetFormat()
+	{
+		return FORMAT_rendertargetMain;
+	}
 }
 
 namespace vz::renderer 
@@ -662,5 +677,24 @@ namespace vz
 	void Deinitialize()
 	{
 		renderer::Deinitialize();
+	}
+
+	void SetRenderTargetFormatPreInit(int format)
+	{
+		// Must be called BEFORE LoadRenderer()
+		// 0 = R11G11B10_FLOAT (default, HDR)
+		// 1 = R8G8B8A8_UNORM (for Python viewer, no GPU->CPU conversion needed)
+		switch (format)
+		{
+		case 1:
+			renderer::SetRenderTargetFormat(graphics::Format::R8G8B8A8_UNORM);
+			backlog::post("[RenderTarget] Format set to R8G8B8A8_UNORM (Python viewer mode)", backlog::LogLevel::Info);
+			break;
+		case 0:
+		default:
+			renderer::SetRenderTargetFormat(graphics::Format::R11G11B10_FLOAT);
+			backlog::post("[RenderTarget] Format set to R11G11B10_FLOAT (HDR mode)", backlog::LogLevel::Info);
+			break;
+		}
 	}
 }

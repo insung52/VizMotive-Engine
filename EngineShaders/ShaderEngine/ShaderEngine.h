@@ -21,6 +21,9 @@ namespace vz
 	extern "C" DX12_EXPORT bool LoadRenderer();
 	extern "C" DX12_EXPORT bool ApplyConfiguration();
 	extern "C" DX12_EXPORT void Deinitialize();
+	// Must be called BEFORE LoadRenderer() - sets the render target format
+	// format: 0 = R11G11B10_FLOAT (default, HDR), 1 = R8G8B8A8_UNORM (for Python viewer)
+	extern "C" DX12_EXPORT void SetRenderTargetFormatPreInit(int format);
 
 	// Renderer.cpp
 	extern "C" DX12_EXPORT GScene* NewGScene(Scene* scene);
