@@ -1,4 +1,4 @@
-#include "Renderer.h"
+﻿#include "Renderer.h"
 #include "RenderPath3D_Detail.h"
 #include "Font.h"
 #include "GPUBVH.h"
@@ -1181,7 +1181,7 @@ namespace vz
 
 		// GPU instance-mapping material count allocation is ready at this point:
 		instanceResLookupSize = scene_->GetRenderableResLookupAllocatorSize();
-		if (instanceResLookupUploadBuffer[0].desc.size < (instanceResLookupSize * sizeof(uint)))
+		if (instanceResLookupUploadBuffer[0].desc.size < (instanceResLookupSize * sizeof(ShaderInstanceResLookup)))
 		{
 			GPUBufferDesc desc;
 			desc.stride = sizeof(ShaderInstanceResLookup);
