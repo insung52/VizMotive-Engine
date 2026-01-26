@@ -562,6 +562,7 @@ namespace vz::renderer
 
 		renderer::SetUpStates();	// depthStencils, blendStates, samplers
 		renderer::LoadBuffers();	// buffers, textures
+		renderer::InitGPUSuballocator(); // GPU buffer suballocation for reduced index buffer rebinding
 
 		static eventhandler::Handle handle2 = eventhandler::Subscribe(eventhandler::EVENT_RELOAD_SHADERS, [](uint64_t userdata) { LoadShaders(); });
 
@@ -581,6 +582,9 @@ namespace vz::renderer
 	void Deinitialize()
 	{
 		jobsystem::WaitAllJobs();
+
+		// Release GPU suballocator blocks first
+		renderer::DeinitGPUSuballocator();
 
 		ReleaseRenderRes(buffers, BUFFERTYPE_COUNT);
 		ReleaseRenderRes(textures, TEXTYPE_COUNT);
@@ -634,6 +638,9 @@ namespace vz
 		assert(version == vz::COMPONENT_INTERFACE_VERSION);
 
 		graphics::GetDevice() = device;
+
+		// Initialize GPU suballocator early, before any meshes can be loaded
+		renderer::InitGPUSuballocator();
 
 		return true;
 	}

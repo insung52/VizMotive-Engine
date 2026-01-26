@@ -1,5 +1,6 @@
 #pragma once
 #include "CommonInclude.h"
+#include "Utils/Allocator.h"
 
 #include <vector>
 #include <cassert>
@@ -2103,6 +2104,19 @@ namespace vz::graphics
 		constexpr const RenderPassDesc& GetDesc() const { return desc; }
 		constexpr bool IsValid() const { return valid; }
 	};
+
+	// GPU Buffer Suballocation interface
+	// This allows multiple mesh buffers to be allocated from a single large GPU buffer
+	// to reduce index buffer rebinding overhead during rendering
+	struct BufferSuballocation
+	{
+		GPUBuffer alias;
+		allocator::PageAllocator::Allocation allocation;
+
+		inline bool IsValid() const { return allocation.IsValid(); }
+	};
+	// Note: SuballocateGPUBuffer function pointer is stored in GraphicsDevice class
+	// to work across DLL boundaries. Access via device->SuballocateGPUBuffer
 }
 
 template<>

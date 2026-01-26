@@ -5,6 +5,7 @@
 
 #include "ThirdParty/mikktspace.h"
 #include "ThirdParty/meshoptimizer/meshoptimizer.h"
+#include "ThirdParty/offsetAllocator.cpp"
 
 namespace vz
 {
@@ -1327,9 +1328,36 @@ namespace vz
 				}
 			};
 
-			bool success = device->CreateBuffer2(&bd, init_callback, &part_buffers.generalBuffer);
-			assert(success);
-			device->SetName(&part_buffers.generalBuffer, "GGeometryComponent::bufferHandle_::generalBuffer");
+			// Try suballocation first for better batching (reduces index buffer rebinding)
+			graphics::BufferSuballocation suballoc;
+			if (device->SuballocateGPUBuffer != nullptr)
+			{
+				suballoc = device->SuballocateGPUBuffer(bd.size);
+			}
+			if (suballoc.IsValid())
+			{
+				bool success = device->CreateBuffer2(&bd, init_callback, &part_buffers.generalBuffer, &suballoc.alias, suballoc.allocation.byte_offset);
+				assert(success);
+				device->SetName(&part_buffers.generalBuffer, "GGeometryComponent::generalBuffer (suballocated)");
+				part_buffers.generalBufferOffsetAllocation = std::move(suballoc.allocation);
+				part_buffers.generalBufferOffsetAllocationAlias = std::move(suballoc.alias);
+				backlog::post("GPU buffer suballocated: size=" + std::to_string(bd.size) + ", offset=" + std::to_string(part_buffers.generalBufferOffsetAllocation.byte_offset), backlog::LogLevel::Info);
+			}
+			else
+			{
+				// Fallback to standalone buffer if suballocation not available or failed
+				bool success = device->CreateBuffer2(&bd, init_callback, &part_buffers.generalBuffer);
+				assert(success);
+				device->SetName(&part_buffers.generalBuffer, "GGeometryComponent::generalBuffer");
+				if (device->SuballocateGPUBuffer == nullptr)
+				{
+					backlog::post("GPU buffer standalone (suballocator not initialized): size=" + std::to_string(bd.size), backlog::LogLevel::Warn);
+				}
+				else
+				{
+					backlog::post("GPU buffer standalone (suballocation failed, size too large?): size=" + std::to_string(bd.size), backlog::LogLevel::Info);
+				}
+			}
 
 			assert(ib.IsValid());
 			const Format ib_format = GetIndexFormat(part_index) == IndexBufferFormat::UINT32 ? Format::R32_UINT : Format::R16_UINT;

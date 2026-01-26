@@ -1,6 +1,7 @@
 #pragma once
 #include "Components.h"
 #include "GBackend/GBackendDevice.h"
+#include "Utils/Allocator.h"
 
 namespace vz
 {
@@ -144,6 +145,8 @@ namespace vz
 
 			graphics::GPUBuffer generalBuffer; // index buffer + all static vertex buffers
 			graphics::GPUBuffer streamoutBuffer; // all dynamic vertex buffers
+			allocator::PageAllocator::Allocation generalBufferOffsetAllocation;
+			graphics::GPUBuffer generalBufferOffsetAllocationAlias;
 
 			BufferView ib;
 			BufferView vbPosW;
@@ -168,6 +171,8 @@ namespace vz
 
 			void Destroy()
 			{
+				generalBufferOffsetAllocation = {};
+				generalBufferOffsetAllocationAlias = {};
 				generalBuffer = {};
 				streamoutBuffer = {};
 

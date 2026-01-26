@@ -12,6 +12,7 @@
 #include "Utils/Geometrics.h"
 
 #include "ThirdParty/RectPacker.h"
+#include "ThirdParty/offsetAllocator.cpp"
 
 namespace vz::renderer
 {
@@ -438,7 +439,8 @@ namespace vz::renderer
 		uint32_t prev_stencilref = SCU32(StencilRef::STENCILREF_DEFAULT);
 		device->BindStencilRef(prev_stencilref, cmd);
 
-		const GPUBuffer* prev_ib = nullptr;
+		const void* prev_ib_internal = nullptr;
+		IndexBufferFormat prev_ibformat = IndexBufferFormat::UINT16;
 
 		// This will be called every time we start a new draw call:
 		//	calls draw per A geometry part
@@ -498,8 +500,21 @@ namespace vz::renderer
 
 						device->BindPipelineState(&PSO_RenderableShapes[MESH_RENDERING_LINES_DEPTH], cmd);
 						device->PushConstants(&push, sizeof(push), cmd);
-						device->BindIndexBuffer(&part_buffer.generalBuffer, geometry.GetIndexFormat(part_index), part_buffer.ib.offset, cmd);
-						device->DrawIndexed(part.GetNumIndices(), 0, 0, cmd);
+
+						// Support suballocated buffers for lines rendering
+						uint32_t lineIndexOffset = 0;
+						if (part_buffer.generalBufferOffsetAllocation.IsValid())
+						{
+							const size_t ib_stride = geometry.GetIndexStride(part_index);
+							device->BindIndexBuffer(&part_buffer.generalBufferOffsetAllocationAlias, geometry.GetIndexFormat(part_index), 0, cmd);
+							lineIndexOffset = uint32_t((part_buffer.generalBufferOffsetAllocation.byte_offset + part_buffer.ib.offset) / ib_stride);
+						}
+						else
+						{
+							device->BindIndexBuffer(&part_buffer.generalBuffer, geometry.GetIndexFormat(part_index), 0, cmd);
+							lineIndexOffset = uint32_t(part_buffer.ib.offset / geometry.GetIndexStride(part_index));
+						}
+						device->DrawIndexed(part.GetNumIndices(), lineIndexOffset, 0, cmd);
 					}
 					
 					GMaterialComponent& material = *renderable.materials[part_index];
@@ -588,10 +603,35 @@ namespace vz::renderer
 						device->BindStencilRef(stencilRef, cmd);
 					}
 
-					if (!is_meshshader_pso && prev_ib != &part_buffer.generalBuffer)
+					uint32_t indexOffset = 0;
+					if (!is_meshshader_pso)
 					{
-						device->BindIndexBuffer(&part_buffer.generalBuffer, geometry.GetIndexFormat(part_index), part_buffer.ib.offset, cmd);
-						prev_ib = &part_buffer.generalBuffer;
+						// Use alias buffer if suballocated, otherwise use standalone buffer
+						const GPUBuffer* ib = part_buffer.generalBufferOffsetAllocation.IsValid()
+							? &part_buffer.generalBufferOffsetAllocationAlias
+							: &part_buffer.generalBuffer;
+						const void* ib_internal = ib->internal_state.get();
+						const IndexBufferFormat ibformat = geometry.GetIndexFormat(part_index);
+						const size_t ib_stride = geometry.GetIndexStride(part_index);
+
+						if (prev_ib_internal != ib_internal || prev_ibformat != ibformat)
+						{
+							device->BindIndexBuffer(ib, ibformat, 0, cmd);
+							prev_ib_internal = ib_internal;
+							prev_ibformat = ibformat;
+						}
+
+						// Calculate index offset based on buffer allocation type
+						if (part_buffer.generalBufferOffsetAllocation.IsValid())
+						{
+							// When suballocated, offset is relative to the beginning of the aliased buffer block
+							indexOffset = uint32_t((part_buffer.generalBufferOffsetAllocation.byte_offset + part_buffer.ib.offset) / ib_stride);
+						}
+						else
+						{
+							// When standalone, offset is relative to the buffer itself
+							indexOffset = uint32_t(part_buffer.ib.offset / ib_stride);
+						}
 					}
 
 					if (
@@ -623,8 +663,7 @@ namespace vz::renderer
 						}
 						else
 						{
-							//device->DrawIndexedInstanced(part.indexCount, instancedBatch.instanceCount, part.indexOffset, 0, 0, cmd);
-							device->DrawIndexedInstanced(part.GetNumIndices(), instancedBatch.instanceCount, 0, 0, 0, cmd);
+							device->DrawIndexedInstanced(part.GetNumIndices(), instancedBatch.instanceCount, indexOffset, 0, 0, cmd);
 						}
 					}
 
@@ -637,8 +676,7 @@ namespace vz::renderer
 					}
 					else
 					{
-						//device->DrawIndexedInstanced(part.indexCount, instancedBatch.instanceCount, part.indexOffset, 0, 0, cmd);
-						device->DrawIndexedInstanced(part.GetNumIndices(), instancedBatch.instanceCount, 0, 0, 0, cmd);
+						device->DrawIndexedInstanced(part.GetNumIndices(), instancedBatch.instanceCount, indexOffset, 0, 0, cmd);
 					}
 
 				}
@@ -1352,6 +1390,9 @@ namespace vz::renderer
 		{
 			return false;
 		}
+
+		// Update GPU suballocator for deferred release of memory blocks
+		renderer::UpdateGPUSuballocator();
 
 		if (!rtMain.IsValid())
 		{
@@ -2477,6 +2518,118 @@ namespace vz
 		//renderer::deferredResourceLock.lock();
 		renderer::deferredBufferUpdate.push_back(std::make_pair(buffer, std::make_pair(data_ptr + offset, update_size)));
 		//renderer::deferredResourceLock.unlock();
+	}
+}
+
+// GPU Buffer Suballocation System
+namespace vz::renderer
+{
+	struct GPUSubAllocator
+	{
+		static constexpr uint64_t blocksize = 256ull * 1024ull * 1024ull; // 256 MB
+		struct Block
+		{
+			vz::allocator::PageAllocator allocator;
+			GPUBuffer buffer;
+		};
+		std::vector<Block> blocks;
+		std::mutex locker;
+	};
+	static GPUSubAllocator suballocator;
+
+	graphics::BufferSuballocation SuballocateGPUBufferImpl(uint64_t size)
+	{
+		if (size > GPUSubAllocator::blocksize / 2)
+			return {}; // invalid, larger allocations than half block size will not be suballocated
+
+		std::scoped_lock lock(suballocator.locker);
+
+		// See if any of the large blocks can fulfill the allocation request:
+		graphics::BufferSuballocation allocation;
+		for (auto& block : suballocator.blocks)
+		{
+			allocation.allocation = block.allocator.allocate(size);
+			if (allocation.allocation.IsValid())
+			{
+				allocation.alias = block.buffer;
+				return allocation;
+			}
+		}
+
+		// Allocation couldn't be fulfilled, create new block:
+		GraphicsDevice* device = graphics::GetDevice();
+		GPUBufferDesc desc;
+		desc.size = GPUSubAllocator::blocksize;
+		if (device->CheckCapability(GraphicsDeviceCapability::CACHE_COHERENT_UMA))
+		{
+			// In UMA mode, it is better to create UPLOAD buffer, this avoids one copy from UPLOAD to DEFAULT
+			desc.usage = Usage::UPLOAD;
+		}
+		else
+		{
+			desc.usage = Usage::DEFAULT;
+		}
+		desc.bind_flags = BindFlag::SHADER_RESOURCE | BindFlag::VERTEX_BUFFER | BindFlag::INDEX_BUFFER | BindFlag::UNORDERED_ACCESS;
+		desc.misc_flags = ResourceMiscFlag::ALIASING_BUFFER | ResourceMiscFlag::NO_DEFAULT_DESCRIPTORS;
+		if (device->CheckCapability(GraphicsDeviceCapability::RAYTRACING))
+		{
+			desc.misc_flags |= ResourceMiscFlag::RAY_TRACING;
+		}
+		desc.alignment = device->GetMinOffsetAlignment(&desc);
+		auto& block = suballocator.blocks.emplace_back();
+		bool success = device->CreateBuffer(&desc, nullptr, &block.buffer);
+		assert(success);
+		device->SetName(&block.buffer, "GPUSubAllocator");
+		block.allocator.init(desc.size, (uint32_t)desc.alignment, true);
+		backlog::post("GPUSubAllocator: Created new 256MB block #" + std::to_string(suballocator.blocks.size()) + " (alignment=" + std::to_string(desc.alignment) + ")", backlog::LogLevel::Info);
+
+		allocation.allocation = block.allocator.allocate(size);
+		if (allocation.allocation.IsValid())
+		{
+			allocation.alias = block.buffer;
+		}
+		return allocation;
+	}
+
+	void InitGPUSuballocator()
+	{
+		GraphicsDevice* device = graphics::GetDevice();
+		if (device != nullptr)
+		{
+			device->SuballocateGPUBuffer = SuballocateGPUBufferImpl;
+			backlog::post("GPUSubAllocator: Initialized (256MB blocks, reduces index buffer rebinding)", backlog::LogLevel::Info);
+		}
+	}
+
+	void UpdateGPUSuballocator()
+	{
+		GraphicsDevice* device = graphics::GetDevice();
+		std::scoped_lock lock(suballocator.locker);
+		for (auto& block : suballocator.blocks)
+		{
+			block.allocator.update_deferred_release(device->GetFrameCount(), device->GetBufferCount());
+		}
+		for (size_t i = 0; i < suballocator.blocks.size(); ++i)
+		{
+			const auto& block = suballocator.blocks[i];
+			if (block.allocator.is_empty())
+			{
+				suballocator.blocks.erase(suballocator.blocks.begin() + i);
+				break;
+			}
+		}
+	}
+
+	void DeinitGPUSuballocator()
+	{
+		std::scoped_lock lock(suballocator.locker);
+		suballocator.blocks.clear();
+		GraphicsDevice* device = graphics::GetDevice();
+		if (device != nullptr)
+		{
+			device->SuballocateGPUBuffer = nullptr;
+		}
+		backlog::post("GPUSubAllocator: Deinitialized", backlog::LogLevel::Info);
 	}
 }
 

@@ -7,6 +7,7 @@
 
 #include "Utils/JobSystem.h"
 #include "Utils/Spinlock.h"
+#include "Utils/Allocator.h"
 
 #include "../Shaders/ShaderInterop.h"
 #include "../Shaders/ShaderInterop_Renderer.h"
@@ -311,6 +312,19 @@ namespace vz::renderer
 	// renderer only (not scene)
 	extern bool isDebugShapeEnabled;
 	extern bool isDebugShapeCleanStart;
+}
+
+// GPU Buffer Suballocation System
+// Note: graphics::BufferSuballocation is defined in GBackend.h
+// The function pointer is stored in GraphicsDevice::SuballocateGPUBuffer (works across DLL boundaries)
+// The implementation is in Renderer.cpp and sets up the function pointer during initialization
+namespace vz::renderer
+{
+	// Internal implementation of SuballocateGPUBuffer (called through device->SuballocateGPUBuffer)
+	graphics::BufferSuballocation SuballocateGPUBufferImpl(uint64_t size);
+	void UpdateGPUSuballocator(); // called every frame for deferred release of GPU suballocations
+	void InitGPUSuballocator();   // sets up device->SuballocateGPUBuffer function pointer
+	void DeinitGPUSuballocator(); // releases all 256MB blocks on shutdown
 }
 
 #define ReleaseRenderRes(SRC, R_COUNT) for (size_t i = 0, n = (size_t)R_COUNT; i < n; ++i) SRC[i] = {};
