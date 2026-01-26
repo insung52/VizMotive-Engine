@@ -47,6 +47,8 @@ namespace vz::graphics
 		QUEUE_COUNT,
 	};
 
+	struct BufferSuballocation; // forward declaration
+
 	class GraphicsDevice
 	{
 	protected:
@@ -64,6 +66,10 @@ namespace vz::graphics
 		std::string driverDescription;
 		ValidationMode validationMode = ValidationMode::Disabled;
 		AdapterType adapterType = AdapterType::Other;
+
+	public:
+		// GPU buffer suballocation function pointer (set by Renderer, works across DLL boundaries)
+		BufferSuballocation(*SuballocateGPUBuffer)(uint64_t size) = nullptr;
 
 	public:
 		virtual ~GraphicsDevice() = default;
