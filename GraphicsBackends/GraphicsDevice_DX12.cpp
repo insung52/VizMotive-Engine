@@ -1724,6 +1724,7 @@ std::mutex queue_locker;
 
 			hr = device->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, PPV_ARGS(cmd.fence));
 			assert(SUCCEEDED(hr));
+			dx12_check(cmd.fence->SetName(L"CopyAllocator::fence"));
 
 			GPUBufferDesc uploadBufferDesc;
 			uploadBufferDesc.size = vz::math::GetNextPowerOfTwo(staging_size);
@@ -1763,17 +1764,12 @@ std::mutex queue_locker;
 		hr = queue->Signal(cmd.fence.Get(), cmd.fenceValueSignaled);
 		assert(SUCCEEDED(hr));
 
-		hr = device->queues[QUEUE_GRAPHICS].queue->Wait(cmd.fence.Get(), cmd.fenceValueSignaled);
+		// CPU wait for copy to complete:
+		HANDLE event_handle = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
+		hr = cmd.fence->SetEventOnCompletion(cmd.fenceValueSignaled, event_handle);
 		assert(SUCCEEDED(hr));
-		hr = device->queues[QUEUE_COMPUTE].queue->Wait(cmd.fence.Get(), cmd.fenceValueSignaled);
-		assert(SUCCEEDED(hr));
-		hr = device->queues[QUEUE_COPY].queue->Wait(cmd.fence.Get(), cmd.fenceValueSignaled);
-		assert(SUCCEEDED(hr));
-		if (device->queues[QUEUE_VIDEO_DECODE].queue)
-		{
-			hr = device->queues[QUEUE_VIDEO_DECODE].queue->Wait(cmd.fence.Get(), cmd.fenceValueSignaled);
-			assert(SUCCEEDED(hr));
-		}
+		WaitForSingleObject(event_handle, INFINITE);
+		CloseHandle(event_handle);
 	}
 
 	void GraphicsDevice_DX12::DescriptorBinder::init(GraphicsDevice_DX12* device)
@@ -2594,6 +2590,7 @@ std::mutex queue_locker;
 
 			hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, PPV_ARGS(descriptorheap_res.fence));
 			assert(SUCCEEDED(hr));
+			dx12_check(descriptorheap_res.fence->SetName(L"descriptorheap_res::fence"));
 			if (FAILED(hr))
 			{
 				std::stringstream ss("");
@@ -2631,6 +2628,7 @@ std::mutex queue_locker;
 
 			hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, PPV_ARGS(descriptorheap_sam.fence));
 			assert(SUCCEEDED(hr));
+			dx12_check(descriptorheap_sam.fence->SetName(L"descriptorheap_sam::fence"));
 			if (FAILED(hr))
 			{
 				std::stringstream ss("");
@@ -2661,6 +2659,8 @@ std::mutex queue_locker;
 					vz::helper::messageBox(ss.str(), "Error!");
 					vz::platform::Exit();
 				}
+				std::wstring fencename = L"frame_fence[" + std::to_wstring(buffer) + L"][" + std::to_wstring(queue) + L"]";
+				dx12_check(frame_fence[buffer][queue]->SetName(fencename.c_str()));
 			}
 		}
 
@@ -2878,6 +2878,7 @@ std::mutex queue_locker;
 		{
 			hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(deviceRemovedFence.GetAddressOf()));
 			assert(SUCCEEDED(hr));
+			dx12_check(deviceRemovedFence->SetName(L"deviceRemovedFence"));
 
 			HANDLE deviceRemovedEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
 			hr = deviceRemovedFence->SetEventOnCompletion(UINT64_MAX, deviceRemovedEvent);
@@ -5544,6 +5545,24 @@ std::mutex queue_locker;
 
 				hr = queue.queue->Signal(frame_fence[GetBufferIndex()][q].Get(), 1);
 				assert(SUCCEEDED(hr));
+			}
+
+			// End of frame synchronize queues with each other:
+			for (int q = 0; q < QUEUE_COUNT; ++q)
+			{
+				CommandQueue& queue = queues[q];
+				if (queue.queue == nullptr)
+					continue;
+				for (int q2 = 0; q2 < QUEUE_COUNT; ++q2)
+				{
+					if (q2 == q)
+						continue;
+					CommandQueue& queue2 = queues[q2];
+					if (queue2.queue == nullptr)
+						continue;
+					hr = queue.queue->Wait(frame_fence[GetBufferIndex()][q2].Get(), 1);
+					assert(SUCCEEDED(hr));
+				}
 			}
 
 			for (uint32_t cmd = 0; cmd < cmd_last; ++cmd)
