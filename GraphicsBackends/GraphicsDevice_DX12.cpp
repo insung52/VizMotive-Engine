@@ -1699,17 +1699,15 @@ std::mutex queue_locker;
 
 		locker.lock();
 		// Try to search for a staging buffer that can fit the request:
+		// Note: All entries in freelist are already completed (CPU wait in submit)
 		for (size_t i = 0; i < freelist.size(); ++i)
 		{
 			if (freelist[i].uploadbuffer.desc.size >= staging_size)
 			{
-				if (freelist[i].IsCompleted())
-				{
-					cmd = std::move(freelist[i]);
-					std::swap(freelist[i], freelist.back());
-					freelist.pop_back();
-					break;
-				}
+				cmd = std::move(freelist[i]);
+				std::swap(freelist[i], freelist.back());
+				freelist.pop_back();
+				break;
 			}
 		}
 		locker.unlock();
@@ -1747,14 +1745,9 @@ std::mutex queue_locker;
 	}
 	void GraphicsDevice_DX12::CopyAllocator::submit(CopyCMD cmd)
 	{
-		HRESULT hr;
+		dx12_check(cmd.commandList->Close());
+		dx12_check(cmd.fence->Signal(0)); // Reset fence to 0
 
-		locker.lock();
-		cmd.fenceValueSignaled++;
-		freelist.push_back(cmd);
-		locker.unlock();
-
-		cmd.commandList->Close();
 		ID3D12CommandList* commandlists[] = {
 			cmd.commandList.Get()
 		};
@@ -1764,15 +1757,14 @@ std::mutex queue_locker;
 #endif // PLATFORM_XBOX
 
 		queue->ExecuteCommandLists(1, commandlists);
-		hr = queue->Signal(cmd.fence.Get(), cmd.fenceValueSignaled);
-		assert(SUCCEEDED(hr));
+		dx12_check(queue->Signal(cmd.fence.Get(), 1)); // Signal 1 when complete
 
 		// CPU wait for copy to complete:
-		HANDLE event_handle = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
-		hr = cmd.fence->SetEventOnCompletion(cmd.fenceValueSignaled, event_handle);
-		assert(SUCCEEDED(hr));
-		WaitForSingleObject(event_handle, INFINITE);
-		CloseHandle(event_handle);
+		dx12_check(cmd.fence->SetEventOnCompletion(1, nullptr));
+
+		// Add to freelist after completion
+		std::scoped_lock lock(locker);
+		freelist.push_back(cmd);
 	}
 
 	void GraphicsDevice_DX12::DescriptorBinder::init(GraphicsDevice_DX12* device)
@@ -6795,7 +6787,11 @@ std::mutex queue_locker;
 	void GraphicsDevice_DX12::BindStencilRef(uint32_t value, CommandList cmd)
 	{
 		CommandList_DX12& commandlist = GetCommandList(cmd);
-		commandlist.GetGraphicsCommandList()->OMSetStencilRef(value);
+		if (commandlist.prev_stencilref != value)
+		{
+			commandlist.prev_stencilref = value;
+			commandlist.GetGraphicsCommandList()->OMSetStencilRef(value);
+		}
 	}
 	void GraphicsDevice_DX12::BindBlendFactor(float r, float g, float b, float a, CommandList cmd)
 	{
