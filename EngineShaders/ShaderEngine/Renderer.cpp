@@ -1454,9 +1454,7 @@ namespace vz::renderer
 
 		// Preparing the frame:
 		CommandList cmd = device->BeginCommandList();
-		device->WaitQueue(cmd, QUEUE_COMPUTE); // sync to prev frame compute (disallow prev frame overlapping a compute task into updating global scene resources for this frame)
-		ProcessDeferredResourceRequests(cmd); // Execute it first thing in the frame here, on main thread, to not allow other thread steal it and execute on different command list!
-		
+				
 		CommandList cmd_prepareframe = cmd;
 		// remember GraphicsDevice::BeginCommandList does incur some overhead
 		//	this is why jobsystem::Execute is used here

@@ -5482,7 +5482,7 @@ std::mutex queue_locker;
 				}
 
 				CommandQueue& queue = queues[commandlist.queue];
-				const bool dependency = !commandlist.signals.empty() || !commandlist.waits.empty() || !commandlist.wait_queues.empty();
+				const bool dependency = !commandlist.signals.empty() || !commandlist.waits.empty();
 
 				if (dependency)
 				{
@@ -5495,30 +5495,6 @@ std::mutex queue_locker;
 
 				if (dependency)
 				{
-					for (auto& wait : commandlist.wait_queues)
-					{
-						CommandQueue& waitqueue = queues[wait.first];
-						const Semaphore& semaphore = wait.second;
-						
-						// If the queue doesn't exist, signal the semaphore immediately without waiting
-						if (waitqueue.queue == nullptr) {
-							vzlog_warning("waitqueue.queue is nullptr!");
-							free_semaphore(semaphore);
-							continue;
-						}
-
-						// The WaitQueue operation will submit and signal the specified dependency queue:
-						waitqueue.submit();
-						waitqueue.signal(semaphore); // signals immediately after submit
-
-						// The current queue will be waiting for the dependency queue to complete:
-						queue.wait(semaphore);
-
-						// recycle semaphore:
-						free_semaphore(semaphore);
-					}
-					commandlist.wait_queues.clear();
-
 					for(auto& semaphore : commandlist.waits)
 					{
 						// Wait for command list dependency:
@@ -6069,11 +6045,6 @@ std::mutex queue_locker;
 		Semaphore semaphore = new_semaphore();
 		commandlist.waits.push_back(semaphore);
 		commandlist_wait_for.signals.push_back(semaphore);
-	}
-	void GraphicsDevice_DX12::WaitQueue(CommandList cmd, QUEUE_TYPE wait_for)
-	{
-		CommandList_DX12& commandlist = GetCommandList(cmd);
-		commandlist.wait_queues.push_back(std::make_pair(wait_for, new_semaphore()));
 	}
 	void GraphicsDevice_DX12::RenderPassBegin(const SwapChain* swapchain, CommandList cmd)
 	{
