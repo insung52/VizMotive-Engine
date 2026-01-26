@@ -701,9 +701,9 @@ namespace vz::renderer
 				bd.size = required_debug_buffer_size;
 				bd.bind_flags = BindFlag::VERTEX_BUFFER | BindFlag::UNORDERED_ACCESS;
 				bd.misc_flags = ResourceMiscFlag::BUFFER_RAW | ResourceMiscFlag::INDIRECT_ARGS;
-				device->CreateBuffer(&bd, nullptr, &buffers[BUFFERTYPE_INDIRECT_DEBUG_0]);
+				device->CreateBufferZeroed(&bd, &buffers[BUFFERTYPE_INDIRECT_DEBUG_0]);
 				device->SetName(&buffers[BUFFERTYPE_INDIRECT_DEBUG_0], "buffers[BUFFERTYPE_INDIRECT_DEBUG_0]");
-				device->CreateBuffer(&bd, nullptr, &buffers[BUFFERTYPE_INDIRECT_DEBUG_1]);
+				device->CreateBufferZeroed(&bd, &buffers[BUFFERTYPE_INDIRECT_DEBUG_1]);
 				device->SetName(&buffers[BUFFERTYPE_INDIRECT_DEBUG_1], "buffers[BUFFERTYPE_INDIRECT_DEBUG_1]");
 				std::memset(indirectDebugStatsReadback_available, 0, sizeof(indirectDebugStatsReadback_available));
 			}
@@ -2191,7 +2191,7 @@ namespace vz::renderer
 			desc.size = desc.stride * (SCU32(MaterialComponent::ShaderType::COUNT) + 1); // +1 for sky
 			desc.bind_flags = BindFlag::SHADER_RESOURCE | BindFlag::UNORDERED_ACCESS;
 			desc.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED | ResourceMiscFlag::INDIRECT_ARGS;
-			bool success = device->CreateBuffer(&desc, nullptr, &res.bins);
+			bool success = device->CreateBufferZeroed(&desc, &res.bins);
 			assert(success);
 			device->SetName(&res.bins, "res.bins");
 
