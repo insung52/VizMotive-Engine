@@ -43,7 +43,7 @@ namespace vz::gpusortlib
 		bd.bind_flags = BindFlag::UNORDERED_ACCESS;
 		bd.misc_flags = ResourceMiscFlag::INDIRECT_ARGS | ResourceMiscFlag::BUFFER_RAW;
 		bd.size = sizeof(IndirectDispatchArgs);
-		graphics::GetDevice()->CreateBuffer(&bd, nullptr, &indirectBuffer);
+		graphics::GetDevice()->CreateBufferZeroed(&bd, &indirectBuffer);
 
 		static eventhandler::Handle handle = eventhandler::Subscribe(eventhandler::EVENT_RELOAD_SHADERS, [](uint64_t userdata) { LoadShaders(); });
 		LoadShaders();
