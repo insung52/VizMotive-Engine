@@ -143,10 +143,22 @@ namespace vz
 			bool busyUpdate = false;
 			uint32_t slot = 0;
 
-			graphics::GPUBuffer generalBuffer; // index buffer + all static vertex buffers
+			// Static buffer storage:
+			// - If suballocated: blockBufferRef points to 256MB block, generalBuffer is unused
+			// - If standalone: blockBufferRef is null, generalBuffer holds the data
+			graphics::GPUBuffer generalBuffer; // standalone buffer (used only when suballocation fails)
 			graphics::GPUBuffer streamoutBuffer; // all dynamic vertex buffers
-			allocator::PageAllocator::Allocation generalBufferOffsetAllocation;
-			graphics::GPUBuffer generalBufferOffsetAllocationAlias;
+
+			// Suballocation info (pure offset-based, no aliasing resource created)
+			graphics::GPUBuffer* blockBufferRef = nullptr;  // Pointer to 256MB block (null if standalone)
+			uint64_t blockBaseOffset = 0;                   // Offset within block buffer
+			allocator::PageAllocator::Allocation generalBufferOffsetAllocation;  // For deallocation
+
+			// Helper to get the actual buffer to use for rendering
+			const graphics::GPUBuffer* GetRenderBuffer() const {
+				return blockBufferRef ? blockBufferRef : &generalBuffer;
+			}
+			bool IsSuballocated() const { return blockBufferRef != nullptr; }
 
 			BufferView ib;
 			BufferView vbPosW;
@@ -171,9 +183,12 @@ namespace vz
 
 			void Destroy()
 			{
+				// Release suballocation (offset returned to PageAllocator)
 				generalBufferOffsetAllocation = {};
-				generalBufferOffsetAllocationAlias = {};
-				generalBuffer = {};
+				blockBufferRef = nullptr;  // Don't delete - block buffer is managed by suballocator
+				blockBaseOffset = 0;
+
+				generalBuffer = {};  // Standalone buffer (if used)
 				streamoutBuffer = {};
 
 				bvhBuffers = {};

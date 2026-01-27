@@ -2108,12 +2108,16 @@ namespace vz::graphics
 	// GPU Buffer Suballocation interface
 	// This allows multiple mesh buffers to be allocated from a single large GPU buffer
 	// to reduce index buffer rebinding overhead during rendering
+	//
+	// Pure offset-based approach: No aliasing resources created, only views with offsets
+	// This avoids D3D12_MESSAGE_ID_HEAP_ADDRESS_RANGE_INTERSECTS_MULTIPLE_BUFFERS warning
 	struct BufferSuballocation
 	{
-		GPUBuffer alias;
+		GPUBuffer* blockBuffer = nullptr;  // Pointer to 256MB block buffer (not a copy)
 		allocator::PageAllocator::Allocation allocation;
 
-		inline bool IsValid() const { return allocation.IsValid(); }
+		inline bool IsValid() const { return blockBuffer != nullptr && allocation.IsValid(); }
+		inline uint64_t GetOffset() const { return allocation.byte_offset; }
 	};
 	// Note: SuballocateGPUBuffer function pointer is stored in GraphicsDevice class
 	// to work across DLL boundaries. Access via device->SuballocateGPUBuffer

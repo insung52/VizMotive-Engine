@@ -3547,6 +3547,40 @@ std::mutex queue_locker;
 
 		return SUCCEEDED(hr);
 	}
+
+	void GraphicsDevice_DX12::UploadToBufferRegion(GPUBuffer* buffer, uint64_t offset, const void* data, uint64_t size) const
+	{
+		if (buffer == nullptr || data == nullptr || size == 0)
+			return;
+
+		auto internal_state = to_internal(buffer);
+		if (internal_state == nullptr || internal_state->resource == nullptr)
+			return;
+
+		// For UPLOAD buffers (UMA mode), write directly to mapped memory
+		if (buffer->mapped_data != nullptr)
+		{
+			std::memcpy((uint8_t*)buffer->mapped_data + offset, data, size);
+		}
+		else
+		{
+			// For DEFAULT buffers, use CopyAllocator
+			CopyAllocator::CopyCMD cmd = copyAllocator.allocate(size);
+			if (cmd.IsValid())
+			{
+				std::memcpy(cmd.uploadbuffer.mapped_data, data, size);
+				cmd.commandList->CopyBufferRegion(
+					internal_state->resource.Get(),
+					offset,
+					to_internal(&cmd.uploadbuffer)->resource.Get(),
+					0,
+					size
+				);
+				copyAllocator.submit(cmd);
+			}
+		}
+	}
+
 	bool GraphicsDevice_DX12::CreateTexture(const TextureDesc* desc, const SubresourceData* initial_data, Texture* texture, const GPUResource* alias, uint64_t alias_offset) const
 	{
 		auto internal_state = std::make_shared<Texture_DX12>();

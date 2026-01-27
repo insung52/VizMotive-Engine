@@ -1329,19 +1329,32 @@ namespace vz
 			};
 
 			// Try suballocation first for better batching (reduces index buffer rebinding)
+			// Pure offset-based approach: no aliasing resource created, just views with offsets
 			graphics::BufferSuballocation suballoc;
 			if (device->SuballocateGPUBuffer != nullptr)
 			{
 				suballoc = device->SuballocateGPUBuffer(bd.size);
 			}
+
+			// Pointer to the buffer used for creating views
+			graphics::GPUBuffer* renderBuffer = nullptr;
+			uint64_t viewBaseOffset = 0;  // Base offset for creating views
+
 			if (suballoc.IsValid())
 			{
-				bool success = device->CreateBuffer2(&bd, init_callback, &part_buffers.generalBuffer, &suballoc.alias, suballoc.allocation.byte_offset);
-				assert(success);
-				device->SetName(&part_buffers.generalBuffer, "GGeometryComponent::generalBuffer (suballocated)");
+				// Suballocated: upload data to block buffer at offset, no aliased resource created
+				part_buffers.blockBufferRef = suballoc.blockBuffer;
+				part_buffers.blockBaseOffset = suballoc.GetOffset();
 				part_buffers.generalBufferOffsetAllocation = std::move(suballoc.allocation);
-				part_buffers.generalBufferOffsetAllocationAlias = std::move(suballoc.alias);
-				backlog::post("GPU buffer suballocated: size=" + std::to_string(bd.size) + ", offset=" + std::to_string(part_buffers.generalBufferOffsetAllocation.byte_offset), backlog::LogLevel::Info);
+
+				// Prepare data in temporary buffer and upload to block buffer
+				std::vector<uint8_t> tempBuffer(bd.size);
+				init_callback(tempBuffer.data());
+				device->UploadToBufferRegion(part_buffers.blockBufferRef, part_buffers.blockBaseOffset, tempBuffer.data(), bd.size);
+
+				renderBuffer = part_buffers.blockBufferRef;
+				viewBaseOffset = part_buffers.blockBaseOffset;
+				backlog::post("GPU buffer suballocated (offset-based): size=" + std::to_string(bd.size) + ", offset=" + std::to_string(part_buffers.blockBaseOffset), backlog::LogLevel::Info);
 			}
 			else
 			{
@@ -1349,6 +1362,12 @@ namespace vz
 				bool success = device->CreateBuffer2(&bd, init_callback, &part_buffers.generalBuffer);
 				assert(success);
 				device->SetName(&part_buffers.generalBuffer, "GGeometryComponent::generalBuffer");
+
+				part_buffers.blockBufferRef = nullptr;
+				part_buffers.blockBaseOffset = 0;
+				renderBuffer = &part_buffers.generalBuffer;
+				viewBaseOffset = 0;
+
 				if (device->SuballocateGPUBuffer == nullptr)
 				{
 					backlog::post("GPU buffer standalone (suballocator not initialized): size=" + std::to_string(bd.size), backlog::LogLevel::Warn);
@@ -1359,35 +1378,36 @@ namespace vz
 				}
 			}
 
+			// Create views on the render buffer with absolute offsets
 			assert(ib.IsValid());
 			const Format ib_format = GetIndexFormat(part_index) == IndexBufferFormat::UINT32 ? Format::R32_UINT : Format::R16_UINT;
-			ib.subresource_srv = device->CreateSubresource(&generalBuffer, SubresourceType::SRV, ib.offset, ib.size, &ib_format);
-			ib.descriptor_srv = device->GetDescriptorIndex(&generalBuffer, SubresourceType::SRV, ib.subresource_srv);
+			ib.subresource_srv = device->CreateSubresource(renderBuffer, SubresourceType::SRV, viewBaseOffset + ib.offset, ib.size, &ib_format);
+			ib.descriptor_srv = device->GetDescriptorIndex(renderBuffer, SubresourceType::SRV, ib.subresource_srv);
 
 			assert(vb_pos.IsValid());
-			vb_pos.subresource_srv = device->CreateSubresource(&generalBuffer, SubresourceType::SRV, vb_pos.offset, vb_pos.size, &positionFormat);
-			vb_pos.descriptor_srv = device->GetDescriptorIndex(&generalBuffer, SubresourceType::SRV, vb_pos.subresource_srv);
+			vb_pos.subresource_srv = device->CreateSubresource(renderBuffer, SubresourceType::SRV, viewBaseOffset + vb_pos.offset, vb_pos.size, &positionFormat);
+			vb_pos.descriptor_srv = device->GetDescriptorIndex(renderBuffer, SubresourceType::SRV, vb_pos.subresource_srv);
 
 			if (vb_nor.IsValid())
 			{
-				vb_nor.subresource_srv = device->CreateSubresource(&generalBuffer, SubresourceType::SRV, vb_nor.offset, vb_nor.size, &Vertex_NOR::FORMAT);
-				vb_nor.descriptor_srv = device->GetDescriptorIndex(&generalBuffer, SubresourceType::SRV, vb_nor.subresource_srv);
+				vb_nor.subresource_srv = device->CreateSubresource(renderBuffer, SubresourceType::SRV, viewBaseOffset + vb_nor.offset, vb_nor.size, &Vertex_NOR::FORMAT);
+				vb_nor.descriptor_srv = device->GetDescriptorIndex(renderBuffer, SubresourceType::SRV, vb_nor.subresource_srv);
 			}
 			if (vb_tan.IsValid())
 			{
-				vb_tan.subresource_srv = device->CreateSubresource(&generalBuffer, SubresourceType::SRV, vb_tan.offset, vb_tan.size, &Vertex_TAN::FORMAT);
-				vb_tan.descriptor_srv = device->GetDescriptorIndex(&generalBuffer, SubresourceType::SRV, vb_tan.subresource_srv);
+				vb_tan.subresource_srv = device->CreateSubresource(renderBuffer, SubresourceType::SRV, viewBaseOffset + vb_tan.offset, vb_tan.size, &Vertex_TAN::FORMAT);
+				vb_tan.descriptor_srv = device->GetDescriptorIndex(renderBuffer, SubresourceType::SRV, vb_tan.subresource_srv);
 			}
 			if (vb_uvs.IsValid())
 			{
-				vb_uvs.subresource_srv = device->CreateSubresource(&generalBuffer, SubresourceType::SRV, vb_uvs.offset, vb_uvs.size, 
+				vb_uvs.subresource_srv = device->CreateSubresource(renderBuffer, SubresourceType::SRV, viewBaseOffset + vb_uvs.offset, vb_uvs.size,
 					primitive.useFullPrecisionUV_ ? &GGeometryComponent::Vertex_UVS32::FORMAT : &GGeometryComponent::Vertex_UVS::FORMAT);
-				vb_uvs.descriptor_srv = device->GetDescriptorIndex(&generalBuffer, SubresourceType::SRV, vb_uvs.subresource_srv);
+				vb_uvs.descriptor_srv = device->GetDescriptorIndex(renderBuffer, SubresourceType::SRV, vb_uvs.subresource_srv);
 			}
 			if (vb_col.IsValid())
 			{
-				vb_col.subresource_srv = device->CreateSubresource(&generalBuffer, SubresourceType::SRV, vb_col.offset, vb_col.size, &Vertex_COL::FORMAT);
-				vb_col.descriptor_srv = device->GetDescriptorIndex(&generalBuffer, SubresourceType::SRV, vb_col.subresource_srv);
+				vb_col.subresource_srv = device->CreateSubresource(renderBuffer, SubresourceType::SRV, viewBaseOffset + vb_col.offset, vb_col.size, &Vertex_COL::FORMAT);
+				vb_col.descriptor_srv = device->GetDescriptorIndex(renderBuffer, SubresourceType::SRV, vb_col.subresource_srv);
 			}
 
 			part_buffers.busyUpdate = false;
@@ -1715,12 +1735,15 @@ namespace vz
 				desc.bottom_level.geometries.emplace_back();
 				auto& geometry = desc.bottom_level.geometries.back();
 				geometry.type = RaytracingAccelerationStructureDesc::BottomLevel::Geometry::Type::TRIANGLES;
-				geometry.triangles.vertex_buffer = part_buffers.generalBuffer;
-				geometry.triangles.vertex_byte_offset = part_buffers.vbPosW.offset;
-				geometry.triangles.index_buffer = part_buffers.generalBuffer;
+				// Use the correct buffer (block buffer if suballocated, standalone otherwise)
+				const GPUBuffer* renderBuffer = part_buffers.GetRenderBuffer();
+				const uint64_t baseOffset = part_buffers.IsSuballocated() ? part_buffers.blockBaseOffset : 0;
+				geometry.triangles.vertex_buffer = *renderBuffer;
+				geometry.triangles.vertex_byte_offset = baseOffset + part_buffers.vbPosW.offset;
+				geometry.triangles.index_buffer = *renderBuffer;
 				geometry.triangles.index_format = GetIndexFormat(part_index);
 				geometry.triangles.index_count = subset.indexCount;
-				geometry.triangles.index_offset = part_buffers.ib.offset / GetIndexStride(part_index) + subset.indexOffset; // element unit
+				geometry.triangles.index_offset = (baseOffset + part_buffers.ib.offset) / GetIndexStride(part_index) + subset.indexOffset; // element unit
 				geometry.triangles.vertex_count = (uint32_t)primitive.GetNumVertices();
 				if (part_buffers.soPosW.IsValid())
 				{
