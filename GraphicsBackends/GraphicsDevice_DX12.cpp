@@ -7990,7 +7990,7 @@ std::mutex queue_locker;
 		if (commandlist.queue == QUEUE_VIDEO_DECODE)
 			return;
 		wchar_t text[128];
-		if (vz::helper::StringConvert(name, text) > 0)
+		if (vz::helper::StringConvert(name, text, arraysize(text)) > 0)
 		{
 			PIXBeginEvent(commandlist.GetGraphicsCommandList(), 0xFF000000, text);
 		}
@@ -8008,7 +8008,7 @@ std::mutex queue_locker;
 		if (commandlist.queue == QUEUE_VIDEO_DECODE)
 			return;
 		wchar_t text[128];
-		if (vz::helper::StringConvert(name, text) > 0)
+		if (vz::helper::StringConvert(name, text, arraysize(text)) > 0)
 		{
 			PIXSetMarker(commandlist.GetGraphicsCommandList(), 0xFFFF0000, text);
 		}
