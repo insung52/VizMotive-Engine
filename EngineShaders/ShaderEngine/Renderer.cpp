@@ -503,11 +503,11 @@ namespace vz::renderer
 
 						// Support suballocated buffers for lines rendering
 						uint32_t lineIndexOffset = 0;
-						if (part_buffer.generalBufferOffsetAllocation.IsValid())
+						if (part_buffer.IsSuballocated())
 						{
 							const size_t ib_stride = geometry.GetIndexStride(part_index);
-							device->BindIndexBuffer(&part_buffer.generalBufferOffsetAllocationAlias, geometry.GetIndexFormat(part_index), 0, cmd);
-							lineIndexOffset = uint32_t((part_buffer.generalBufferOffsetAllocation.byte_offset + part_buffer.ib.offset) / ib_stride);
+							device->BindIndexBuffer(part_buffer.GetRenderBuffer(), geometry.GetIndexFormat(part_index), 0, cmd);
+							lineIndexOffset = uint32_t((part_buffer.blockBaseOffset + part_buffer.ib.offset) / ib_stride);
 						}
 						else
 						{
@@ -606,10 +606,8 @@ namespace vz::renderer
 					uint32_t indexOffset = 0;
 					if (!is_meshshader_pso)
 					{
-						// Use alias buffer if suballocated, otherwise use standalone buffer
-						const GPUBuffer* ib = part_buffer.generalBufferOffsetAllocation.IsValid()
-							? &part_buffer.generalBufferOffsetAllocationAlias
-							: &part_buffer.generalBuffer;
+						// Use block buffer if suballocated, otherwise use standalone buffer
+						const GPUBuffer* ib = part_buffer.GetRenderBuffer();
 						const void* ib_internal = ib->internal_state.get();
 						const IndexBufferFormat ibformat = geometry.GetIndexFormat(part_index);
 						const size_t ib_stride = geometry.GetIndexStride(part_index);
@@ -622,10 +620,10 @@ namespace vz::renderer
 						}
 
 						// Calculate index offset based on buffer allocation type
-						if (part_buffer.generalBufferOffsetAllocation.IsValid())
+						if (part_buffer.IsSuballocated())
 						{
-							// When suballocated, offset is relative to the beginning of the aliased buffer block
-							indexOffset = uint32_t((part_buffer.generalBufferOffsetAllocation.byte_offset + part_buffer.ib.offset) / ib_stride);
+							// When suballocated, offset is relative to the beginning of the block buffer
+							indexOffset = uint32_t((part_buffer.blockBaseOffset + part_buffer.ib.offset) / ib_stride);
 						}
 						else
 						{
@@ -2551,12 +2549,13 @@ namespace vz::renderer
 			allocation.allocation = block.allocator.allocate(size);
 			if (allocation.allocation.IsValid())
 			{
-				allocation.alias = block.buffer;
+				allocation.blockBuffer = &block.buffer;  // Return pointer, not copy
 				return allocation;
 			}
 		}
 
 		// Allocation couldn't be fulfilled, create new block:
+		// NOTE: No ALIASING_BUFFER flag - we use pure offset-based views instead
 		GraphicsDevice* device = graphics::GetDevice();
 		GPUBufferDesc desc;
 		desc.size = GPUSubAllocator::blocksize;
@@ -2570,7 +2569,7 @@ namespace vz::renderer
 			desc.usage = Usage::DEFAULT;
 		}
 		desc.bind_flags = BindFlag::SHADER_RESOURCE | BindFlag::VERTEX_BUFFER | BindFlag::INDEX_BUFFER | BindFlag::UNORDERED_ACCESS;
-		desc.misc_flags = ResourceMiscFlag::ALIASING_BUFFER | ResourceMiscFlag::NO_DEFAULT_DESCRIPTORS;
+		desc.misc_flags = ResourceMiscFlag::NO_DEFAULT_DESCRIPTORS;  // No ALIASING_BUFFER - pure offset views
 		if (device->CheckCapability(GraphicsDeviceCapability::RAYTRACING))
 		{
 			desc.misc_flags |= ResourceMiscFlag::RAY_TRACING;
@@ -2579,14 +2578,14 @@ namespace vz::renderer
 		auto& block = suballocator.blocks.emplace_back();
 		bool success = device->CreateBuffer(&desc, nullptr, &block.buffer);
 		assert(success);
-		device->SetName(&block.buffer, "GPUSubAllocator");
+		device->SetName(&block.buffer, "GPUSubAllocator (offset-based)");
 		block.allocator.init(desc.size, (uint32_t)desc.alignment, true);
-		backlog::post("GPUSubAllocator: Created new 256MB block #" + std::to_string(suballocator.blocks.size()) + " (alignment=" + std::to_string(desc.alignment) + ")", backlog::LogLevel::Info);
+		backlog::post("GPUSubAllocator: Created new 256MB block #" + std::to_string(suballocator.blocks.size()) + " (pure offset-based, no aliasing)", backlog::LogLevel::Info);
 
 		allocation.allocation = block.allocator.allocate(size);
 		if (allocation.allocation.IsValid())
 		{
-			allocation.alias = block.buffer;
+			allocation.blockBuffer = &block.buffer;  // Return pointer, not copy
 		}
 		return allocation;
 	}
