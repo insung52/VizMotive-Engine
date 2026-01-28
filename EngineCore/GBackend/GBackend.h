@@ -825,8 +825,8 @@ namespace vz::graphics
 
 	struct Sampler
 	{
-		std::shared_ptr<void> internal_state;
-		inline bool IsValid() const { return internal_state != nullptr; }
+		vz::allocator::shared_ptr<void> internal_state;
+		constexpr bool IsValid() const { return internal_state.IsValid(); }
 
 		SamplerDesc desc;
 
@@ -835,16 +835,16 @@ namespace vz::graphics
 
 	struct Shader
 	{
-		std::shared_ptr<void> internal_state;
-		inline bool IsValid() const { return internal_state != nullptr; }
+		vz::allocator::shared_ptr<void> internal_state;
+		constexpr bool IsValid() const { return internal_state.IsValid(); }
 
 		ShaderStage stage = ShaderStage::Count;
 	};
 
 	struct GPUResource
 	{
-		std::shared_ptr<void> internal_state;
-		inline bool IsValid() const { return internal_state != nullptr; }
+		vz::allocator::shared_ptr<void> internal_state;
+		constexpr bool IsValid() const { return internal_state.IsValid(); }
 
 		// These are only valid if the resource was created with CPU access (USAGE::UPLOAD or USAGE::READBACK)
 		void* mapped_data = nullptr;	// for buffers, it is a pointer to the buffer data; for textures, it is a pointer to texture data with linear tiling;
@@ -909,8 +909,8 @@ namespace vz::graphics
 
 	struct VideoDecoder
 	{
-		std::shared_ptr<void> internal_state;
-		inline bool IsValid() const { return internal_state != nullptr; }
+		vz::allocator::shared_ptr<void> internal_state;
+		constexpr bool IsValid() const { return internal_state.IsValid(); }
 
 		VideoDesc desc;
 		constexpr const VideoDesc& GetDesc() const { return desc; }
@@ -1142,8 +1142,8 @@ namespace vz::graphics
 
 	struct GPUQueryHeap
 	{
-		std::shared_ptr<void> internal_state;
-		inline bool IsValid() const { return internal_state != nullptr; }
+		vz::allocator::shared_ptr<void> internal_state;
+		constexpr bool IsValid() const { return internal_state.IsValid(); }
 
 		GPUQueryHeapDesc desc;
 
@@ -1152,8 +1152,8 @@ namespace vz::graphics
 
 	struct PipelineState
 	{
-		std::shared_ptr<void> internal_state;
-		inline bool IsValid() const { return internal_state != nullptr; }
+		vz::allocator::shared_ptr<void> internal_state;
+		constexpr bool IsValid() const { return internal_state.IsValid(); }
 
 		PipelineStateDesc desc;
 
@@ -1162,8 +1162,8 @@ namespace vz::graphics
 
 	struct SwapChain
 	{
-		std::shared_ptr<void> internal_state;
-		inline bool IsValid() const { return internal_state != nullptr; }
+		vz::allocator::shared_ptr<void> internal_state;
+		constexpr bool IsValid() const { return internal_state.IsValid(); }
 
 		SwapChainDesc desc;
 
@@ -1312,8 +1312,8 @@ namespace vz::graphics
 	};
 	struct RaytracingPipelineState
 	{
-		std::shared_ptr<void> internal_state;
-		inline bool IsValid() const { return internal_state != nullptr; }
+		vz::allocator::shared_ptr<void> internal_state;
+		constexpr bool IsValid() const { return internal_state.IsValid(); }
 
 		RaytracingPipelineStateDesc desc;
 
