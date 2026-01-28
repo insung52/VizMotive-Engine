@@ -518,4 +518,86 @@ namespace vz::allocator
 		return shared_block_allocator<T, block_size>->allocate(std::forward<ARG>(args)...);
 	}
 
+
+	// Implementation of a thread-safe refcounted heap allocator for single objects
+	//	Use this when you only need one or a few objects of the same type (not pooled)
+	template<typename T>
+	struct SharedHeapAllocator final : public SharedBlockAllocator
+	{
+		struct RawStruct
+		{
+			uint8_t data[sizeof(T)];
+			std::atomic<uint32_t> refcount;
+			std::atomic<uint32_t> refcount_weak;
+		};
+		static_assert(offsetof(RawStruct, data) == 0);
+
+		template<typename... ARG>
+		inline shared_ptr<T> allocate(ARG&&... args)
+		{
+			RawStruct* ptr = new RawStruct;
+			new (ptr) T(std::forward<ARG>(args)...);
+			init_refcount(ptr);
+			shared_ptr<T> allocation;
+			allocation.ptr = reinterpret_cast<T*>(ptr);
+			allocation.allocator = this;
+			return allocation;
+		}
+
+		void reclaim(void* ptr)
+		{
+			delete static_cast<RawStruct*>(ptr);
+		}
+
+		void init_refcount(void* ptr) override
+		{
+			static_cast<RawStruct*>(ptr)->refcount.store(1, std::memory_order_relaxed);
+			static_cast<RawStruct*>(ptr)->refcount_weak.store(1, std::memory_order_relaxed);
+		}
+		uint32_t get_refcount(void* ptr) override
+		{
+			return static_cast<RawStruct*>(ptr)->refcount.load(std::memory_order_acquire);
+		}
+		uint32_t inc_refcount(void* ptr) override
+		{
+			return static_cast<RawStruct*>(ptr)->refcount.fetch_add(1, std::memory_order_relaxed);
+		}
+		uint32_t dec_refcount(void* ptr, bool destruct_on_zero) override
+		{
+			uint32_t old = static_cast<RawStruct*>(ptr)->refcount.fetch_sub(1, std::memory_order_acq_rel);
+			if (old == 1)
+			{
+				if (destruct_on_zero) static_cast<T*>(ptr)->~T();
+				dec_refcount_weak(ptr);
+			}
+			return old;
+		}
+		uint32_t get_refcount_weak(void* ptr) override
+		{
+			return static_cast<RawStruct*>(ptr)->refcount_weak.load(std::memory_order_acquire);
+		}
+		uint32_t inc_refcount_weak(void* ptr) override
+		{
+			return static_cast<RawStruct*>(ptr)->refcount_weak.fetch_add(1, std::memory_order_relaxed);
+		}
+		uint32_t dec_refcount_weak(void* ptr) override
+		{
+			uint32_t old = static_cast<RawStruct*>(ptr)->refcount_weak.fetch_sub(1, std::memory_order_acq_rel);
+			if (old == 1)
+			{
+				reclaim(ptr);
+			}
+			return old;
+		}
+	};
+
+	// Create a new shared individually allocated object (not pooled):
+	template<typename T, typename... ARG>
+	inline shared_ptr<T> make_shared_single(ARG&&... args)
+	{
+		// Allocator is created here, it's safer for global construction. The heap allocator is not used in high-performance code
+		static SharedHeapAllocator<T>* shared_heap_allocator = new SharedHeapAllocator<T>; // only destroyed after program exit, never earlier
+		return shared_heap_allocator->allocate(std::forward<ARG>(args)...);
+	}
+
 }

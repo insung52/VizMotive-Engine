@@ -601,7 +601,7 @@ namespace vz::graphics
 				}
 			}
 		};
-		std::shared_ptr<AllocationHandler> allocationhandler;
+		vz::allocator::shared_ptr<AllocationHandler> allocationhandler;
 
 	};
 
