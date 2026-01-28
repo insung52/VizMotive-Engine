@@ -1365,7 +1365,7 @@ namespace dx12_internal
 			destroy_subresources();
 		}
 	};
-	struct Texture_DX12 : public Resource_DX12
+	struct Texture_DX12 final : public Resource_DX12
 	{
 		SingleDescriptor rtv = {};
 		SingleDescriptor dsv = {};
@@ -1468,7 +1468,7 @@ namespace dx12_internal
 			if (rootSignature) allocationhandler->destroyer_rootSignatures.push_back(std::make_pair(rootSignature, framecount));
 		}
 	};
-	struct BVH_DX12 : public Resource_DX12
+	struct BVH_DX12 final : public Resource_DX12
 	{
 		D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS desc = {};
 		std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometries;
