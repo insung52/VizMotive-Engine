@@ -5330,6 +5330,8 @@ std::mutex queue_locker;
 			}
 			else
 			{
+				if (subresource >= (int)internal_state->subresources_srv.size())
+					return -1;
 				return internal_state->subresources_srv[subresource].index;
 			}
 			break;
@@ -5340,6 +5342,8 @@ std::mutex queue_locker;
 			}
 			else
 			{
+				if (subresource >= (int)internal_state->subresources_uav.size())
+					return -1;
 				return internal_state->subresources_uav[subresource].index;
 			}
 			break;
