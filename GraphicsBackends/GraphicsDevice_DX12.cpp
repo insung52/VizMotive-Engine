@@ -2476,6 +2476,7 @@ std::mutex queue_locker;
 		//allocatorDesc.Flags |= D3D12MA::ALLOCATOR_FLAG_ALWAYS_COMMITTED;
 		allocatorDesc.Flags |= D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED;
 		allocatorDesc.Flags |= D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED;
+		allocatorDesc.Flags |= D3D12MA::ALLOCATOR_FLAG_DONT_PREFER_SMALL_BUFFERS_COMMITTED; // small committed buffers are a performance problem on windows 11
 
 		allocationhandler = vz::allocator::make_shared_single<AllocationHandler>();
 		allocationhandler->device = device;
