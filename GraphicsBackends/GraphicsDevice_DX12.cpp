@@ -2638,32 +2638,17 @@ std::mutex queue_locker;
 		{
 			for (int queue = 0; queue < QUEUE_COUNT; ++queue)
 			{
-				// CPU fence (value 1 = free, 0 = in use)
-				hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, PPV_ARGS(frame_fence_cpu[buffer][queue]));
+				hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, PPV_ARGS(frame_fence[buffer][queue]));
 				assert(SUCCEEDED(hr));
 				if (FAILED(hr))
 				{
 					std::stringstream ss("");
-					ss << "ID3D12Device::CreateFence[FRAME_CPU] failed! ERROR: 0x" << std::hex << hr;
+					ss << "ID3D12Device::CreateFence[FRAME] failed! ERROR: 0x" << std::hex << hr;
 					vz::helper::messageBox(ss.str(), "Error!");
 					vz::platform::Exit();
 				}
-				std::wstring fencename_cpu = L"frame_fence_cpu[" + std::to_wstring(buffer) + L"][" + std::to_wstring(queue) + L"]";
-				dx12_check(frame_fence_cpu[buffer][queue]->SetName(fencename_cpu.c_str()));
-				dx12_check(frame_fence_cpu[buffer][queue]->Signal(1)); // Initialize to free state
-
-				// GPU fence (monotonically increasing FRAMECOUNT)
-				hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, PPV_ARGS(frame_fence_gpu[buffer][queue]));
-				assert(SUCCEEDED(hr));
-				if (FAILED(hr))
-				{
-					std::stringstream ss("");
-					ss << "ID3D12Device::CreateFence[FRAME_GPU] failed! ERROR: 0x" << std::hex << hr;
-					vz::helper::messageBox(ss.str(), "Error!");
-					vz::platform::Exit();
-				}
-				std::wstring fencename_gpu = L"frame_fence_gpu[" + std::to_wstring(buffer) + L"][" + std::to_wstring(queue) + L"]";
-				dx12_check(frame_fence_gpu[buffer][queue]->SetName(fencename_gpu.c_str()));
+				std::wstring fencename = L"frame_fence[" + std::to_wstring(buffer) + L"][" + std::to_wstring(queue) + L"]";
+				dx12_check(frame_fence[buffer][queue]->SetName(fencename.c_str()));
 			}
 		}
 
@@ -5359,15 +5344,18 @@ std::mutex queue_locker;
 	}
 	void GraphicsDevice_DX12::WriteTopLevelAccelerationStructureInstance(const RaytracingAccelerationStructureDesc::TopLevel::Instance* instance, void* dest) const
 	{
-		D3D12_RAYTRACING_INSTANCE_DESC tmp;
-		tmp.AccelerationStructure = to_internal(instance->bottom_level)->gpu_address;
-		std::memcpy(tmp.Transform, &instance->transform, sizeof(tmp.Transform));
-		tmp.InstanceID = instance->instance_id;
-		tmp.InstanceMask = instance->instance_mask;
-		tmp.InstanceContributionToHitGroupIndex = instance->instance_contribution_to_hit_group_index;
-		tmp.Flags = instance->flags;
-
-		std::memcpy(dest, &tmp, sizeof(D3D12_RAYTRACING_INSTANCE_DESC)); // memcpy whole structure into mapped pointer to avoid read from uncached memory
+		D3D12_RAYTRACING_INSTANCE_DESC tmp = {};
+		if (instance != nullptr)
+		{
+			auto internal_state = to_internal(instance->bottom_level);
+			tmp.AccelerationStructure = internal_state->gpu_address;
+			std::memcpy(tmp.Transform, &instance->transform, sizeof(tmp.Transform));
+			tmp.InstanceID = instance->instance_id;
+			tmp.InstanceMask = instance->instance_mask;
+			tmp.InstanceContributionToHitGroupIndex = instance->instance_contribution_to_hit_group_index;
+			tmp.Flags = instance->flags;
+		}
+		std::memcpy(dest, &tmp, sizeof(tmp)); // memcpy whole structure into mapped pointer to avoid read from uncached memory
 	}
 	void GraphicsDevice_DX12::WriteShaderIdentifier(const RaytracingPipelineState* rtpso, uint32_t group_index, void* dest) const
 	{
@@ -5579,6 +5567,7 @@ std::mutex queue_locker;
 			}
 
 			// Mark the completion of queues for this frame:
+			frame_fence_values[GetBufferIndex()]++;
 			for (int q = 0; q < QUEUE_COUNT; ++q)
 			{
 				CommandQueue& queue = queues[q];
@@ -5587,13 +5576,11 @@ std::mutex queue_locker;
 
 				queue.submit();
 
-				hr = queue.queue->Signal(frame_fence_cpu[GetBufferIndex()][q].Get(), 1);
-				assert(SUCCEEDED(hr));
-				hr = queue.queue->Signal(frame_fence_gpu[GetBufferIndex()][q].Get(), FRAMECOUNT);
+				hr = queue.queue->Signal(frame_fence[GetBufferIndex()][q].Get(), frame_fence_values[GetBufferIndex()]);
 				assert(SUCCEEDED(hr));
 			}
 
-			// End of frame synchronize queues with each other (using GPU fence):
+			// End of frame synchronize queues with each other:
 			for (int q = 0; q < QUEUE_COUNT; ++q)
 			{
 				CommandQueue& queue = queues[q];
@@ -5606,7 +5593,7 @@ std::mutex queue_locker;
 					CommandQueue& queue2 = queues[q2];
 					if (queue2.queue == nullptr)
 						continue;
-					hr = queue.queue->Wait(frame_fence_gpu[GetBufferIndex()][q2].Get(), FRAMECOUNT);
+					hr = queue.queue->Wait(frame_fence[GetBufferIndex()][q2].Get(), frame_fence_values[GetBufferIndex()]);
 					assert(SUCCEEDED(hr));
 				}
 			}
@@ -5668,17 +5655,14 @@ std::mutex queue_locker;
 			if (queues[queue].queue == nullptr)
 				continue;
 
-			// Wait for GPU to complete previous frame's work on this buffer (using CPU fence)
-			ID3D12Fence* fence = frame_fence_cpu[bufferindex][queue].Get();
-			if (fence->GetCompletedValue() < 1)
+			// Wait for GPU to complete previous frame's work on this buffer
+			ID3D12Fence* fence = frame_fence[bufferindex][queue].Get();
+			if (fence->GetCompletedValue() < frame_fence_values[bufferindex])
 			{
 				// NULL event handle will simply wait immediately:
 				//	https://docs.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12fence-seteventoncompletion#remarks
-				dx12_check(fence->SetEventOnCompletion(1, nullptr));
+				dx12_check(fence->SetEventOnCompletion(frame_fence_values[bufferindex], nullptr));
 			}
-
-			// Mark CPU fence as "in use" for this frame
-			dx12_check(fence->Signal(0));
 		}
 
 		allocationhandler->Update(FRAMECOUNT, BUFFERCOUNT);
