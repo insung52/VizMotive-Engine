@@ -1908,6 +1908,12 @@ namespace vz::graphics
 		return mips;
 	}
 
+	// Get mipmap count from a texture description (if the description specified 0 mipmaps then this will return the max allowed)
+	constexpr uint32_t GetMipCount(const TextureDesc& desc)
+	{
+		return desc.mip_levels == 0 ? GetMipCount(desc.width, desc.height, desc.depth) : desc.mip_levels;
+	}
+
 	// Returns the plane slice index for an aspect
 	constexpr uint32_t GetPlaneSlice(ImageAspect aspect)
 	{
@@ -1938,6 +1944,13 @@ namespace vz::graphics
 		return ComputeSubresource(mip, slice, GetPlaneSlice(aspect), mip_count, array_size);
 	}
 
+	// Returns the total number of subresources in a texture (array_size * mip_levels)
+	constexpr uint32_t GetTextureSubresourceCount(const TextureDesc& desc)
+	{
+		const uint32_t mips = GetMipCount(desc);
+		return desc.array_size * mips;
+	}
+
 	// Compute the approximate texture memory usage
 	//	Approximate because this doesn't reflect GPU specific texture memory requirements, like alignment and metadata
 	constexpr size_t ComputeTextureMemorySizeInBytes(const TextureDesc& desc)
@@ -1945,7 +1958,7 @@ namespace vz::graphics
 		size_t size = 0;
 		const uint32_t bytes_per_block = GetFormatStride(desc.format);
 		const uint32_t pixels_per_block = GetFormatBlockSize(desc.format);
-		const uint32_t mips = desc.mip_levels == 0 ? GetMipCount(desc.width, desc.height, desc.depth) : desc.mip_levels;
+		const uint32_t mips = GetMipCount(desc);
 		for (uint32_t layer = 0; layer < desc.array_size; ++layer)
 		{
 			for (uint32_t mip = 0; mip < mips; ++mip)
