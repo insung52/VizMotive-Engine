@@ -3069,6 +3069,13 @@ std::mutex queue_locker;
 	{
 		WaitForGPU();
 
+		// Free command lists allocated by block allocator
+		for (auto* cmdlist : commandlists)
+		{
+			cmd_allocator.free(cmdlist);
+		}
+		commandlists.clear();
+
 #ifdef PLATFORM_WINDOWS_DESKTOP
 		std::ignore = UnregisterWait(deviceRemovedWaitHandle);
 		deviceRemovedFence.Reset();
@@ -5386,10 +5393,10 @@ std::mutex queue_locker;
 		uint32_t cmd_current = cmd_count++;
 		if (cmd_current >= commandlists.size())
 		{
-			commandlists.push_back(std::make_unique<CommandList_DX12>());
+			commandlists.push_back(cmd_allocator.allocate());
 		}
 		CommandList cmd;
-		cmd.internal_state = commandlists[cmd_current].get();
+		cmd.internal_state = commandlists[cmd_current];
 		cmd_locker.unlock();
 
 		CommandList_DX12& commandlist = GetCommandList(cmd);
@@ -5504,7 +5511,7 @@ std::mutex queue_locker;
 			cmd_count = 0;
 			for (uint32_t cmd = 0; cmd < cmd_last; ++cmd)
 			{
-				CommandList_DX12& commandlist = *commandlists[cmd].get();
+				CommandList_DX12& commandlist = *commandlists[cmd];
 				if (commandlist.queue == QUEUE_VIDEO_DECODE)
 				{
 					dx12_check(commandlist.GetVideoDecodeCommandList()->Close());
@@ -5600,7 +5607,7 @@ std::mutex queue_locker;
 
 			for (uint32_t cmd = 0; cmd < cmd_last; ++cmd)
 			{
-				CommandList_DX12& commandlist = *commandlists[cmd].get();
+				CommandList_DX12& commandlist = *commandlists[cmd];
 				for (auto& swapchain : commandlist.swapchains)
 				{
 					auto swapchain_internal = to_internal(swapchain);
