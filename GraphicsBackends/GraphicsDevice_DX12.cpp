@@ -7075,10 +7075,41 @@ std::mutex queue_locker;
 		CommandList_DX12& commandlist = GetCommandList(cmd);
 		auto src_internal = to_internal(src);
 		auto dst_internal = to_internal(dst);
-		UINT srcPlane = src_aspect == ImageAspect::STENCIL ? 1 : 0;
-		UINT dstPlane = dst_aspect == ImageAspect::STENCIL ? 1 : 0;
-		CD3DX12_TEXTURE_COPY_LOCATION src_location(src_internal->resource.Get(), D3D12CalcSubresource(srcMip, srcSlice, srcPlane, src->desc.mip_levels, src->desc.array_size));
-		CD3DX12_TEXTURE_COPY_LOCATION dst_location(dst_internal->resource.Get(), D3D12CalcSubresource(dstMip, dstSlice, dstPlane, dst->desc.mip_levels, dst->desc.array_size));
+
+		const TextureDesc& src_desc = src->GetDesc();
+		const TextureDesc& dst_desc = dst->GetDesc();
+
+		const UINT srcPlane = GetPlaneSlice(src_aspect);
+		const UINT dstPlane = GetPlaneSlice(dst_aspect);
+		const UINT src_subresource = D3D12CalcSubresource(srcMip, srcSlice, srcPlane, src->desc.mip_levels, src->desc.array_size);
+		const UINT dst_subresource = D3D12CalcSubresource(dstMip, dstSlice, dstPlane, dst->desc.mip_levels, dst->desc.array_size);
+
+		CD3DX12_TEXTURE_COPY_LOCATION src_location;
+		CD3DX12_TEXTURE_COPY_LOCATION dst_location;
+		if (src_desc.usage == Usage::UPLOAD && dst_desc.usage == Usage::DEFAULT)
+		{
+			// CPU (buffer) -> GPU (texture)
+			src_location = CD3DX12_TEXTURE_COPY_LOCATION(src_internal->resource.Get(), src_internal->footprints[src_subresource]);
+			dst_location = CD3DX12_TEXTURE_COPY_LOCATION(dst_internal->resource.Get(), dst_subresource);
+		}
+		else if (src_desc.usage == Usage::DEFAULT && dst_desc.usage == Usage::READBACK)
+		{
+			// GPU (texture) -> CPU (buffer)
+			src_location = CD3DX12_TEXTURE_COPY_LOCATION(src_internal->resource.Get(), src_subresource);
+			dst_location = CD3DX12_TEXTURE_COPY_LOCATION(dst_internal->resource.Get(), dst_internal->footprints[dst_subresource]);
+		}
+		else if (src_desc.usage == Usage::DEFAULT && dst_desc.usage == Usage::DEFAULT)
+		{
+			// GPU (texture) -> GPU (texture)
+			src_location = CD3DX12_TEXTURE_COPY_LOCATION(src_internal->resource.Get(), src_subresource);
+			dst_location = CD3DX12_TEXTURE_COPY_LOCATION(dst_internal->resource.Get(), dst_subresource);
+		}
+		else
+		{
+			// CPU (buffer) -> CPU (buffer)
+			src_location = CD3DX12_TEXTURE_COPY_LOCATION(src_internal->resource.Get(), src_internal->footprints[src_subresource]);
+			dst_location = CD3DX12_TEXTURE_COPY_LOCATION(dst_internal->resource.Get(), dst_internal->footprints[dst_subresource]);
+		}
 		if (srcbox == nullptr)
 		{
 			commandlist.GetGraphicsCommandList()->CopyTextureRegion(

@@ -1908,6 +1908,36 @@ namespace vz::graphics
 		return mips;
 	}
 
+	// Returns the plane slice index for an aspect
+	constexpr uint32_t GetPlaneSlice(ImageAspect aspect)
+	{
+		switch (aspect)
+		{
+		case ImageAspect::COLOR:
+		case ImageAspect::DEPTH:
+		case ImageAspect::LUMINANCE:
+			return 0;
+		case ImageAspect::STENCIL:
+		case ImageAspect::CHROMINANCE:
+			return 1;
+		default:
+			break;
+		}
+		return 0;
+	}
+
+	// Computes the subresource index for indexing SubresourceData arrays
+	constexpr uint32_t ComputeSubresource(uint32_t mip, uint32_t slice, uint32_t plane, uint32_t mip_count, uint32_t array_size)
+	{
+		return mip + slice * mip_count + plane * mip_count * array_size;
+	}
+
+	// Computes the subresource index for indexing SubresourceData arrays
+	constexpr uint32_t ComputeSubresource(uint32_t mip, uint32_t slice, ImageAspect aspect, uint32_t mip_count, uint32_t array_size)
+	{
+		return ComputeSubresource(mip, slice, GetPlaneSlice(aspect), mip_count, array_size);
+	}
+
 	// Compute the approximate texture memory usage
 	//	Approximate because this doesn't reflect GPU specific texture memory requirements, like alignment and metadata
 	constexpr size_t ComputeTextureMemorySizeInBytes(const TextureDesc& desc)
