@@ -35,6 +35,9 @@ namespace vz
 			else if (api == "VULKAN") {
 				moduleName = "GBackendVulkan";
 			}
+			else if (api == "METAL") {
+				moduleName = "GBackendMetal";
+			}
 			else {
 				assert(0);
 				return false;
