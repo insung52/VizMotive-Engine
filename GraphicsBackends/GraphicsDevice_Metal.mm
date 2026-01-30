@@ -180,7 +180,7 @@ namespace vz::graphics
         return false;
     }
 
-    uint32_t GraphicsDevice_Metal::GetMinOffsetAlignment(const GPUBufferDesc* desc) const
+    uint64_t GraphicsDevice_Metal::GetMinOffsetAlignment(const GPUBufferDesc* desc) const
     {
         return 256; // Metal's typical alignment requirement
     }
@@ -205,6 +205,7 @@ namespace vz::graphics
     }
 
     void GraphicsDevice_Metal::WaitCommandList(CommandList cmd, CommandList wait_for) {}
+    void GraphicsDevice_Metal::WaitQueue(CommandList cmd, QUEUE_TYPE wait_for) {}
     void GraphicsDevice_Metal::RenderPassBegin(const SwapChain* swapchain, CommandList cmd) {}
     void GraphicsDevice_Metal::RenderPassBegin(const RenderPassImage* images, uint32_t image_count, CommandList cmd, RenderPassFlags flags) {}
     void GraphicsDevice_Metal::RenderPassEnd(CommandList cmd) {}

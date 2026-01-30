@@ -1,6 +1,9 @@
 #pragma once
 // This file includes platform, os specific libraries and supplies common platform specific resources
 
+#include <unordered_map>
+#include <string>
+
 #ifdef _WIN32
 
 #ifndef NOMINMAX
@@ -12,14 +15,20 @@
 #include <SDKDDKVer.h>
 #include <windows.h>
 #include <tchar.h>
-#include <unordered_map>
-#include <string>
 
 #if WINAPI_FAMILY
 #define PLATFORM_WINDOWS_DESKTOP
 #endif // WINAPI_FAMILY_GAMES
 #define vzLoadLibrary(name) LoadLibraryA(name)
 #define vzGetProcAddress(handle,name) GetProcAddress(handle, name)
+
+#elif defined(__APPLE__)
+#define PLATFORM_MACOS
+#include <dlfcn.h>
+#define vzLoadLibrary(name) dlopen(name, RTLD_LAZY)
+#define vzGetProcAddress(handle,name) dlsym(handle, name)
+typedef void* HMODULE;
+
 #else
 #define PLATFORM_LINUX
 #include <dlfcn.h>
@@ -40,6 +49,9 @@ namespace vz::platform
 #ifdef _WIN32
 	using window_type = HWND;
 	using error_type = HRESULT;
+#elif defined(PLATFORM_MACOS)
+	using window_type = void*;  // NSWindow* or CAMetalLayer*
+	using error_type = int;
 #elif SDL2
 	using window_type = SDL_Window*;
 	using error_type = int;
@@ -82,6 +94,14 @@ namespace vz::platform
 		dest->width = int(rect.right - rect.left);
 		dest->height = int(rect.bottom - rect.top);
 #endif // PLATFORM_WINDOWS_DESKTOP || PLATFORM_XBOX
+
+#ifdef PLATFORM_MACOS
+		// On macOS, window properties are typically obtained via Objective-C
+		// For now, use default values; actual implementation should query NSWindow/CAMetalLayer
+		dest->dpi = 96.f * 2.f;  // Retina display default
+		dest->width = 0;
+		dest->height = 0;
+#endif // PLATFORM_MACOS
 
 #ifdef PLATFORM_LINUX
 		int window_width, window_height;

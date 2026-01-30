@@ -28,7 +28,7 @@ namespace vz::graphics
 
         bool CreateSwapChain(const SwapChainDesc* desc, vz::platform::window_type window, SwapChain* swapchain) const override;
         bool CreateBuffer2(const GPUBufferDesc* desc, const std::function<void(void* dest)>& init_callback, GPUBuffer* buffer, const GPUResource* alias = nullptr, uint64_t alias_offset = 0ull) const override;
-        void UploadToBufferRegion(GPUBuffer* buffer, uint64_t offset, const void* data, uint64_t size) const override;
+        void UploadToBufferRegion(GPUBuffer* buffer, uint64_t offset, const void* data, uint64_t size) const;
         bool CreateTexture(const TextureDesc* desc, const SubresourceData* initial_data, Texture* texture, const GPUResource* alias = nullptr, uint64_t alias_offset = 0ull) const override;
         bool CreateShader(ShaderStage stage, const void* shadercode, size_t shadercode_size, Shader* shader) const override;
         bool CreateSampler(const SamplerDesc* desc, Sampler* sampler) const override;
@@ -56,12 +56,13 @@ namespace vz::graphics
         Texture GetBackBuffer(const SwapChain* swapchain) const override;
         ColorSpace GetSwapChainColorSpace(const SwapChain* swapchain) const override;
         bool IsSwapChainSupportsHDR(const SwapChain* swapchain) const override;
-        uint32_t GetMinOffsetAlignment(const GPUBufferDesc* desc) const override;
+        uint64_t GetMinOffsetAlignment(const GPUBufferDesc* desc) const override;
         MemoryUsage GetMemoryUsage() const override;
         uint32_t GetMaxViewportCount() const override;
 
         // Command List functions
         void WaitCommandList(CommandList cmd, CommandList wait_for) override;
+        void WaitQueue(CommandList cmd, QUEUE_TYPE wait_for) override;
         void RenderPassBegin(const SwapChain* swapchain, CommandList cmd) override;
         void RenderPassBegin(const RenderPassImage* images, uint32_t image_count, CommandList cmd, RenderPassFlags flags = RenderPassFlags::NONE) override;
         void RenderPassEnd(CommandList cmd) override;
