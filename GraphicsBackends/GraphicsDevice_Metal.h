@@ -6,16 +6,206 @@
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
 #import <QuartzCore/CAMetalLayer.h>
+#import <dispatch/dispatch.h>
 #endif
+
+#include <vector>
+#include <mutex>
+#include <deque>
 
 namespace vz::graphics
 {
+#ifdef __APPLE__
+    namespace metal_internal
+    {
+        static constexpr uint32_t BUFFERCOUNT = 2;
+        static constexpr uint32_t MAX_COMMANDLISTS = 32;
+
+        // Resource wrapper for MTLBuffer/MTLTexture
+        struct Resource_Metal
+        {
+            id<MTLBuffer> buffer = nil;
+            id<MTLTexture> texture = nil;
+            void* mapped_data = nullptr;
+            size_t mapped_size = 0;
+        };
+
+        // Texture-specific wrapper with format info
+        struct Texture_Metal : public Resource_Metal
+        {
+            MTLPixelFormat pixelFormat = MTLPixelFormatInvalid;
+            uint32_t width = 0;
+            uint32_t height = 0;
+            uint32_t depth = 0;
+            uint32_t mipLevels = 1;
+            uint32_t arraySize = 1;
+        };
+
+        // Sampler wrapper
+        struct Sampler_Metal
+        {
+            id<MTLSamplerState> sampler = nil;
+        };
+
+        // Shader wrapper
+        struct Shader_Metal
+        {
+            id<MTLLibrary> library = nil;
+            id<MTLFunction> function = nil;
+            ShaderStage stage = ShaderStage::Count;
+            std::string entryPoint;
+        };
+
+        // Pipeline state wrapper
+        struct PipelineState_Metal
+        {
+            id<MTLRenderPipelineState> renderPipeline = nil;
+            id<MTLDepthStencilState> depthStencilState = nil;
+            id<MTLComputePipelineState> computePipeline = nil;
+
+            // Rasterizer state (applied at encoder level)
+            MTLCullMode cullMode = MTLCullModeNone;
+            MTLWinding frontFace = MTLWindingCounterClockwise;
+            MTLTriangleFillMode fillMode = MTLTriangleFillModeFill;
+            float depthBias = 0;
+            float depthBiasClamp = 0;
+            float slopeScaledDepthBias = 0;
+            bool depthClipEnable = false;
+
+            MTLPrimitiveType primitiveType = MTLPrimitiveTypeTriangle;
+        };
+
+        // SwapChain wrapper
+        struct SwapChain_Metal
+        {
+            CAMetalLayer* metalLayer = nil;
+            id<CAMetalDrawable> currentDrawable = nil;
+            Texture backBuffer;
+            SwapChainDesc desc;
+            ColorSpace colorSpace = ColorSpace::SRGB;
+        };
+
+        // Command list state
+        struct CommandList_Metal
+        {
+            id<MTLCommandBuffer> commandBuffer = nil;
+            id<MTLRenderCommandEncoder> renderEncoder = nil;
+            id<MTLComputeCommandEncoder> computeEncoder = nil;
+            id<MTLBlitCommandEncoder> blitEncoder = nil;
+
+            QUEUE_TYPE queueType = QUEUE_GRAPHICS;
+            bool isInsideRenderPass = false;
+
+            // Current render pass info
+            RenderPassInfo renderPassInfo = {};
+
+            // Bound state
+            const PipelineState_Metal* boundPipeline = nullptr;
+
+            // Index buffer state
+            id<MTLBuffer> boundIndexBuffer = nil;
+            MTLIndexType indexType = MTLIndexTypeUInt16;
+            uint64_t indexBufferOffset = 0;
+
+            // Viewport and scissor
+            std::vector<MTLViewport> viewports;
+            std::vector<MTLScissorRect> scissorRects;
+
+            // Current drawable for presentation
+            id<CAMetalDrawable> currentDrawable = nil;
+
+            void Reset()
+            {
+                commandBuffer = nil;
+                renderEncoder = nil;
+                computeEncoder = nil;
+                blitEncoder = nil;
+                isInsideRenderPass = false;
+                renderPassInfo = {};
+                boundPipeline = nullptr;
+                boundIndexBuffer = nil;
+                indexBufferOffset = 0;
+                viewports.clear();
+                scissorRects.clear();
+                currentDrawable = nil;
+            }
+        };
+
+        // Deferred destruction handler
+        struct AllocationHandler_Metal
+        {
+            std::mutex mutex;
+            std::deque<std::pair<uint64_t, id<MTLBuffer>>> destroyedBuffers;
+            std::deque<std::pair<uint64_t, id<MTLTexture>>> destroyedTextures;
+            std::deque<std::pair<uint64_t, id<MTLSamplerState>>> destroyedSamplers;
+
+            void DeferredDestroy(id<MTLBuffer> buffer, uint64_t frameCount)
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                destroyedBuffers.push_back({frameCount, buffer});
+            }
+
+            void DeferredDestroy(id<MTLTexture> texture, uint64_t frameCount)
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                destroyedTextures.push_back({frameCount, texture});
+            }
+
+            void DeferredDestroy(id<MTLSamplerState> sampler, uint64_t frameCount)
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                destroyedSamplers.push_back({frameCount, sampler});
+            }
+
+            void Update(uint64_t completedFrame)
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                while (!destroyedBuffers.empty() && destroyedBuffers.front().first <= completedFrame)
+                {
+                    destroyedBuffers.pop_front();
+                }
+                while (!destroyedTextures.empty() && destroyedTextures.front().first <= completedFrame)
+                {
+                    destroyedTextures.pop_front();
+                }
+                while (!destroyedSamplers.empty() && destroyedSamplers.front().first <= completedFrame)
+                {
+                    destroyedSamplers.pop_front();
+                }
+            }
+        };
+
+        // Helper to get internal state
+        template<typename T>
+        inline T* to_internal(const GraphicsDeviceChild* child)
+        {
+            return static_cast<T*>(child->internal_state.get());
+        }
+    }
+#endif
+
     class GraphicsDevice_Metal : public GraphicsDevice
     {
     private:
 #ifdef __APPLE__
         id<MTLDevice> device = nil;
         id<MTLCommandQueue> commandQueue = nil;
+
+        // Frame synchronization
+        dispatch_semaphore_t frameSemaphore = nullptr;
+        uint64_t completedFrameCount = 0;
+
+        // Command list pool
+        mutable std::mutex cmdListMutex;
+        mutable std::vector<metal_internal::CommandList_Metal> commandLists;
+        mutable std::vector<CommandList> activeCommandLists;
+        mutable uint32_t nextCommandListIndex = 0;
+
+        // Allocation handler
+        mutable metal_internal::AllocationHandler_Metal allocationHandler;
+
+        // Frame allocators per command list
+        mutable std::vector<GPULinearAllocator> frameAllocators;
 #endif
 
     public:

@@ -97,4 +97,35 @@ if(APPLE)
         MACOSX_RPATH ON
         INSTALL_RPATH "@executable_path"
     )
+
+    # MetalTriangleSample executable
+    add_executable(MetalTriangleSample
+        ${CMAKE_SOURCE_DIR}/../Examples/MetalTriangleSample/main.mm
+    )
+
+    target_include_directories(MetalTriangleSample PRIVATE
+        ${CMAKE_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/../EngineCore
+    )
+
+    target_link_libraries(MetalTriangleSample PRIVATE
+        ${METAL_FRAMEWORK}
+        ${METALKIT_FRAMEWORK}
+        ${FOUNDATION_FRAMEWORK}
+        ${QUARTZCORE_FRAMEWORK}
+        ${APPKIT_FRAMEWORK}
+        GBackendMetal
+    )
+
+    target_compile_options(MetalTriangleSample PRIVATE
+        -fobjc-arc
+    )
+
+    set_target_properties(MetalTriangleSample PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.vizmotive.MetalTriangleSample"
+        MACOSX_BUNDLE_BUNDLE_NAME "MetalTriangleSample"
+        MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+    )
 endif()
