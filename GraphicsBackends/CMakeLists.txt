@@ -127,5 +127,6 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_NAME "MetalTriangleSample"
         MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+        XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "com.vizmotive.MetalTriangleSample"
     )
 endif()
