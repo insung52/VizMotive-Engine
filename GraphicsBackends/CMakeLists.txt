@@ -21,8 +21,24 @@ if(APPLE)
     set(PLATFORM_SOURCES
         GBackendMetal.mm
         GraphicsDevice_Metal.mm
+        SpirvToMsl.cpp
     )
     set(CMAKE_OBJCXX_STANDARD 17)
+
+    # SPIRV-Cross 빌드 설정
+    set(SPIRV_CROSS_CLI OFF CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_ENABLE_GLSL ON CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_ENABLE_HLSL OFF CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_ENABLE_MSL ON CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_ENABLE_CPP OFF CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_ENABLE_REFLECT OFF CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_ENABLE_C_API OFF CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_ENABLE_UTIL OFF CACHE BOOL "" FORCE)
+    set(SPIRV_CROSS_SKIP_INSTALL ON CACHE BOOL "" FORCE)
+
+    add_subdirectory(External/SPIRV-Cross)
+
 else()
     # Windows: 스텁 버전
     set(PLATFORM_SOURCES
@@ -43,6 +59,16 @@ target_include_directories(GBackendMetal PRIVATE
 
 # 플랫폼별 설정
 if(APPLE)
+    # SPIRV-Cross 포함 디렉토리 및 링크
+    target_include_directories(GBackendMetal PRIVATE
+        ${CMAKE_SOURCE_DIR}/External/SPIRV-Cross
+    )
+    target_link_libraries(GBackendMetal PRIVATE
+        spirv-cross-core
+        spirv-cross-glsl
+        spirv-cross-msl
+    )
+
     # macOS: Metal 프레임워크 링크
     find_library(METAL_FRAMEWORK Metal REQUIRED)
     find_library(METALKIT_FRAMEWORK MetalKit REQUIRED)

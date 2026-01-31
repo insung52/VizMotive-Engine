@@ -1,4 +1,5 @@
 #include "GraphicsDevice_Metal.h"
+#include "SpirvToMsl.h"
 
 #ifdef __APPLE__
 #import <Foundation/Foundation.h>
@@ -688,33 +689,101 @@ namespace vz::graphics
         internal_state->stage = stage;
 
         NSError* error = nil;
+        std::string mslSource;
+        std::string entryPointFromSpirv;
 
-        // Try to load as metallib first (compiled Metal library)
-        dispatch_data_t data = dispatch_data_create(shadercode, shadercode_size, nil, DISPATCH_DATA_DESTRUCTOR_DEFAULT);
-        internal_state->library = [device newLibraryWithData:data error:&error];
-
-        if (!internal_state->library)
+        // Check if input is SPIRV bytecode
+        if (IsSpirvBytecode(shadercode, shadercode_size))
         {
-            // If that fails, try to compile as MSL source
-            NSString* source = [[NSString alloc] initWithBytes:shadercode
-                                                        length:shadercode_size
-                                                      encoding:NSUTF8StringEncoding];
-            if (source)
+            // Convert SPIRV to MSL using SPIRV-Cross
+            SpirvToMslOptions options;
+            options.msl_version = 20100;  // Metal 2.1
+            options.platform = 0;  // macOS
+
+            SpirvToMslResult result = ConvertSpirvToMsl(
+                static_cast<const uint32_t*>(shadercode),
+                shadercode_size,
+                options
+            );
+
+            if (!result.success)
             {
-                MTLCompileOptions* options = [[MTLCompileOptions alloc] init];
-                if (@available(macOS 15.0, *))
-                {
-                    options.mathMode = MTLMathModeFast;
-                }
-                else
-                {
+                NSLog(@"Failed to convert SPIRV to MSL: %s", result.error_message.c_str());
+                return false;
+            }
+
+            mslSource = result.msl_source;
+            entryPointFromSpirv = result.entry_point_name;
+
+            NSLog(@"SPIRV to MSL conversion successful, entry point: %s", entryPointFromSpirv.c_str());
+        }
+
+        // If we have MSL source from SPIRV conversion, compile it
+        if (!mslSource.empty())
+        {
+            NSString* source = [NSString stringWithUTF8String:mslSource.c_str()];
+            MTLCompileOptions* options = [[MTLCompileOptions alloc] init];
+            if (@available(macOS 15.0, *))
+            {
+                options.mathMode = MTLMathModeFast;
+            }
+            else
+            {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-                    options.fastMathEnabled = YES;
+                options.fastMathEnabled = YES;
 #pragma clang diagnostic pop
-                }
+            }
 
-                internal_state->library = [device newLibraryWithSource:source options:options error:&error];
+            internal_state->library = [device newLibraryWithSource:source options:options error:&error];
+
+            if (!internal_state->library)
+            {
+                if (error)
+                {
+                    NSLog(@"Failed to compile MSL from SPIRV: %@", error.localizedDescription);
+                    NSLog(@"MSL Source:\n%s", mslSource.c_str());
+                }
+                return false;
+            }
+
+            // Use entry point from SPIRV-Cross
+            if (!entryPointFromSpirv.empty())
+            {
+                NSString* entryPoint = [NSString stringWithUTF8String:entryPointFromSpirv.c_str()];
+                internal_state->function = [internal_state->library newFunctionWithName:entryPoint];
+                internal_state->entryPoint = entryPointFromSpirv;
+            }
+        }
+        else
+        {
+            // Not SPIRV - try to load as metallib first (compiled Metal library)
+            dispatch_data_t data = dispatch_data_create(shadercode, shadercode_size, nil, DISPATCH_DATA_DESTRUCTOR_DEFAULT);
+            internal_state->library = [device newLibraryWithData:data error:&error];
+
+            if (!internal_state->library)
+            {
+                // If that fails, try to compile as MSL source
+                NSString* source = [[NSString alloc] initWithBytes:shadercode
+                                                            length:shadercode_size
+                                                          encoding:NSUTF8StringEncoding];
+                if (source)
+                {
+                    MTLCompileOptions* options = [[MTLCompileOptions alloc] init];
+                    if (@available(macOS 15.0, *))
+                    {
+                        options.mathMode = MTLMathModeFast;
+                    }
+                    else
+                    {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+                        options.fastMathEnabled = YES;
+#pragma clang diagnostic pop
+                    }
+
+                    internal_state->library = [device newLibraryWithSource:source options:options error:&error];
+                }
             }
         }
 
@@ -727,61 +796,64 @@ namespace vz::graphics
             return false;
         }
 
-        // Determine entry point based on shader stage
-        NSString* entryPoint = nil;
-        switch (stage)
-        {
-        case ShaderStage::VS:
-            entryPoint = @"vertexMain";
-            break;
-        case ShaderStage::PS:
-            entryPoint = @"fragmentMain";
-            break;
-        case ShaderStage::CS:
-            entryPoint = @"computeMain";
-            break;
-        default:
-            // For other stages, try to get the first function
-            NSArray<NSString*>* functionNames = [internal_state->library functionNames];
-            if (functionNames.count > 0)
-            {
-                entryPoint = functionNames[0];
-            }
-            break;
-        }
-
-        if (entryPoint)
-        {
-            internal_state->function = [internal_state->library newFunctionWithName:entryPoint];
-            internal_state->entryPoint = [entryPoint UTF8String];
-        }
-
-        // If we couldn't find the standard entry point, try common alternatives
+        // If we don't have an entry point yet, determine it based on shader stage
         if (!internal_state->function)
         {
-            NSArray<NSString*>* alternativeNames = nil;
+            NSString* entryPoint = nil;
             switch (stage)
             {
             case ShaderStage::VS:
-                alternativeNames = @[@"vertex_main", @"vs_main", @"main_vs", @"vert"];
+                entryPoint = @"vertexMain";
                 break;
             case ShaderStage::PS:
-                alternativeNames = @[@"fragment_main", @"ps_main", @"main_ps", @"frag"];
+                entryPoint = @"fragmentMain";
                 break;
             case ShaderStage::CS:
-                alternativeNames = @[@"compute_main", @"cs_main", @"main_cs", @"compute"];
+                entryPoint = @"computeMain";
                 break;
             default:
+                // For other stages, try to get the first function
+                NSArray<NSString*>* functionNames = [internal_state->library functionNames];
+                if (functionNames.count > 0)
+                {
+                    entryPoint = functionNames[0];
+                }
                 break;
             }
 
-            for (NSString* name in alternativeNames)
+            if (entryPoint)
             {
-                internal_state->function = [internal_state->library newFunctionWithName:name];
-                if (internal_state->function)
+                internal_state->function = [internal_state->library newFunctionWithName:entryPoint];
+                internal_state->entryPoint = [entryPoint UTF8String];
+            }
+
+            // If we couldn't find the standard entry point, try common alternatives
+            if (!internal_state->function)
+            {
+                NSArray<NSString*>* alternativeNames = nil;
+                switch (stage)
                 {
-                    internal_state->entryPoint = [name UTF8String];
+                case ShaderStage::VS:
+                    alternativeNames = @[@"vertex_main", @"vs_main", @"main_vs", @"vert", @"main0"];
                     break;
+                case ShaderStage::PS:
+                    alternativeNames = @[@"fragment_main", @"ps_main", @"main_ps", @"frag", @"main0"];
+                    break;
+                case ShaderStage::CS:
+                    alternativeNames = @[@"compute_main", @"cs_main", @"main_cs", @"compute", @"main0"];
+                    break;
+                default:
+                    break;
+                }
+
+                for (NSString* name in alternativeNames)
+                {
+                    internal_state->function = [internal_state->library newFunctionWithName:name];
+                    if (internal_state->function)
+                    {
+                        internal_state->entryPoint = [name UTF8String];
+                        break;
+                    }
                 }
             }
         }
@@ -1182,7 +1254,7 @@ namespace vz::graphics
 
     ShaderFormat GraphicsDevice_Metal::GetShaderFormat() const
     {
-        return ShaderFormat::HLSL6; // Metal uses MSL, but we return HLSL6 for compatibility
+        return ShaderFormat::SPIRV; // Engine compiles HLSL to SPIRV, we convert to MSL via SPIRV-Cross
     }
 
     Texture GraphicsDevice_Metal::GetBackBuffer(const SwapChain* swapchain) const
@@ -1858,7 +1930,7 @@ namespace vz::graphics
     void GraphicsDevice_Metal::WaitForGPU() const {}
     void GraphicsDevice_Metal::ClearPipelineStateCache() {}
     size_t GraphicsDevice_Metal::GetActivePipelineCount() const { return 0; }
-    ShaderFormat GraphicsDevice_Metal::GetShaderFormat() const { return ShaderFormat::HLSL6; }
+    ShaderFormat GraphicsDevice_Metal::GetShaderFormat() const { return ShaderFormat::SPIRV; }
     Texture GraphicsDevice_Metal::GetBackBuffer(const SwapChain* swapchain) const { return Texture{}; }
     ColorSpace GraphicsDevice_Metal::GetSwapChainColorSpace(const SwapChain* swapchain) const { return ColorSpace::SRGB; }
     bool GraphicsDevice_Metal::IsSwapChainSupportsHDR(const SwapChain* swapchain) const { return false; }

@@ -2,3 +2,6 @@
 	path = EnginePlugins/AssetIO/External/assimp
 	url = https://github.com/assimp/assimp.git
 	branch = v5.4.3
+[submodule "GraphicsBackends/External/SPIRV-Cross"]
+	path = GraphicsBackends/External/SPIRV-Cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
