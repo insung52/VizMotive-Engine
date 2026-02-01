@@ -18,6 +18,20 @@
 #include <pthread.h>
 #endif // PLATFORM_LINUX
 
+#ifdef PLATFORM_MACOS
+#include <pthread.h>
+#include <alloca.h>
+#endif // PLATFORM_MACOS
+
+// Cross-platform stack allocation
+#ifdef _WIN32
+#define VZ_MALLOCA(size) VZ_MALLOCA(size)
+#define VZ_FREEA(ptr) VZ_FREEA(ptr)
+#else
+#define VZ_MALLOCA(size) alloca(size)
+#define VZ_FREEA(ptr) ((void)0)  // alloca doesn't need free
+#endif
+
 namespace vz::jobsystem
 {
 	struct Job
@@ -48,7 +62,7 @@ namespace vz::jobsystem
 			args.groupID = groupID;
 			if (sharedmemory_size > 0)
 			{
-				args.sharedmemory = _malloca(sharedmemory_size);
+				args.sharedmemory = VZ_MALLOCA(sharedmemory_size);
 				//args.sharedmemory = alloca(sharedmemory_size);
 			}
 			else
@@ -67,7 +81,7 @@ namespace vz::jobsystem
 
 			if (args.sharedmemory)
 			{
-				_freea(args.sharedmemory);
+				VZ_FREEA(args.sharedmemory);
 			}
 
 			AtomicAdd(&ctx->counter, -1);
@@ -79,7 +93,7 @@ namespace vz::jobsystem
 			args.groupID = groupID;
 			if (sharedmemory_size > 0)
 			{
-				args.sharedmemory = _malloca(sharedmemory_size);
+				args.sharedmemory = VZ_MALLOCA(sharedmemory_size);
 			}
 			else
 			{
@@ -97,7 +111,7 @@ namespace vz::jobsystem
 
 			if (args.sharedmemory)
 			{
-				_freea(args.sharedmemory);
+				VZ_FREEA(args.sharedmemory);
 			}
 		}
 	};

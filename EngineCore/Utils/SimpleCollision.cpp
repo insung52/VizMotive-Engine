@@ -46,12 +46,17 @@ namespace vz::GJKcollision
 			uint32_t        bestI = 0;
 			float           best = -FLT_MAX;
 
+			// Extract direction components (cross-platform)
+			float dirX = XMVectorGetX(dir);
+			float dirY = XMVectorGetY(dir);
+			float dirZ = XMVectorGetZ(dir);
+
 			for (uint32_t i = 0; i < n; ++i)
 			{
-				// dot in scalar form (SIMD lane 0 only)
-				float d = v[i].x * dir.m128_f32[0] +
-					v[i].y * dir.m128_f32[1] +
-					v[i].z * dir.m128_f32[2];
+				// dot in scalar form
+				float d = v[i].x * dirX +
+					v[i].y * dirY +
+					v[i].z * dirZ;
 				if (d > best) { best = d; bestI = i; }
 			}
 			return XMLoadFloat3(&v[bestI]);

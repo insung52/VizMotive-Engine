@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <string>
+#include <vector>
 
 #ifdef _WIN32
 
@@ -118,7 +119,29 @@ namespace vz::platform
 		auto it = importedModules.find(moduleName);
 		if (it == importedModules.end())
 		{
+#if defined(PLATFORM_MACOS) || defined(PLATFORM_LINUX)
+			// On macOS/Linux, try multiple paths with lib prefix and .dylib/.so extension
+			std::vector<std::string> searchPaths;
+#if defined(PLATFORM_MACOS)
+			std::string libName = "lib" + moduleName + ".dylib";
+#else
+			std::string libName = "lib" + moduleName + ".so";
+#endif
+			// Try: current directory, @executable_path, absolute name
+			searchPaths.push_back("./" + libName);
+			searchPaths.push_back(libName);
+			searchPaths.push_back("@executable_path/" + libName);
+			searchPaths.push_back("@loader_path/" + libName);
+
+			for (const auto& path : searchPaths)
+			{
+				hMouleLib = vzLoadLibrary(path.c_str());
+				if (hMouleLib != NULL)
+					break;
+			}
+#else
 			hMouleLib = vzLoadLibrary(moduleName.c_str());
+#endif
 			if (hMouleLib != NULL)
 				importedModules[moduleName] = hMouleLib;
 		}

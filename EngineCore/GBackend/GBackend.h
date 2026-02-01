@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <limits>
+#include <type_traits>
 
 namespace vz::graphics
 {
@@ -1832,13 +1833,14 @@ namespace vz::graphics
 		return swizzle;
 	}
 
-	template<typename T>
-	constexpr T AlignTo(T value, T alignment)
+	template<typename T, typename U>
+	constexpr auto AlignTo(T value, U alignment) -> typename std::common_type<T, U>::type
 	{
-		return ((value + alignment - T(1)) / alignment) * alignment;
+		using CommonT = typename std::common_type<T, U>::type;
+		return ((static_cast<CommonT>(value) + static_cast<CommonT>(alignment) - CommonT(1)) / static_cast<CommonT>(alignment)) * static_cast<CommonT>(alignment);
 	}
-	template<typename T>
-	constexpr bool IsAligned(T value, T alignment)
+	template<typename T, typename U>
+	constexpr bool IsAligned(T value, U alignment)
 	{
 		return value == AlignTo(value, alignment);
 	}

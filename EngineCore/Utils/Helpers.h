@@ -8,12 +8,20 @@
 #include <filesystem>
 #include <functional>
 #include <thread>
+#include <locale>
+#include <codecvt>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <Psapi.h> // GetProcessMemoryInfo
 #include <Commdlg.h> // openfile
 #include <comdef.h> // com_error
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <sys/sysctl.h>
+// Suppress deprecation warnings for codecvt on macOS
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #else
 #include <sys/sysinfo.h>
 #include "Utility/portable-file-dialogs.h"
@@ -1251,3 +1259,7 @@ namespace vz::helper
 		}
 	};
 }
+
+#ifdef __APPLE__
+#pragma clang diagnostic pop
+#endif

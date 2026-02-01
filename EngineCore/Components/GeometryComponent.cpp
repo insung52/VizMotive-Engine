@@ -1063,6 +1063,7 @@ struct alignas(16) ShaderClusterBounds
 
 namespace vz
 {
+	using namespace graphics;
 	using GPrimBuffers = GGeometryComponent::GPrimBuffers;
 
 	void GGeometryComponent::DeleteRenderData()

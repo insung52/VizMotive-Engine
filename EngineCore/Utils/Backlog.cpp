@@ -87,10 +87,11 @@ namespace vz::backlog
 			}
 
 			logPath += "\\";
-#else
-			logPath += "/";
-#endif
 		}
+#else
+		// macOS/Linux: use temp directory
+		logPath += "/";
+#endif
 
 		std::string log_file_path = logPath + "vzEngine.log";
 

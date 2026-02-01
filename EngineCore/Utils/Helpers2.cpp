@@ -31,6 +31,9 @@
 #include <Commdlg.h> // openfile
 #include <WinBase.h>
 #include <comdef.h> // com_error
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <sys/sysctl.h>
 #else	// LINUX
 #include <sys/sysinfo.h>
 #include "Utility/portable-file-dialogs.h"

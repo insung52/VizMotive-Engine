@@ -212,9 +212,9 @@ namespace vz
 		inline const std::string GetSceneName() const { return name_; }
 		inline const Entity GetSceneEntity() const { return entity_; }
 
-		inline void Clear();
+		void Clear();
 
-		inline void AddEntity(const Entity entity);
+		void AddEntity(const Entity entity);
 
 		/**
 		 * Adds a list of entities to the Scene.
@@ -222,7 +222,7 @@ namespace vz
 		 * @param entities Array containing entities to add to the scene.
 		 * @param count Size of the entity array.
 		 */
-		inline void AddEntities(const std::vector<Entity>& entities);
+		void AddEntities(const std::vector<Entity>& entities);
 
 		/**
 		 * Removes a list of entities to the Scene.
@@ -233,7 +233,7 @@ namespace vz
 		 * @param entities Array containing entities to remove from the scene.
 		 * @param count Size of the entity array.
 		 */
-		inline void RemoveEntities(const std::vector<Entity>& entities);
+		void RemoveEntities(const std::vector<Entity>& entities);
 
 		/**
 		 * Returns the total number of Entities in the Scene, whether alive or not.
@@ -377,7 +377,7 @@ namespace vz
 		/**
 		 * Read/write scene components (renderables, lights and Scene-attached cameras), make sure their VUID-based components are serialized first
 		 */
-		inline void Serialize(vz::Archive& archive);
+		void Serialize(vz::Archive& archive);
 	};
 
 	enum class ComponentType : uint8_t
@@ -441,7 +441,7 @@ namespace vz
 		NameComponent(const Entity entity, const VUID vuid = 0) : ComponentBase(ComponentType::NAME, entity, vuid) {}
 		virtual ~NameComponent() = default;
 
-		inline void SetName(const std::string& name);
+		void SetName(const std::string& name);
 		inline const std::string& GetName() const { return name_; }
 
 		void Serialize(vz::Archive& archive, const uint64_t version) override;
@@ -477,12 +477,12 @@ namespace vz
 		inline void SetMatrixAutoUpdate(const bool enable) { isMatrixAutoUpdate_ = enable; timeStampSetter_ = TimerNow; }
 
 		// recommend checking IsDirtyWorldMatrix with scene's timeStampWorldUpdate
-		inline const XMFLOAT3 GetWorldPosition() const;
-		inline const XMFLOAT4 GetWorldRotation() const;
-		inline const XMFLOAT3 GetWorldScale() const; 
-		inline const XMFLOAT3 GetWorldForward() const;	// (-)z axis
-		inline const XMFLOAT3 GetWorldUp() const;		// y axis
-		inline const XMFLOAT3 GetWorldRight() const;	// x axis
+		const XMFLOAT3 GetWorldPosition() const;
+		const XMFLOAT4 GetWorldRotation() const;
+		const XMFLOAT3 GetWorldScale() const;
+		const XMFLOAT3 GetWorldForward() const;	// (-)z axis
+		const XMFLOAT3 GetWorldUp() const;		// y axis
+		const XMFLOAT3 GetWorldRight() const;	// x axis
 		inline const XMFLOAT4X4& GetWorldMatrix() const { return world_; };
 
 		// Local
@@ -494,19 +494,19 @@ namespace vz
 		inline void SetPosition(const XMFLOAT3& p) { isDirty_ = true; position_ = p; timeStampSetter_ = TimerNow; }
 		inline void SetScale(const XMFLOAT3& s) { isDirty_ = true; scale_ = s; timeStampSetter_ = TimerNow; }
 		inline void SetEulerAngleRPY(const XMFLOAT3& rotAngles) { SetEulerAngleZXY({ -rotAngles.z, rotAngles.x, rotAngles.y }); }
-		inline void SetEulerAngleZXY(const XMFLOAT3& rotAngles); // ROLL(-z)->PITCH(x)->YAW(y) (mainly used CG-convention) 
+		void SetEulerAngleZXY(const XMFLOAT3& rotAngles); // ROLL(-z)->PITCH(x)->YAW(y) (mainly used CG-convention)
 		inline void SetEulerAngleRPYInDegree(const XMFLOAT3& rotAngles) { SetEulerAngleZXYInDegree({ -rotAngles.z, rotAngles.x, rotAngles.y }); }
-		inline void SetEulerAngleZXYInDegree(const XMFLOAT3& rotAngles); // ROLL(-z)->PITCH(x)->YAW(y) (mainly used CG-convention) 
+		void SetEulerAngleZXYInDegree(const XMFLOAT3& rotAngles); // ROLL(-z)->PITCH(x)->YAW(y) (mainly used CG-convention) 
 		inline void SetQuaternion(const XMFLOAT4& q) { isDirty_ = true; rotation_ = q; timeStampSetter_ = TimerNow; }
-		inline void SetRotateAxis(const XMFLOAT3& axis, const float rotAngle);
-		inline void SetMatrix(const XMFLOAT4X4& local);
-		inline void SetWorldMatrix(const XMFLOAT4X4& world);
+		void SetRotateAxis(const XMFLOAT3& axis, const float rotAngle);
+		void SetMatrix(const XMFLOAT4X4& local);
+		void SetWorldMatrix(const XMFLOAT4X4& world);
 
-		inline void UpdateMatrix();	// local matrix
-		inline void UpdateWorldMatrix(); // call UpdateMatrix() if necessary
+		void UpdateMatrix();	// local matrix
+		void UpdateWorldMatrix(); // call UpdateMatrix() if necessary
 		inline bool IsDirtyWorldMatrix() { return TimeDurationCount(timeStampSetter_, timeStampWorldUpdate_) > 0; }
 
-		inline void Serialize(vz::Archive& archive, const uint64_t version) override;
+		void Serialize(vz::Archive& archive, const uint64_t version) override;
 
 		inline static const ComponentType IntrinsicType = ComponentType::TRANSFORM;
 	};
@@ -522,19 +522,19 @@ namespace vz
 
 		// Non-serialized attributes
 		std::vector<VUID> childrenCache_;
-		inline void updateChildren();
+		void updateChildren();
 
 	public:
 		HierarchyComponent(const Entity entity, const VUID vuid = 0) : ComponentBase(ComponentType::HIERARCHY, entity, vuid) {}
 		virtual ~HierarchyComponent() = default;
 
-		inline void SetParentByVUID(const VUID vuidParent);
-		inline void SetParent(const Entity entityParent);
-		inline VUID GetParent() const;
-		inline Entity GetParentEntity() const;
+		void SetParentByVUID(const VUID vuidParent);
+		void SetParent(const Entity entityParent);
+		VUID GetParent() const;
+		Entity GetParentEntity() const;
 
-		inline void AddChild(const VUID vuidChild);
-		inline void RemoveChild(const VUID vuidChild);
+		void AddChild(const VUID vuidChild);
+		void RemoveChild(const VUID vuidChild);
 		inline const std::vector<VUID>& GetChildren() { if (children_.size() != childrenCache_.size()) updateChildren(); return childrenCache_; }
 		
 		bool ResetRefComponents(const VUID vuidRef) override;
@@ -766,7 +766,7 @@ namespace vz
 		inline XMFLOAT3 GetRootTranslation() const { return rootTranslationOffset_; }
 		inline XMFLOAT4 GetRootRotation() const { return rootRotationOffset_; }
 		inline Entity GetRootMotionBone() const { return rootMotionBone_; }
-		inline float GetDuration() const;
+		float GetDuration() const;
 		inline void SetRootMotionBone(Entity _rootMotionBone) { rootMotionBone_ = _rootMotionBone; timeStampSetter_ = TimerNow; }
 
 		inline const std::vector<Channel>& GetChannels() const { return channels_; }
@@ -985,11 +985,11 @@ namespace vz
 		inline void SetChromaticAberration(const float value) { chromaticAberration_ = value; timeStampSetter_ = TimerNow; }
 		inline void SetTexMulAdd(const XMFLOAT4 value) { texMulAdd_ = value; timeStampSetter_ = TimerNow; }
 
-		inline void SetTexture(const Entity textureEntity, const TextureSlot textureSlot);
-		inline void SetVolumeTexture(const Entity volumetextureEntity, const VolumeTextureSlot volumetextureSlot);
-		inline void SetLookupTable(const Entity lookuptextureEntity, const LookupTableSlot lookuptextureSlot);
+		void SetTexture(const Entity textureEntity, const TextureSlot textureSlot);
+		void SetVolumeTexture(const Entity volumetextureEntity, const VolumeTextureSlot volumetextureSlot);
+		void SetLookupTable(const Entity lookuptextureEntity, const LookupTableSlot lookuptextureSlot);
 
-		inline void SetVolumeMapper(const Entity targetRenderableEntity, const VolumeTextureSlot volumetextureSlot = VolumeTextureSlot::VOLUME_MAIN_MAP, const LookupTableSlot lookupSlot = LookupTableSlot::LOOKUP_COLOR);
+		void SetVolumeMapper(const Entity targetRenderableEntity, const VolumeTextureSlot volumetextureSlot = VolumeTextureSlot::VOLUME_MAIN_MAP, const LookupTableSlot lookupSlot = LookupTableSlot::LOOKUP_COLOR);
 		inline VUID GetVolumeMapperTargetRenderableVUID() const { return vuidVolumeMapperRenderable_; }
 		inline VolumeTextureSlot GetVolumeMapperVolumeSlot() const { return volumemapperVolumeSlot_; }
 		inline LookupTableSlot GetVolumeMapperLookupSlot() const { return volumemapperLookupSlot_; }
@@ -1527,7 +1527,7 @@ namespace vz
 		inline const XMFLOAT4X4& GetMatrixVS2TS() const { return matVS2TS_; }
 		inline const XMFLOAT4X4& GetMatrixTS2VS() const { return matTS2VS_; }
 
-		inline geometrics::AABB ComputeAABB() const;
+		geometrics::AABB ComputeAABB() const;
 
 		bool LoadVolume(const std::string& fileName, const std::vector<uint8_t>& volData, 
 			const uint32_t w, const uint32_t h, const uint32_t d, const VolumeFormat volFormat);
@@ -1686,15 +1686,15 @@ namespace vz
 		XMFLOAT3 center = XMFLOAT3(0, 0, 0);
 		float radius = 0;
 
-		inline void SetGeometry(const Entity geometryEntity);
-		inline void SetMaterial(const Entity materialEntity, const size_t slot);
-		inline void SetMaterials(const std::vector<Entity>& materials);
+		void SetGeometry(const Entity geometryEntity);
+		void SetMaterial(const Entity materialEntity, const size_t slot);
+		void SetMaterials(const std::vector<Entity>& materials);
 
-		inline Entity GetGeometry() const;
-		inline Entity GetMaterial(const size_t slot) const;
-		inline std::vector<Entity> GetMaterials() const;
-		inline size_t GetNumParts() const;
-		inline size_t GetMaterials(Entity* entities) const;
+		Entity GetGeometry() const;
+		Entity GetMaterial(const size_t slot) const;
+		std::vector<Entity> GetMaterials() const;
+		size_t GetNumParts() const;
+		size_t GetMaterials(Entity* entities) const;
 		inline const geometrics::AABB& GetAABB() const { return aabb_; }
 
 		inline void SetDirty() { isDirty_ = true; }
@@ -1785,9 +1785,9 @@ namespace vz
 		inline void SetLineThickness(const float lineThickness) { lineThickness_ = lineThickness; timeStampSetter_ = TimerNow; }
 		inline float GetLineThickness() { return lineThickness_; }
 
-		inline bool HasDoubleSideMaterial() const;
+		bool HasDoubleSideMaterial() const;
 
-		inline void Update();
+		void Update();
 
 		bool ResetRefComponents(const VUID vuidRef) override;
 		void Serialize(vz::Archive& archive, const uint64_t version) override;
@@ -1903,7 +1903,7 @@ namespace vz
 		SpriteComponent(const Entity entity, const VUID vuid = 0) : ComponentBase(ComponentType::SPRITE, entity, vuid) {}
 		virtual ~SpriteComponent() = default;
 
-		inline void SetSpriteTexture(const Entity entity);
+		void SetSpriteTexture(const Entity entity);
 		inline VUID GetSpriteTextureVUID() const { return vuidSpriteTexture_; }
 
 		inline void SetHidden(bool enabled = true) { ENABLE_FLAG(enabled, HIDDEN); }
@@ -2213,9 +2213,9 @@ namespace vz
 		inline bool IsStatic() const { return lightFlag_ & LIGHTMAPONLY_STATIC; }
 		inline bool IsInactive() const { return intensity_ == 0 || range_ == 0; }
 
-		inline void Update();	// if there is a transform entity, make sure the transform is updated!
+		void Update();	// if there is a transform entity, make sure the transform is updated!
 
-		inline void Serialize(vz::Archive& archive, const uint64_t version) override;
+		void Serialize(vz::Archive& archive, const uint64_t version) override;
 
 		inline static const ComponentType IntrinsicType = ComponentType::LIGHT;
 	};
@@ -2308,7 +2308,7 @@ namespace vz
 		inline TimeStamp GetTimeStampPoseUpdate() const { return timeStampPoseUpdate_; }
 		inline bool IsDirty() const { return isDirty_; }
 		// consider TransformComponent and HierarchyComponent that belong to this CameraComponent entity
-		inline bool SetWorldLookAtFromHierarchyTransforms();
+		bool SetWorldLookAtFromHierarchyTransforms();
 		inline void SetWorldLookTo(const XMFLOAT3& eye, const XMFLOAT3& view, const XMFLOAT3& up) {
 			XMFLOAT3 at; XMStoreFloat3(&at, XMLoadFloat3(&eye) + XMLoadFloat3(&view)); SetWorldLookAt(eye, at, up);
 		}
@@ -2331,7 +2331,7 @@ namespace vz
 		// update view matrix using camera extrinsics such as eye_, at_, and up_ set by the above setters
 		// update proj matrix using camera intrinsics
 		// update view-proj and their inverse matrices using the updated view and proj matrices
-		inline void UpdateMatrix();
+		void UpdateMatrix();
 
 		inline const XMFLOAT3& GetWorldEye() const { return eye_; }
 		inline const XMFLOAT3& GetWorldAt() const { return at_; }
@@ -2449,7 +2449,7 @@ namespace vz
 		inline void SetReverseSide(const bool reversed) { isReverseSide_ = reversed; timeStampSetter_ = TimerNow; }
 		inline bool IsReverseSide() const { return isReverseSide_; }
 		inline bool IsValidCurvedPlane() const { return horizontalCurveControls_.size() > 2 && curvedPlaneHeight_ > 0; }
-		inline bool MakeCurvedSlicerHelperGeometry(const Entity geometryEntity);
+		bool MakeCurvedSlicerHelperGeometry(const Entity geometryEntity);
 
 		virtual void UpdateCurve() = 0;
 

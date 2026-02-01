@@ -307,6 +307,9 @@ __pycache__/
 # macOS
 .DS_Store
 *.DS_Store
+*.dylib
+*.app
+bin/Darwin_*/
 
 # CMake build directories
 build/
@@ -314,4 +317,5 @@ build/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
+Makefile
 *.xcodeproj/

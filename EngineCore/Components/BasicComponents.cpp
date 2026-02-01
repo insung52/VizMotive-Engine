@@ -241,10 +241,10 @@ namespace vz
 	}
 	void TransformComponent::SetRotateAxis(const XMFLOAT3& axis, const float rotAngle)
 	{
-		XMVECTOR axisx = XMLoadFloat3(&axis);  // yÃàÀ» ±âÁØÀ¸·Î
-		float angle_rad = XMConvertToRadians(rotAngle);  // 45µµ
+		XMVECTOR axisx = XMLoadFloat3(&axis);  // yï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+		float angle_rad = XMConvertToRadians(rotAngle);  // 45ï¿½ï¿½
 
-		// È¸Àü ÄõÅÍ´Ï¿Â »ý¼º
+		// È¸ï¿½ï¿½ ï¿½ï¿½ï¿½Í´Ï¿ï¿½ ï¿½ï¿½ï¿½ï¿½
 		XMVECTOR quaternion = XMQuaternionRotationAxis(axisx, angle_rad);
 		XMStoreFloat4(&rotation_, quaternion);
 		isDirty_ = true; 
@@ -361,7 +361,7 @@ namespace vz
 namespace vz
 {
 	const XMVECTOR BASE_LIGHT_DIR = XMVectorSet(0, 0, -1, 0); // Forward direction
-	inline void LightComponent::Update()
+	void LightComponent::Update()
 	{
 		TransformComponent* transform = compfactory::GetTransformComponent(entity_);
 		XMMATRIX W;

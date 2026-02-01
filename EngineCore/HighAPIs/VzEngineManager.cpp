@@ -1045,7 +1045,7 @@ namespace vzm
 
 		components.clear();
 
-#define GETTER_VZCOMP(COMPMAP) for (auto& it : vzcompmanager::##COMPMAP) { if (it.second.get()->GetType() == type) components.push_back(it.second.get()); }
+#define GETTER_VZCOMP(COMPMAP) for (auto& it : vzcompmanager::COMPMAP) { if (it.second.get()->GetType() == type) components.push_back(it.second.get()); }
 
 		switch (type)
 		{

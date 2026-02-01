@@ -70,6 +70,11 @@
 #if defined(__GNUC__) || defined(BUILD_PLATFORM_IOS)
 #   define _XM_NO_CALL_CONVENTION_
 #endif
+
+// Enable XMVECTOR operator overloads on macOS
+#if defined(BUILD_PLATFORM_OSX)
+#   undef _XM_NO_XMVECTOR_OVERLOADS_
+#endif
 #if defined(BUILD_PLATFORM_IOS) || defined(BUILD_PLATFORM_ANDROID)
 #   define _XM_ARM_NEON_NO_ALIGN_
 #endif
