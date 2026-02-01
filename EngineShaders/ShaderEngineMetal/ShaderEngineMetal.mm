@@ -1,8 +1,9 @@
 // ShaderEngineMetal - Metal shader engine module for VizMotive Engine
-// Phase 5A: Hardcoded triangle rendering implementation
+// Phase 5B: Scene-based mesh rendering implementation
 
 #include "ShaderEngineMetal.h"
 #include "Components/Components.h"
+#include "Components/GComponents.h"
 #include "Utils/Backlog.h"
 #include "Common/Version.h"
 #include "GBackend/GBackend.h"
@@ -130,17 +131,155 @@ fragment float4 simple_fragment(VertexOut in [[stage_in]]) {
     return float4(in.color, 1.0);
 }
 )";
+
+    // Mesh shader source for Phase 5B - Scene-based rendering
+    static const char* meshShaderSource = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+// Constant buffer structures (matching CPU-side)
+struct CameraConstants {
+    float4x4 viewProjection;
+    float4x4 view;
+    float4x4 projection;
+    float3 cameraPosition;
+    float padding;
+};
+
+struct InstanceConstants {
+    float4x4 world;
+    float4 color;
+};
+
+// Vertex input structure
+struct VertexIn {
+    float3 position [[attribute(0)]];
+    float3 normal   [[attribute(1)]];
+    float2 texcoord [[attribute(2)]];
+};
+
+// Vertex output / Fragment input
+struct MeshVertexOut {
+    float4 position [[position]];
+    float3 worldPos;
+    float3 normal;
+    float2 texcoord;
+    float4 color;
+};
+
+// Basic Mesh Vertex Shader
+vertex MeshVertexOut mesh_vertex(
+    VertexIn in [[stage_in]],
+    constant CameraConstants& camera [[buffer(0)]],
+    constant InstanceConstants& instance [[buffer(1)]])
+{
+    MeshVertexOut out;
+
+    // Transform to world space
+    float4 worldPos = instance.world * float4(in.position, 1.0);
+    out.worldPos = worldPos.xyz;
+
+    // Transform to clip space
+    out.position = camera.viewProjection * worldPos;
+
+    // Transform normal to world space (using upper 3x3 of world matrix)
+    float3x3 normalMatrix = float3x3(
+        instance.world[0].xyz,
+        instance.world[1].xyz,
+        instance.world[2].xyz
+    );
+    out.normal = normalize(normalMatrix * in.normal);
+
+    out.texcoord = in.texcoord;
+    out.color = instance.color;
+
+    return out;
+}
+
+// Simple position-only vertex shader (for objects without full vertex data)
+vertex MeshVertexOut mesh_vertex_simple(
+    uint vid [[vertex_id]],
+    constant float4* positions [[buffer(0)]],
+    constant CameraConstants& camera [[buffer(1)]],
+    constant InstanceConstants& instance [[buffer(2)]])
+{
+    MeshVertexOut out;
+
+    float4 pos = positions[vid];
+    float4 worldPos = instance.world * float4(pos.xyz, 1.0);
+    out.worldPos = worldPos.xyz;
+    out.position = camera.viewProjection * worldPos;
+    out.normal = float3(0, 1, 0); // default up normal
+    out.texcoord = float2(0, 0);
+    out.color = instance.color;
+
+    return out;
+}
+
+// Solid color fragment shader
+fragment float4 mesh_fragment_solid(MeshVertexOut in [[stage_in]])
+{
+    return in.color;
+}
+
+// Simple lit fragment shader
+fragment float4 mesh_fragment_lit(
+    MeshVertexOut in [[stage_in]],
+    constant CameraConstants& camera [[buffer(0)]])
+{
+    // Simple directional light from above-right
+    float3 lightDir = normalize(float3(0.5, 1.0, 0.3));
+    float3 normal = normalize(in.normal);
+
+    // Diffuse lighting
+    float NdotL = max(dot(normal, lightDir), 0.0);
+    float ambient = 0.3;
+    float diffuse = NdotL * 0.7;
+
+    float3 finalColor = in.color.rgb * (ambient + diffuse);
+
+    return float4(finalColor, in.color.a);
+}
+
+// Debug: Render normals as color
+fragment float4 mesh_fragment_debug_normal(MeshVertexOut in [[stage_in]])
+{
+    float3 normal = normalize(in.normal);
+    // Map normal from [-1,1] to [0,1] for visualization
+    float3 color = normal * 0.5 + 0.5;
+    return float4(color, 1.0);
+}
+)";
+
+    // CPU-side constant buffer structures (must match GPU)
+    struct alignas(16) CameraConstantsCPU {
+        XMFLOAT4X4 viewProjection;
+        XMFLOAT4X4 view;
+        XMFLOAT4X4 projection;
+        XMFLOAT3 cameraPosition;
+        float padding;
+    };
+
+    struct alignas(16) InstanceConstantsCPU {
+        XMFLOAT4X4 world;
+        XMFLOAT4 color;
+    };
 #endif
 
-    // GRenderPath3D implementation for Metal with triangle rendering
+    // GRenderPath3D implementation for Metal with scene-based mesh rendering
     class GRenderPath3DMetal : public GRenderPath3D
     {
     private:
 #ifdef __APPLE__
-        // Metal resources for simple triangle rendering
+        // Metal resources
         id<MTLDevice> mtlDevice = nil;
-        id<MTLLibrary> shaderLibrary = nil;
+        id<MTLLibrary> simpleShaderLibrary = nil;
+        id<MTLLibrary> meshShaderLibrary = nil;
         id<MTLRenderPipelineState> simplePSO = nil;
+        id<MTLRenderPipelineState> meshSolidPSO = nil;
+        id<MTLRenderPipelineState> meshLitPSO = nil;
+        id<MTLBuffer> cameraConstantsBuffer = nil;
+        id<MTLBuffer> instanceConstantsBuffer = nil;
         bool pipelinesInitialized = false;
         bool initializationFailed = false;
 
@@ -186,10 +325,10 @@ fragment float4 simple_fragment(VertexOut in [[stage_in]]) {
             MTLCompileOptions* compileOptions = [[MTLCompileOptions alloc] init];
             compileOptions.languageVersion = MTLLanguageVersion2_4;
 
-            shaderLibrary = [mtlDevice newLibraryWithSource:sourceString
+            simpleShaderLibrary = [mtlDevice newLibraryWithSource:sourceString
                                                     options:compileOptions
                                                       error:&error];
-            if (!shaderLibrary)
+            if (!simpleShaderLibrary)
             {
                 NSString* errorMsg = [error localizedDescription];
                 vz::backlog::post("[Metal] ERROR: Failed to compile shaders: " +
@@ -201,8 +340,8 @@ fragment float4 simple_fragment(VertexOut in [[stage_in]]) {
             vz::backlog::post("[Metal] Shader library compiled successfully");
 
             // Get shader functions
-            id<MTLFunction> vertexFunction = [shaderLibrary newFunctionWithName:@"simple_vertex"];
-            id<MTLFunction> fragmentFunction = [shaderLibrary newFunctionWithName:@"simple_fragment"];
+            id<MTLFunction> vertexFunction = [simpleShaderLibrary newFunctionWithName:@"simple_vertex"];
+            id<MTLFunction> fragmentFunction = [simpleShaderLibrary newFunctionWithName:@"simple_fragment"];
 
             if (!vertexFunction || !fragmentFunction)
             {
@@ -230,8 +369,84 @@ fragment float4 simple_fragment(VertexOut in [[stage_in]]) {
                 return;
             }
 
-            pipelinesInitialized = true;
             vz::backlog::post("[Metal] Simple triangle pipeline initialized successfully");
+
+            // =====================================================
+            // Phase 5B: Mesh Rendering Pipeline
+            // =====================================================
+            NSString* meshSourceString = [NSString stringWithUTF8String:meshShaderSource];
+            meshShaderLibrary = [mtlDevice newLibraryWithSource:meshSourceString
+                                                        options:compileOptions
+                                                          error:&error];
+            if (!meshShaderLibrary)
+            {
+                NSString* errorMsg = [error localizedDescription];
+                vz::backlog::post("[Metal] ERROR: Failed to compile mesh shaders: " +
+                                  std::string([errorMsg UTF8String]));
+                initializationFailed = true;
+                return;
+            }
+            vz::backlog::post("[Metal] Mesh shader library compiled successfully");
+
+            // Get mesh shader functions
+            id<MTLFunction> meshVertexFunc = [meshShaderLibrary newFunctionWithName:@"mesh_vertex_simple"];
+            id<MTLFunction> meshFragmentSolid = [meshShaderLibrary newFunctionWithName:@"mesh_fragment_solid"];
+            id<MTLFunction> meshFragmentLit = [meshShaderLibrary newFunctionWithName:@"mesh_fragment_lit"];
+
+            if (!meshVertexFunc || !meshFragmentSolid || !meshFragmentLit)
+            {
+                vz::backlog::post("[Metal] ERROR: Failed to get mesh shader functions");
+                initializationFailed = true;
+                return;
+            }
+
+            // Create solid mesh pipeline
+            MTLRenderPipelineDescriptor* meshSolidDesc = [[MTLRenderPipelineDescriptor alloc] init];
+            meshSolidDesc.label = @"Mesh Solid Pipeline";
+            meshSolidDesc.vertexFunction = meshVertexFunc;
+            meshSolidDesc.fragmentFunction = meshFragmentSolid;
+            meshSolidDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            meshSolidDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+
+            meshSolidPSO = [mtlDevice newRenderPipelineStateWithDescriptor:meshSolidDesc error:&error];
+            if (!meshSolidPSO)
+            {
+                NSString* errorMsg = [error localizedDescription];
+                vz::backlog::post("[Metal] ERROR: Failed to create mesh solid PSO: " +
+                                  std::string([errorMsg UTF8String]));
+                initializationFailed = true;
+                return;
+            }
+
+            // Create lit mesh pipeline
+            MTLRenderPipelineDescriptor* meshLitDesc = [[MTLRenderPipelineDescriptor alloc] init];
+            meshLitDesc.label = @"Mesh Lit Pipeline";
+            meshLitDesc.vertexFunction = meshVertexFunc;
+            meshLitDesc.fragmentFunction = meshFragmentLit;
+            meshLitDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            meshLitDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+
+            meshLitPSO = [mtlDevice newRenderPipelineStateWithDescriptor:meshLitDesc error:&error];
+            if (!meshLitPSO)
+            {
+                NSString* errorMsg = [error localizedDescription];
+                vz::backlog::post("[Metal] ERROR: Failed to create mesh lit PSO: " +
+                                  std::string([errorMsg UTF8String]));
+                initializationFailed = true;
+                return;
+            }
+
+            // Create constant buffers
+            cameraConstantsBuffer = [mtlDevice newBufferWithLength:sizeof(CameraConstantsCPU)
+                                                           options:MTLResourceStorageModeShared];
+            cameraConstantsBuffer.label = @"Camera Constants";
+
+            instanceConstantsBuffer = [mtlDevice newBufferWithLength:sizeof(InstanceConstantsCPU)
+                                                             options:MTLResourceStorageModeShared];
+            instanceConstantsBuffer.label = @"Instance Constants";
+
+            pipelinesInitialized = true;
+            vz::backlog::post("[Metal] Mesh rendering pipelines initialized successfully");
         }
 #endif
 
@@ -246,8 +461,13 @@ fragment float4 simple_fragment(VertexOut in [[stage_in]]) {
         virtual ~GRenderPath3DMetal()
         {
 #ifdef __APPLE__
+            instanceConstantsBuffer = nil;
+            cameraConstantsBuffer = nil;
+            meshLitPSO = nil;
+            meshSolidPSO = nil;
             simplePSO = nil;
-            shaderLibrary = nil;
+            meshShaderLibrary = nil;
+            simpleShaderLibrary = nil;
             mtlDevice = nil;
 #endif
             vz::backlog::post("[Metal] GRenderPath3DMetal destroyed");
@@ -290,51 +510,122 @@ fragment float4 simple_fragment(VertexOut in [[stage_in]]) {
             vp.max_depth = 1.0f;
             device->BindViewports(1, &vp, cmd);
 
-            // If pipelines are ready, draw the triangle
-            if (pipelinesInitialized && simplePSO)
+            // Get render encoder
+            id<MTLRenderCommandEncoder> encoder = nil;
+            if (pipelinesInitialized)
             {
-                // Get the render encoder from the device
-                // We need to access the internal command encoder
-                // For now, we'll use a workaround by accessing through the device's internal state
-
-                // The GraphicsDevice_Metal stores CommandList_Metal which has renderEncoder
-                // We added GetRenderCommandEncoder helper for this purpose
-                void* encoderPtr = nullptr;
-
-                // Try to get encoder through a known interface pattern
-                // Since we can't directly cast, we'll rely on the device's Draw method
-                // But the device's Draw expects a bound pipeline state...
-
-                // Alternative approach: Use the device's native draw call
-                // We need to bind our pipeline state first
-
-                // Get the internal encoder - this requires accessing GraphicsDevice_Metal
-                // through its helper method that we added
                 auto* metalDevice = dynamic_cast<graphics::GraphicsDevice_Metal*>(device);
                 if (metalDevice)
                 {
-                    encoderPtr = metalDevice->GetRenderCommandEncoder(cmd);
+                    void* encoderPtr = metalDevice->GetRenderCommandEncoder(cmd);
+                    if (encoderPtr)
+                    {
+                        encoder = (__bridge id<MTLRenderCommandEncoder>)encoderPtr;
+                    }
+                }
+            }
+
+            if (encoder && pipelinesInitialized)
+            {
+                // =====================================================
+                // Phase 5B: Scene-based mesh rendering
+                // =====================================================
+                bool hasSceneContent = false;
+
+                // Update camera constants if camera is available
+                if (camera && cameraConstantsBuffer)
+                {
+                    CameraConstantsCPU* camData = (CameraConstantsCPU*)[cameraConstantsBuffer contents];
+                    camData->viewProjection = camera->GetViewProjection();
+                    camData->view = camera->GetView();
+                    camData->projection = camera->GetProjection();
+                    camData->cameraPosition = camera->GetWorldEye();
+                    camData->padding = 0.0f;
                 }
 
-                if (encoderPtr)
+                // Render scene objects if scene is available
+                if (scene && camera && meshLitPSO)
                 {
-                    id<MTLRenderCommandEncoder> encoder = (__bridge id<MTLRenderCommandEncoder>)encoderPtr;
+                    const auto& renderables = scene->GetRenderableEntities();
 
-                    // Set our pipeline state and draw
+                    for (Entity entity : renderables)
+                    {
+                        // Get renderable component
+                        GRenderableComponent* renderable = static_cast<GRenderableComponent*>(
+                            compfactory::GetRenderableComponent(entity));
+                        if (!renderable || !renderable->transform || !renderable->geometry)
+                            continue;
+
+                        // Only render mesh renderables
+                        if (renderable->GetRenderableType() != RenderableComponent::RenderableType::MESH_RENDERABLE)
+                            continue;
+
+                        hasSceneContent = true;
+
+                        // Update instance constants
+                        if (instanceConstantsBuffer)
+                        {
+                            InstanceConstantsCPU* instData = (InstanceConstantsCPU*)[instanceConstantsBuffer contents];
+                            instData->world = renderable->transform->GetWorldMatrix();
+
+                            // Get color from first material if available
+                            if (!renderable->materials.empty() && renderable->materials[0])
+                            {
+                                XMFLOAT4 baseColor = renderable->materials[0]->GetBaseColor();
+                                instData->color = baseColor;
+                            }
+                            else
+                            {
+                                instData->color = XMFLOAT4(0.7f, 0.7f, 0.7f, 1.0f); // Default gray
+                            }
+                        }
+
+                        // Get geometry data
+                        GGeometryComponent* geom = renderable->geometry;
+                        size_t numParts = geom->GetNumParts();
+
+                        for (size_t partIdx = 0; partIdx < numParts; ++partIdx)
+                        {
+                            auto* primBuffers = geom->GetGPrimBuffer(partIdx);
+                            if (!primBuffers || !primBuffers->generalBuffer.IsValid())
+                                continue;
+
+                            // Set pipeline and constant buffers
+                            [encoder setRenderPipelineState:meshLitPSO];
+
+                            // Bind vertex buffer (positions)
+                            // TODO: Access actual Metal buffer from GPUBuffer
+                            // For now, skip actual geometry rendering
+
+                            // Bind camera constants
+                            [encoder setVertexBuffer:cameraConstantsBuffer offset:0 atIndex:1];
+                            [encoder setFragmentBuffer:cameraConstantsBuffer offset:0 atIndex:0];
+
+                            // Bind instance constants
+                            [encoder setVertexBuffer:instanceConstantsBuffer offset:0 atIndex:2];
+
+                            // TODO: Draw actual geometry when we can access the Metal buffers
+                            // [encoder drawIndexedPrimitives:...];
+                        }
+                    }
+                }
+
+                // Fallback: Draw simple triangle if no scene content
+                if (!hasSceneContent && simplePSO)
+                {
                     [encoder setRenderPipelineState:simplePSO];
                     [encoder drawPrimitives:MTLPrimitiveTypeTriangle
                                 vertexStart:0
                                 vertexCount:3];
                 }
-                else
+            }
+            else if (!encoder)
+            {
+                static bool warnedOnce = false;
+                if (!warnedOnce)
                 {
-                    // Fallback: just log that we can't access encoder
-                    static bool warnedOnce = false;
-                    if (!warnedOnce)
-                    {
-                        vz::backlog::post("[Metal] Warning: Could not access render encoder for triangle drawing");
-                        warnedOnce = true;
-                    }
+                    vz::backlog::post("[Metal] Warning: Could not access render encoder");
+                    warnedOnce = true;
                 }
             }
 
@@ -364,8 +655,13 @@ fragment float4 simple_fragment(VertexOut in [[stage_in]]) {
         bool Destroy() override
         {
 #ifdef __APPLE__
+            instanceConstantsBuffer = nil;
+            cameraConstantsBuffer = nil;
+            meshLitPSO = nil;
+            meshSolidPSO = nil;
             simplePSO = nil;
-            shaderLibrary = nil;
+            meshShaderLibrary = nil;
+            simpleShaderLibrary = nil;
             mtlDevice = nil;
             pipelinesInitialized = false;
             initializationFailed = false;
