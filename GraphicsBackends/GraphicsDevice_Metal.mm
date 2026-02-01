@@ -1907,6 +1907,24 @@ namespace vz::graphics
         return frameAllocators[0];
     }
 
+    void* GraphicsDevice_Metal::GetRenderCommandEncoder(CommandList cmd) const
+    {
+        if (!cmd.internal_state)
+            return nullptr;
+
+        CommandList_Metal* cmdList = static_cast<CommandList_Metal*>(cmd.internal_state);
+        return (__bridge void*)cmdList->renderEncoder;
+    }
+
+    void* GraphicsDevice_Metal::GetCommandBuffer(CommandList cmd) const
+    {
+        if (!cmd.internal_state)
+            return nullptr;
+
+        CommandList_Metal* cmdList = static_cast<CommandList_Metal*>(cmd.internal_state);
+        return (__bridge void*)cmdList->commandBuffer;
+    }
+
 #else
     // Non-Apple platforms - stub implementation
     GraphicsDevice_Metal::~GraphicsDevice_Metal() {}
@@ -1983,5 +2001,7 @@ namespace vz::graphics
     void GraphicsDevice_Metal::Map(GPUResource* resource) {}
     void GraphicsDevice_Metal::Unmap(GPUResource* resource) {}
     GraphicsDevice::GPULinearAllocator& GraphicsDevice_Metal::GetFrameAllocator(CommandList cmd) { static GPULinearAllocator allocator; return allocator; }
+    void* GraphicsDevice_Metal::GetRenderCommandEncoder(CommandList cmd) const { return nullptr; }
+    void* GraphicsDevice_Metal::GetCommandBuffer(CommandList cmd) const { return nullptr; }
 #endif
 }

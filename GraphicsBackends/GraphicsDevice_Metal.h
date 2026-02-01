@@ -301,5 +301,10 @@ namespace vz::graphics
         void Unmap(GPUResource* resource) override;
 
         GPULinearAllocator& GetFrameAllocator(CommandList cmd) override;
+
+        // Metal internal access helpers (for ShaderEngineMetal)
+        void* GetMTLDevice() const { return (__bridge void*)device; }
+        void* GetRenderCommandEncoder(CommandList cmd) const;
+        void* GetCommandBuffer(CommandList cmd) const;
     };
 }

@@ -31,6 +31,7 @@ target_include_directories(ShaderEngineMetal PRIVATE
     ${CMAKE_SOURCE_DIR}/../../EngineCore/Utils/DirectXMath
     ${CMAKE_SOURCE_DIR}/../../EngineCore/ThirdParty
     ${CMAKE_SOURCE_DIR}/../../EngineCore/ThirdParty/spdlog
+    ${CMAKE_SOURCE_DIR}/../../GraphicsBackends
 )
 
 # Compile definitions
@@ -50,12 +51,14 @@ if(APPLE)
         ${QUARTZCORE_FRAMEWORK}
     )
 
-    # Link to VizEngineCore
+    # Link to VizEngineCore and GBackendMetal
     target_link_directories(ShaderEngineMetal PRIVATE
         ${CMAKE_SOURCE_DIR}/../../bin/${CMAKE_SYSTEM_NAME}_${CMAKE_BUILD_TYPE}
+        ${CMAKE_SOURCE_DIR}/../../bin/${CMAKE_SYSTEM_NAME}_${CMAKE_BUILD_TYPE}/Release
     )
     target_link_libraries(ShaderEngineMetal PRIVATE
         VizEngineCore
+        GBackendMetal
     )
 
     # Objective-C++ compile flags

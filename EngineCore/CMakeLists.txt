@@ -180,6 +180,9 @@ target_link_libraries(TestMetalBackend PRIVATE
 
 if(APPLE)
     find_library(APPKIT_FRAMEWORK AppKit REQUIRED)
+    find_library(METAL_FRAMEWORK Metal REQUIRED)
+    find_library(QUARTZCORE_FRAMEWORK QuartzCore REQUIRED)
+
     target_link_libraries(TestMetalBackend PRIVATE
         ${APPKIT_FRAMEWORK}
         ${FOUNDATION_FRAMEWORK}
@@ -188,5 +191,46 @@ if(APPLE)
     set_target_properties(TestMetalBackend PROPERTIES
         MACOSX_RPATH ON
         INSTALL_RPATH "@executable_path"
+    )
+
+    # TestShaderEngineMetal - test the triangle rendering through ShaderEngineMetal
+    add_executable(TestShaderEngineMetal
+        ${CMAKE_SOURCE_DIR}/../Examples/TestShaderEngineMetal/main.mm
+    )
+
+    target_include_directories(TestShaderEngineMetal PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Utils/DirectXMath
+        ${CMAKE_SOURCE_DIR}/../GraphicsBackends
+    )
+
+    target_link_directories(TestShaderEngineMetal PRIVATE
+        ${CMAKE_SOURCE_DIR}/../bin/${CMAKE_SYSTEM_NAME}_${CMAKE_BUILD_TYPE}
+    )
+
+    target_link_libraries(TestShaderEngineMetal PRIVATE
+        GBackendMetal
+        ${APPKIT_FRAMEWORK}
+        ${FOUNDATION_FRAMEWORK}
+        ${METAL_FRAMEWORK}
+        ${QUARTZCORE_FRAMEWORK}
+    )
+
+    target_compile_options(TestShaderEngineMetal PRIVATE
+        -fobjc-arc
+    )
+
+    target_compile_definitions(TestShaderEngineMetal PRIVATE
+        BUILD_INTRINSICS_LEVEL=0
+    )
+
+    set_target_properties(TestShaderEngineMetal PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.vizmotive.TestShaderEngineMetal"
+        MACOSX_BUNDLE_BUNDLE_NAME "TestShaderEngineMetal"
+        MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+        MACOSX_RPATH ON
+        INSTALL_RPATH "@executable_path;@executable_path/../../.."
     )
 endif()

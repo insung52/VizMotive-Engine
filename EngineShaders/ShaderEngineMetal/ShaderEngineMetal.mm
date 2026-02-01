@@ -1,11 +1,14 @@
 // ShaderEngineMetal - Metal shader engine module for VizMotive Engine
-// This is a minimal implementation that allows engine initialization
+// Phase 5A: Hardcoded triangle rendering implementation
 
 #include "ShaderEngineMetal.h"
 #include "Components/Components.h"
 #include "Utils/Backlog.h"
 #include "Common/Version.h"
 #include "GBackend/GBackend.h"
+
+// Include GraphicsDevice_Metal for helper function access
+#include "GraphicsDevice_Metal.h"
 
 #include <atomic>
 #include <mutex>
@@ -94,16 +97,161 @@ namespace vz
         void Debug_AddCircle(const XMFLOAT3 p, const float r, const XMFLOAT4 color, const bool depthTest) const override {}
     };
 
-    // Minimal GRenderPath3D implementation for Metal
+#ifdef __APPLE__
+    // MSL shader source code embedded as string
+    static const char* simpleShaderSource = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexOut {
+    float4 position [[position]];
+    float3 color;
+};
+
+vertex VertexOut simple_vertex(uint vid [[vertex_id]]) {
+    float2 positions[3] = {
+        float2(-0.5, -0.5),
+        float2( 0.5, -0.5),
+        float2( 0.0,  0.5)
+    };
+    float3 colors[3] = {
+        float3(1.0, 0.0, 0.0),
+        float3(0.0, 1.0, 0.0),
+        float3(0.0, 0.0, 1.0)
+    };
+
+    VertexOut out;
+    out.position = float4(positions[vid], 0.0, 1.0);
+    out.color = colors[vid];
+    return out;
+}
+
+fragment float4 simple_fragment(VertexOut in [[stage_in]]) {
+    return float4(in.color, 1.0);
+}
+)";
+#endif
+
+    // GRenderPath3D implementation for Metal with triangle rendering
     class GRenderPath3DMetal : public GRenderPath3D
     {
+    private:
+#ifdef __APPLE__
+        // Metal resources for simple triangle rendering
+        id<MTLDevice> mtlDevice = nil;
+        id<MTLLibrary> shaderLibrary = nil;
+        id<MTLRenderPipelineState> simplePSO = nil;
+        bool pipelinesInitialized = false;
+        bool initializationFailed = false;
+
+        void InitializePipelines()
+        {
+            if (pipelinesInitialized || initializationFailed)
+                return;
+
+            vz::backlog::post("[Metal] Initializing simple triangle pipelines...");
+
+            // Get MTLDevice from GraphicsDevice_Metal
+            // We need to access the internal device - use dynamic cast or a helper method
+            if (!device)
+            {
+                vz::backlog::post("[Metal] ERROR: No graphics device available");
+                initializationFailed = true;
+                return;
+            }
+
+            // Try to get the MTLDevice through GraphicsDevice_Metal's helper method
+            // The helper method returns void* which we cast back to id<MTLDevice>
+            void* devicePtr = nullptr;
+
+            // Use dynamic_cast to check if we have a Metal device
+            // First, try to access the MTLDevice through the device name check
+            std::string adapterName = device->GetAdapterName();
+            vz::backlog::post("[Metal] Device adapter: " + adapterName);
+
+            // Create a new MTLDevice for our rendering (simple approach)
+            // In production, we would share the device from GraphicsDevice_Metal
+            mtlDevice = MTLCreateSystemDefaultDevice();
+            if (!mtlDevice)
+            {
+                vz::backlog::post("[Metal] ERROR: Failed to create Metal device");
+                initializationFailed = true;
+                return;
+            }
+
+            // Compile shader from source
+            NSError* error = nil;
+            NSString* sourceString = [NSString stringWithUTF8String:simpleShaderSource];
+
+            MTLCompileOptions* compileOptions = [[MTLCompileOptions alloc] init];
+            compileOptions.languageVersion = MTLLanguageVersion2_4;
+
+            shaderLibrary = [mtlDevice newLibraryWithSource:sourceString
+                                                    options:compileOptions
+                                                      error:&error];
+            if (!shaderLibrary)
+            {
+                NSString* errorMsg = [error localizedDescription];
+                vz::backlog::post("[Metal] ERROR: Failed to compile shaders: " +
+                                  std::string([errorMsg UTF8String]));
+                initializationFailed = true;
+                return;
+            }
+
+            vz::backlog::post("[Metal] Shader library compiled successfully");
+
+            // Get shader functions
+            id<MTLFunction> vertexFunction = [shaderLibrary newFunctionWithName:@"simple_vertex"];
+            id<MTLFunction> fragmentFunction = [shaderLibrary newFunctionWithName:@"simple_fragment"];
+
+            if (!vertexFunction || !fragmentFunction)
+            {
+                vz::backlog::post("[Metal] ERROR: Failed to get shader functions");
+                initializationFailed = true;
+                return;
+            }
+
+            // Create render pipeline descriptor
+            MTLRenderPipelineDescriptor* pipelineDesc = [[MTLRenderPipelineDescriptor alloc] init];
+            pipelineDesc.label = @"Simple Triangle Pipeline";
+            pipelineDesc.vertexFunction = vertexFunction;
+            pipelineDesc.fragmentFunction = fragmentFunction;
+            pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+
+            // Create pipeline state
+            simplePSO = [mtlDevice newRenderPipelineStateWithDescriptor:pipelineDesc
+                                                                  error:&error];
+            if (!simplePSO)
+            {
+                NSString* errorMsg = [error localizedDescription];
+                vz::backlog::post("[Metal] ERROR: Failed to create pipeline state: " +
+                                  std::string([errorMsg UTF8String]));
+                initializationFailed = true;
+                return;
+            }
+
+            pipelinesInitialized = true;
+            vz::backlog::post("[Metal] Simple triangle pipeline initialized successfully");
+        }
+#endif
+
     public:
         GRenderPath3DMetal(SwapChain& swapChain, Texture& rtRenderFinal)
             : GRenderPath3D(swapChain, rtRenderFinal)
         {
             device = renderer_metal::device;
+            vz::backlog::post("[Metal] GRenderPath3DMetal created");
         }
-        virtual ~GRenderPath3DMetal() = default;
+
+        virtual ~GRenderPath3DMetal()
+        {
+#ifdef __APPLE__
+            simplePSO = nil;
+            shaderLibrary = nil;
+            mtlDevice = nil;
+#endif
+            vz::backlog::post("[Metal] GRenderPath3DMetal destroyed");
+        }
 
         bool ResizeCanvas(uint32_t canvasWidth, uint32_t canvasHeight) override
         {
@@ -123,7 +271,14 @@ namespace vz
             if (!device)
                 return false;
 
-            // Basic render pass - just clear the screen
+#ifdef __APPLE__
+            // Initialize pipelines on first render
+            if (!pipelinesInitialized && !initializationFailed)
+            {
+                InitializePipelines();
+            }
+
+            // Start command list and render pass
             CommandList cmd = device->BeginCommandList();
             device->RenderPassBegin(&swapChain_, cmd);
 
@@ -135,13 +290,88 @@ namespace vz
             vp.max_depth = 1.0f;
             device->BindViewports(1, &vp, cmd);
 
+            // If pipelines are ready, draw the triangle
+            if (pipelinesInitialized && simplePSO)
+            {
+                // Get the render encoder from the device
+                // We need to access the internal command encoder
+                // For now, we'll use a workaround by accessing through the device's internal state
+
+                // The GraphicsDevice_Metal stores CommandList_Metal which has renderEncoder
+                // We added GetRenderCommandEncoder helper for this purpose
+                void* encoderPtr = nullptr;
+
+                // Try to get encoder through a known interface pattern
+                // Since we can't directly cast, we'll rely on the device's Draw method
+                // But the device's Draw expects a bound pipeline state...
+
+                // Alternative approach: Use the device's native draw call
+                // We need to bind our pipeline state first
+
+                // Get the internal encoder - this requires accessing GraphicsDevice_Metal
+                // through its helper method that we added
+                auto* metalDevice = dynamic_cast<graphics::GraphicsDevice_Metal*>(device);
+                if (metalDevice)
+                {
+                    encoderPtr = metalDevice->GetRenderCommandEncoder(cmd);
+                }
+
+                if (encoderPtr)
+                {
+                    id<MTLRenderCommandEncoder> encoder = (__bridge id<MTLRenderCommandEncoder>)encoderPtr;
+
+                    // Set our pipeline state and draw
+                    [encoder setRenderPipelineState:simplePSO];
+                    [encoder drawPrimitives:MTLPrimitiveTypeTriangle
+                                vertexStart:0
+                                vertexCount:3];
+                }
+                else
+                {
+                    // Fallback: just log that we can't access encoder
+                    static bool warnedOnce = false;
+                    if (!warnedOnce)
+                    {
+                        vz::backlog::post("[Metal] Warning: Could not access render encoder for triangle drawing");
+                        warnedOnce = true;
+                    }
+                }
+            }
+
             device->RenderPassEnd(cmd);
             device->SubmitCommandLists();
 
             return true;
+#else
+            // Non-Apple fallback
+            CommandList cmd = device->BeginCommandList();
+            device->RenderPassBegin(&swapChain_, cmd);
+
+            Viewport vp;
+            vp.width = (float)swapChain_.desc.width;
+            vp.height = (float)swapChain_.desc.height;
+            vp.min_depth = 0.0f;
+            vp.max_depth = 1.0f;
+            device->BindViewports(1, &vp, cmd);
+
+            device->RenderPassEnd(cmd);
+            device->SubmitCommandLists();
+
+            return true;
+#endif
         }
 
-        bool Destroy() override { return true; }
+        bool Destroy() override
+        {
+#ifdef __APPLE__
+            simplePSO = nil;
+            shaderLibrary = nil;
+            mtlDevice = nil;
+            pipelinesInitialized = false;
+            initializationFailed = false;
+#endif
+            return true;
+        }
 
         const Texture& GetLastProcessRT() const override
         {
