@@ -542,7 +542,11 @@ namespace vzm
 			vzlog_error("Invalid Graphics API : %s", api.c_str());
 			return false;
 		}
-		if (!shaderEngine.Init(api == "DX11" ? "ShaderEngineDX11" : "ShaderEngine"))
+		std::string shaderModuleName = "ShaderEngine";
+		if (api == "DX11") shaderModuleName = "ShaderEngineDX11";
+		else if (api == "METAL") shaderModuleName = "ShaderEngineMetal";
+
+		if (!shaderEngine.Init(shaderModuleName))
 		{
 			vzlog_error("Invalid Shader Engine");
 			return false;
