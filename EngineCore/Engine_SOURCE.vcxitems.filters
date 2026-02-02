@@ -273,9 +273,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)Common\RenderPath3D.cpp">
       <Filter>Common</Filter>
     </ClCompile>
-    <ClCompile Include="$(MSBuildThisFileDirectory)ThirdParty\stb_image.cpp">
-      <Filter>ThirdParty\stb</Filter>
-    </ClCompile>
     <ClCompile Include="$(MSBuildThisFileDirectory)ThirdParty\lodepng.cpp">
       <Filter>ThirdParty</Filter>
     </ClCompile>

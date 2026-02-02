@@ -25,8 +25,9 @@
 
 // Cross-platform stack allocation
 #ifdef _WIN32
-#define VZ_MALLOCA(size) VZ_MALLOCA(size)
-#define VZ_FREEA(ptr) VZ_FREEA(ptr)
+#include <malloc.h>
+#define VZ_MALLOCA(size) _malloca(size)
+#define VZ_FREEA(ptr) _freea(ptr)
 #else
 #define VZ_MALLOCA(size) alloca(size)
 #define VZ_FREEA(ptr) ((void)0)  // alloca doesn't need free

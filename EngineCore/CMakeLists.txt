@@ -81,8 +81,7 @@ set(THIRDPARTY_SOURCES
     ThirdParty/meshoptimizer/vertexfilter.cpp
     ThirdParty/meshoptimizer/vfetchanalyzer.cpp
     ThirdParty/meshoptimizer/vfetchoptimizer.cpp
-    # stb, qoi implementations
-    ThirdParty/stb_image.cpp
+    # stb, qoi implementations are in basisu_common.cpp
     # lodepng
     ThirdParty/lodepng.cpp
     # mikktspace

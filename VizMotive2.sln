@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.3.11312.210 d18.3
+VisualStudioVersion = 18.3.11312.210
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{67975BED-EA57-4D56-8C1F-C06E6BF3ED09}"
 EndProject
@@ -104,6 +104,11 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sample14", "Examples\Sample014\sample14.vcxproj", "{2CB6496B-914D-4ECB-AA84-0C55BAE0890A}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GBackendMetal", "GraphicsBackends\GBackendMetal.vcxproj", "{B8C3D2E1-5F4A-4B9C-A1D7-8E6F45566F70}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Metal Samples", "Metal Samples", "{89014F8C-B62B-4024-B2DF-B5E7E9B295E3}"
+	ProjectSection(SolutionItems) = preProject
+		Examples\MetalTriangleSample\main.mm = Examples\MetalTriangleSample\main.mm
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -521,6 +526,7 @@ Global
 		{9A564F6D-CE0A-4B72-9E49-0323A9E3A8E2} = {0A297EDD-E998-4D81-A886-F244FE4D7DA0}
 		{2CB6496B-914D-4ECB-AA84-0C55BAE0890A} = {0A297EDD-E998-4D81-A886-F244FE4D7DA0}
 		{B8C3D2E1-5F4A-4B9C-A1D7-8E6F45566F70} = {84C866AA-AE3A-4BBE-B89D-50A9EC3A1987}
+		{89014F8C-B62B-4024-B2DF-B5E7E9B295E3} = {67975BED-EA57-4D56-8C1F-C06E6BF3ED09}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {36089187-3D11-4B2A-975E-DF87A5E77426}
