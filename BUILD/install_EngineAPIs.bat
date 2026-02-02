@@ -26,9 +26,14 @@ robocopy "..\EngineCore\Utils\DirectXMath" "..\Install\vzmcore\utils\DirectXMath
 REM ------------------------------------------
 REM Specified header files in Utils folder (outdated copy)
 REM Target: ..\Install\vzmcore\utils\
-set "utils=vzMath.h Geometrics.h GeometryGenerator.h Backlog.h EventHandler.h Helpers.h JobSystem.h Profiler.h Timer.h Platform.h Config.h Random.h"
+set "utils=vzMath.h Geometrics.h GeometryGenerator.h Backlog.h EventHandler.h Helpers.h JobSystem.h Profiler.h Timer.h Platform.h Config.h Random.h Allocator.h Spinlock.h"
 for %%F in (%utils%) do (
     xcopy "..\EngineCore\Utils\%%F" "..\Install\vzmcore\utils\" /D /Y
 )
+
+REM ------------------------------------------
+REM ThirdParty header files needed by Utils
+REM Target: ..\Install\vzmcore\ThirdParty\
+xcopy "..\EngineCore\ThirdParty\offsetAllocator.hpp" "..\Install\vzmcore\ThirdParty\" /D /Y
 
 endlocal
