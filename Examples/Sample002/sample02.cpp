@@ -449,6 +449,9 @@ int main(int, char**)
 		g_frameIndex++;
 	}
 
+	// Wait for async jobs to complete before engine shutdown
+	vz::jobsystem::Wait(ctx_stl_loader);
+
 	vzm::DeinitEngineLib();
 
 	WaitForPendingOperations();

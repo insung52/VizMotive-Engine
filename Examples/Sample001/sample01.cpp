@@ -350,6 +350,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 		renderer->SetViewport(vp_x, vp_y, vp_w, vp_h);
     }
+
+    // Wait for async jobs to complete before engine shutdown
+    vz::jobsystem::Wait(ctx_load_obj);
+
     vzm::DeinitEngineLib();
 
     ReleaseDC(hwnd, hdc); 
