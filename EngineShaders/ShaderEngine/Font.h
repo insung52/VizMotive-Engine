@@ -56,6 +56,7 @@ namespace vz::font
 			DEPTH_TEST = 1 << 3,
 			FLIP_HORIZONTAL = 1 << 4,
 			FLIP_VERTICAL = 1 << 5,
+			HDR_RENDER_TARGET = 1 << 6,  // Render target uses R11G11B10_FLOAT format
 		};
 		uint32_t _flags = SDF_RENDERING;
 
@@ -65,6 +66,7 @@ namespace vz::font
 		constexpr bool isDepthTestEnabled() const { return _flags & DEPTH_TEST; }
 		constexpr bool isFlippedHorizontally() const { return _flags & FLIP_HORIZONTAL; }
 		constexpr bool isFlippedVertically() const { return _flags & FLIP_VERTICAL; }
+		constexpr bool isHdrRenderTarget() const { return _flags & HDR_RENDER_TARGET; }
 
 		// enable Signed Distance Field (SDF) font rendering (enabled by default)
 		constexpr void enableSDFRendering() { _flags |= SDF_RENDERING; }
@@ -75,6 +77,8 @@ namespace vz::font
 		constexpr void enableDepthTest() { _flags |= DEPTH_TEST; }
 		constexpr void enableFlipHorizontally() { _flags |= FLIP_HORIZONTAL; }
 		constexpr void enableFlipVertically() { _flags |= FLIP_VERTICAL; }
+		// Set when rendering to R11G11B10_FLOAT render target (rtMain), unset for R10G10B10A2_UNORM (swapchain)
+		constexpr void enableHdrRenderTarget() { _flags |= HDR_RENDER_TARGET; }
 
 		constexpr void disableSDFRendering() { _flags &= ~SDF_RENDERING; }
 		constexpr void disableHDR10OutputMapping() { _flags &= ~OUTPUT_COLOR_SPACE_HDR10_ST2084; }
@@ -82,6 +86,7 @@ namespace vz::font
 		constexpr void disableDepthTest() { _flags &= ~DEPTH_TEST; }
 		constexpr void disableFlipHorizontally() { _flags &= ~FLIP_HORIZONTAL; }
 		constexpr void disableFlipVertically() { _flags &= ~FLIP_VERTICAL; }
+		constexpr void disableHdrRenderTarget() { _flags &= ~HDR_RENDER_TARGET; }
 
 		Params(
 			float posX = 0,

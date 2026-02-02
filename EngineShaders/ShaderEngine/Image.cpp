@@ -34,8 +34,15 @@ namespace vz::image
 		STRIP_MODE_COUNT,
 	};
 
-	static PipelineState imagePSO[2][BLENDMODE_COUNT][STENCILMODE_COUNT][STENCILREFMODE_COUNT][DEPTH_TEST_MODE_COUNT][STRIP_MODE_COUNT];
-	static PipelineState debugPSO;
+	enum RT_FORMAT_MODE
+	{
+		RT_FORMAT_SDR,  // R10G10B10A2_UNORM (swapchain, rtRenderFinal)
+		RT_FORMAT_HDR,  // R11G11B10_FLOAT (rtMain)
+		RT_FORMAT_MODE_COUNT
+	};
+
+	static PipelineState imagePSO[RT_FORMAT_MODE_COUNT][BLENDMODE_COUNT][STENCILMODE_COUNT][STENCILREFMODE_COUNT][DEPTH_TEST_MODE_COUNT][STRIP_MODE_COUNT];
+	static PipelineState debugPSO[RT_FORMAT_MODE_COUNT];
 	
 	static thread_local Texture backgroundTexture;
 
@@ -425,15 +432,17 @@ namespace vz::image
 		}
 		device->BindStencilRef(stencilRef, cmd);
 
+		// Select PSO based on render target format
+		int formatMode = params.isHdrRenderTarget() ? RT_FORMAT_HDR : RT_FORMAT_SDR;
+
 		if (params.isDebugTestEnabled())
 		{
 			image.sampler_index = params._debugBuffer;
-			device->BindPipelineState(&debugPSO, cmd);
+			device->BindPipelineState(&debugPSO[formatMode], cmd);
 		}
 		else
 		{
-			//device->BindPipelineState(&imagePSO[params.isSpriteEnabled()][SCU32(params.blendFlag)][params.stencilComp][params.stencilRefMode][params.isDepthTestEnabled()][strip_mode], cmd);
-			device->BindPipelineState(&imagePSO[0][SCU32(params.blendFlag)][params.stencilComp][params.stencilRefMode][params.isDepthTestEnabled()][strip_mode], cmd);
+			device->BindPipelineState(&imagePSO[formatMode][SCU32(params.blendFlag)][params.stencilComp][params.stencilRefMode][params.isDepthTestEnabled()][strip_mode], cmd);
 		}
 
 		device->BindDynamicConstantBuffer(image, CBSLOT_IMAGE, cmd);
@@ -473,12 +482,14 @@ namespace vz::image
 		desc.ps = &pixelShader;
 		desc.rs = &rasterizerState;
 
-		for (int i = 0; i < 1; i++)
+		// Create PSOs for both RT formats
+		Format rtFormats[RT_FORMAT_MODE_COUNT] = {
+			Format::R10G10B10A2_UNORM,  // RT_FORMAT_SDR (swapchain)
+			FORMAT_rendertargetMain     // RT_FORMAT_HDR (R11G11B10_FLOAT)
+		};
+
+		for (int f = 0; f < RT_FORMAT_MODE_COUNT; ++f)
 		{
-			if (i == 1)
-			{
-				desc.ps = &pixelShader_sprite;
-			}
 			for (int j = 0; j < BLENDMODE_COUNT; ++j)
 			{
 				desc.bs = &blendStates[j];
@@ -491,7 +502,7 @@ namespace vz::image
 							desc.dss = &depthStencilStates[k][m][d];
 
 							RenderPassInfo renderpass_image = {};
-							renderpass_image.rt_formats[0] = Format::R10G10B10A2_UNORM;
+							renderpass_image.rt_formats[0] = rtFormats[f];
 							renderpass_image.rt_count = 1;
 							renderpass_image.sample_count = 1;
 
@@ -518,25 +529,29 @@ namespace vz::image
 									desc.pt = PrimitiveTopology::TRIANGLELIST;
 									break;
 								}
-								device->CreatePipelineState(&desc, &imagePSO[i][j][k][m][d][n], &renderpass_image);
+								device->CreatePipelineState(&desc, &imagePSO[f][j][k][m][d][n], &renderpass_image);
 							}
 						}
 					}
 				}
 			}
+
+			// Debug PSO for each format
+			desc.ps = &debugShader;
+			desc.bs = &blendStates[BLENDMODE_OPAQUE];
+			desc.dss = &depthStencilStates[STENCILMODE_DISABLED][STENCILREFMODE_ALL][DEPTH_TEST_OFF];
+			desc.pt = PrimitiveTopology::TRIANGLESTRIP;
+
+			RenderPassInfo renderpass_debug = {};
+			renderpass_debug.rt_formats[0] = rtFormats[f];
+			renderpass_debug.rt_count = 1;
+			renderpass_debug.ds_format = Format::UNKNOWN;
+			renderpass_debug.sample_count = 1;
+			device->CreatePipelineState(&desc, &debugPSO[f], &renderpass_debug);
+
+			// Reset for next format iteration
+			desc.ps = &pixelShader;
 		}
-
-		desc.ps = &debugShader;
-		desc.bs = &blendStates[BLENDMODE_OPAQUE];
-		desc.dss = &depthStencilStates[STENCILMODE_DISABLED][STENCILREFMODE_ALL][DEPTH_TEST_OFF];  // No depth/stencil in Compose()
-		desc.pt = PrimitiveTopology::TRIANGLESTRIP;
-
-		RenderPassInfo renderpass_debug = {};
-		renderpass_debug.rt_formats[0] = Format::R10G10B10A2_UNORM;
-		renderpass_debug.rt_count = 1;
-		renderpass_debug.ds_format = Format::UNKNOWN;  // debugPSO used in Compose() without depth buffer
-		renderpass_debug.sample_count = 1;
-		device->CreatePipelineState(&desc, &debugPSO, &renderpass_debug);
 	}
 
 	bool isInitialized = false;
@@ -777,7 +792,7 @@ namespace vz::image
 	{
 		jobsystem::WaitAllJobs();
 
-		for (int i = 0; i < 2; ++i)
+		for (int f = 0; f < RT_FORMAT_MODE_COUNT; ++f)
 		{
 			for (int j = 0; j < BLENDMODE_COUNT; ++j)
 			{
@@ -789,7 +804,7 @@ namespace vz::image
 						{
 							for (int n = 0; n < STRIP_MODE_COUNT; ++n)
 							{
-								imagePSO[i][j][k][m][d][n] = {};
+								imagePSO[f][j][k][m][d][n] = {};
 							}
 						}
 					}
@@ -797,7 +812,10 @@ namespace vz::image
 			}
 		}
 
-		debugPSO = {};
+		for (int f = 0; f < RT_FORMAT_MODE_COUNT; f++)
+		{
+			debugPSO[f] = {};
+		}
 
 		for (int i = 0; i < SAMPLER_COUNT; i++)
 		{

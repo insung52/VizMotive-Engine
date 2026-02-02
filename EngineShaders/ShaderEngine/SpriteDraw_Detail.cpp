@@ -107,6 +107,7 @@ namespace vz::renderer
 				sprite->IsCornerRoundingEnabled() ? params.enableCornerRounding() : params.disableCornerRounding();
 				sprite->IsDepthTestEnabled() ? params.enableDepthTest() : params.disableDepthTest();
 				sprite->IsHighlightEnabled() ? params.enableHighlight() : params.disableHighlight();
+				params.enableHdrRenderTarget();  // Rendering to rtMain (R11G11B10_FLOAT)
 
 				if (sprite->IsCameraScaling())
 				{
@@ -170,6 +171,8 @@ namespace vz::renderer
 				params.intensity = font_sprite->GetIntensity();
 				params.shadow_intensity = font_sprite->GetShadowIntensity();
 				params.cursor = font_sprite->GetCursor();
+				params.enableHdrRenderTarget();  // Rendering to rtMain (R11G11B10_FLOAT)
+				params.enableDepthTest();  // 3D space font rendering requires depth test
 
 				if (font_sprite->IsCameraScaling())
 				{

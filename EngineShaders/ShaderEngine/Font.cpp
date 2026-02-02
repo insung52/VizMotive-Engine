@@ -34,9 +34,16 @@ namespace vz::font
 		static RasterizerState rasterizerState;
 		static DepthStencilState depthStencilStates[DEPTH_TEST_MODE_COUNT];
 
+		enum RT_FORMAT_MODE
+		{
+			RT_FORMAT_SDR,  // R10G10B10A2_UNORM (swapchain)
+			RT_FORMAT_HDR,  // R11G11B10_FLOAT (rtMain)
+			RT_FORMAT_MODE_COUNT
+		};
+
 		static Shader vertexShader;
 		static Shader pixelShader;
-		static PipelineState PSO[DEPTH_TEST_MODE_COUNT];
+		static PipelineState PSO[RT_FORMAT_MODE_COUNT][DEPTH_TEST_MODE_COUNT];
 
 		struct Canvas
 		{
@@ -322,32 +329,41 @@ namespace vz::font
 		shader::LoadShader(ShaderStage::VS, vertexShader, "fontVS.cso");
 		shader::LoadShader(ShaderStage::PS, pixelShader, "fontPS.cso");
 
-		for (int d = 0; d < DEPTH_TEST_MODE_COUNT; ++d)
+		// Create PSOs for both RT formats
+		Format rtFormats[RT_FORMAT_MODE_COUNT] = {
+			Format::R10G10B10A2_UNORM,        // RT_FORMAT_SDR (swapchain)
+			renderer::FORMAT_rendertargetMain  // RT_FORMAT_HDR (R11G11B10_FLOAT)
+		};
+
+		for (int f = 0; f < RT_FORMAT_MODE_COUNT; ++f)
 		{
-			RenderPassInfo renderpass_font = {};
-			renderpass_font.rt_formats[0] = Format::R10G10B10A2_UNORM;
-			renderpass_font.rt_count = 1;
-			renderpass_font.sample_count = 1;
-
-			// DEPTH_TEST_OFF: 2D UI (no depth buffer)
-			// DEPTH_TEST_ON: 3D debug text (needs depth buffer)
-			if (d == DEPTH_TEST_OFF)
+			for (int d = 0; d < DEPTH_TEST_MODE_COUNT; ++d)
 			{
-				renderpass_font.ds_format = Format::UNKNOWN;
-			}
-			else
-			{
-				renderpass_font.ds_format = Format::D32_FLOAT_S8X24_UINT;  // Match main depth buffer format
-			}
+				RenderPassInfo renderpass_font = {};
+				renderpass_font.rt_formats[0] = rtFormats[f];
+				renderpass_font.rt_count = 1;
+				renderpass_font.sample_count = 1;
 
-			PipelineStateDesc desc;
-			desc.vs = &vertexShader;
-			desc.ps = &pixelShader;
-			desc.bs = &blendState;
-			desc.dss = &depthStencilStates[d];
-			desc.rs = &rasterizerState;
-			desc.pt = PrimitiveTopology::TRIANGLESTRIP;
-			graphics::GetDevice()->CreatePipelineState(&desc, &PSO[d], &renderpass_font);
+				// DEPTH_TEST_OFF: 2D UI (no depth buffer)
+				// DEPTH_TEST_ON: 3D debug text (needs depth buffer)
+				if (d == DEPTH_TEST_OFF)
+				{
+					renderpass_font.ds_format = Format::UNKNOWN;
+				}
+				else
+				{
+					renderpass_font.ds_format = Format::D32_FLOAT_S8X24_UINT;  // Match main depth buffer format
+				}
+
+				PipelineStateDesc desc;
+				desc.vs = &vertexShader;
+				desc.ps = &pixelShader;
+				desc.bs = &blendState;
+				desc.dss = &depthStencilStates[d];
+				desc.rs = &rasterizerState;
+				desc.pt = PrimitiveTopology::TRIANGLESTRIP;
+				graphics::GetDevice()->CreatePipelineState(&desc, &PSO[f][d], &renderpass_font);
+			}
 		}
 	}
 
@@ -421,9 +437,15 @@ namespace vz::font
 
 		InvalidateAtlas();
 
+		for (int f = 0; f < RT_FORMAT_MODE_COUNT; f++)
+		{
+			for (int d = 0; d < DEPTH_TEST_MODE_COUNT; d++)
+			{
+				PSO[f][d] = {};
+			}
+		}
 		for (int i = 0; i < DEPTH_TEST_MODE_COUNT; i++)
 		{
-			PSO[i] = {};
 			depthStencilStates[i] = {};
 		}
 
@@ -672,7 +694,9 @@ namespace vz::font
 
 			device->EventBegin("Font", cmd);
 
-			device->BindPipelineState(&PSO[params.isDepthTestEnabled()], cmd);
+			// Select PSO based on render target format
+			int formatMode = params.isHdrRenderTarget() ? RT_FORMAT_HDR : RT_FORMAT_SDR;
+			device->BindPipelineState(&PSO[formatMode][params.isDepthTestEnabled()], cmd);
 
 			using namespace math;
 			XMFLOAT4 color = XMFLOAT4(1, 1, 1, 1);

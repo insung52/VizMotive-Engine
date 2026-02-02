@@ -64,6 +64,7 @@ namespace vz::image
 
 			DEBUG_TEST = 1 << 14,
 			SPRITE = 1 << 15,
+			HDR_RENDER_TARGET = 1 << 16,  // Render target uses R11G11B10_FLOAT format
 		};
 
 		enum DEBUG_BUFFER
@@ -181,6 +182,8 @@ namespace vz::image
 		// Mask texture RG will be used for distortion of screen UVs for background image, A will be used as opacity
 		constexpr void enableDistortionMask() { _flags |= DISTORTION_MASK; }
 		constexpr void enableHighlight() { _flags |= HIGHLIGHT; }
+		// Set when rendering to R11G11B10_FLOAT render target (rtMain), unset for R10G10B10A2_UNORM (swapchain)
+		constexpr void enableHdrRenderTarget() { _flags |= HDR_RENDER_TARGET; }
 
 		constexpr void disableDebugTest() { _flags &= ~DEBUG_TEST; }
 		// disable draw rectangle for base texture (whole texture will be drawn, no cutout)
@@ -199,6 +202,9 @@ namespace vz::image
 		constexpr void disableAngularSoftnessInverse() { _flags &= ~ANGULAR_INVERSE; }
 		constexpr void disableDistortionMask() { _flags &= ~DISTORTION_MASK; }
 		constexpr void disableHighlight() { _flags &= ~HIGHLIGHT; }
+		constexpr void disableHdrRenderTarget() { _flags &= ~HDR_RENDER_TARGET; }
+
+		constexpr bool isHdrRenderTarget() const { return _flags & HDR_RENDER_TARGET; }
 
 		Params() = default;
 
