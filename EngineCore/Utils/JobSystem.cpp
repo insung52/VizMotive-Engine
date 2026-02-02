@@ -241,7 +241,8 @@ namespace vz::jobsystem
 			if (IsShuttingDown())
 				return;
 
-			vzlog("Jobsystem Shutdown...");
+			// Note: Don't log here - this may be called from static destructor
+			// when the logger is already destroyed
 			WaitAll();
 
 			for (auto& x : resources)

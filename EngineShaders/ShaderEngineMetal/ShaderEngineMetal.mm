@@ -61,7 +61,7 @@ namespace vz::renderer_metal
         if (!initialized.load())
             return;
 
-        vz::backlog::post("[Metal] Renderer deinitializing...");
+        // Note: Don't log during shutdown - logger may be in undefined state
 
         // Cleanup deferred queues
         {
@@ -74,7 +74,6 @@ namespace vz::renderer_metal
         }
 
         initialized.store(false);
-        vz::backlog::post("[Metal] Renderer deinitialized");
     }
 }
 
@@ -470,7 +469,7 @@ fragment float4 mesh_fragment_debug_normal(MeshVertexOut in [[stage_in]])
             simpleShaderLibrary = nil;
             mtlDevice = nil;
 #endif
-            vz::backlog::post("[Metal] GRenderPath3DMetal destroyed");
+            // Note: Don't log here - logger may already be destroyed during shutdown
         }
 
         bool ResizeCanvas(uint32_t canvasWidth, uint32_t canvasHeight) override

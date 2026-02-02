@@ -204,8 +204,17 @@ if(APPLE)
         ${CMAKE_SOURCE_DIR}/../GraphicsBackends
     )
 
+    # Handle both single-config (Makefile) and multi-config (Xcode) generators
+    if(CMAKE_CONFIGURATION_TYPES)
+        # Multi-config generator (Xcode)
+        set(DYLIB_DIR "${CMAKE_SOURCE_DIR}/../bin/${CMAKE_SYSTEM_NAME}_Release")
+    else()
+        # Single-config generator (Makefile)
+        set(DYLIB_DIR "${CMAKE_SOURCE_DIR}/../bin/${CMAKE_SYSTEM_NAME}_${CMAKE_BUILD_TYPE}")
+    endif()
+
     target_link_directories(TestShaderEngineMetal PRIVATE
-        ${CMAKE_SOURCE_DIR}/../bin/${CMAKE_SYSTEM_NAME}_${CMAKE_BUILD_TYPE}
+        ${DYLIB_DIR}
     )
 
     target_link_libraries(TestShaderEngineMetal PRIVATE
@@ -231,6 +240,17 @@ if(APPLE)
         MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
         MACOSX_RPATH ON
-        INSTALL_RPATH "@executable_path;@executable_path/../../.."
+        INSTALL_RPATH "@executable_path;@executable_path/../../../"
+    )
+
+    # Copy dylibs to app bundle for Xcode
+    add_custom_command(TARGET TestShaderEngineMetal POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DYLIB_DIR}/libGBackendMetal.dylib"
+            "$<TARGET_BUNDLE_CONTENT_DIR:TestShaderEngineMetal>/MacOS/libGBackendMetal.dylib"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DYLIB_DIR}/libShaderEngineMetal.dylib"
+            "$<TARGET_BUNDLE_CONTENT_DIR:TestShaderEngineMetal>/MacOS/libShaderEngineMetal.dylib"
+        COMMENT "Copying dylibs to app bundle..."
     )
 endif()

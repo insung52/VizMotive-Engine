@@ -205,26 +205,39 @@ typedef void (*FP_Deinitialize)();
     [self.renderTimer invalidate];
     self.renderTimer = nil;
 
+    _initialized = false;
+
+    // Wait for GPU to finish before any cleanup
+    if (_device) {
+        _device->WaitForGPU();
+    }
+
+    // Destroy render path first (while device and shader engine are still valid)
     if (_renderPath) {
         _renderPath->Destroy();
         delete _renderPath;
         _renderPath = nullptr;
     }
 
+    // Deinitialize shader engine
     if (_shaderDeinit) {
         _shaderDeinit();
+        _shaderDeinit = nullptr;
+        _shaderInit = nullptr;
+        _shaderLoadRenderer = nullptr;
+        _shaderNewRenderPath = nullptr;
     }
 
+    // Delete device after shader engine is deinitialized
     if (_device) {
-        _device->WaitForGPU();
         delete _device;
         _device = nullptr;
     }
 
-    if (_shaderHandle) {
-        dlclose(_shaderHandle);
-        _shaderHandle = nullptr;
-    }
+    // Note: Don't dlclose() the shader library - it contains spdlog which may
+    // have static destructors that conflict with the main process cleanup.
+    // The OS will clean up when the process exits anyway.
+    _shaderHandle = nullptr;
 
     NSLog(@"Cleanup complete");
 }
