@@ -222,6 +222,11 @@
 
 - (void)windowWillClose:(NSNotification*)notification
 {
+    // Prevent double cleanup (terminate: triggers another windowWillClose)
+    static bool cleanupDone = false;
+    if (cleanupDone) return;
+    cleanupDone = true;
+
     [self.renderTimer invalidate];
     self.renderTimer = nil;
 
@@ -242,7 +247,8 @@
     vzm::DeinitEngineLib();
 
     NSLog(@"Cleanup complete");
-    [NSApp terminate:nil];
+    // Don't call [NSApp terminate:nil] here - it causes double windowWillClose
+    // applicationShouldTerminateAfterLastWindowClosed returns YES, so app will terminate automatically
 }
 
 - (void)windowDidResize:(NSNotification*)notification

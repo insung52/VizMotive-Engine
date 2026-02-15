@@ -1204,13 +1204,15 @@ namespace vzm
 	bool DeinitEngineLib()
 	{
 		CHECK_API_INIT_VALIDITY(false);
-		graphicsDevice->WaitForGPU();
+		if (graphicsDevice)
+			graphicsDevice->WaitForGPU();
 		jobsystem::ShutDown();
 		profiler::Shutdown();
 
 		// lock_gaurd MUST be placed AFTER jobsystem::ShutDown() or WaitAllJobs()!
 		std::lock_guard<std::recursive_mutex> lock(GetEngineMutex());
-		graphicsDevice->WaitForGPU();	// double check for safe
+		if (graphicsDevice)
+			graphicsDevice->WaitForGPU();	// double check for safe
 
 		// high-level apis handle engine components via functions defined in vzcomp namespace
 		vzcompmanager::DestroyAll();	// here, after-shutdown drives a single threaded process

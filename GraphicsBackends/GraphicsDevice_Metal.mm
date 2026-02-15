@@ -1232,6 +1232,9 @@ namespace vz::graphics
 
     void GraphicsDevice_Metal::WaitForGPU() const
     {
+        if (!frameSemaphore)
+            return;
+
         // Wait for all in-flight frames to complete
         for (uint32_t i = 0; i < BUFFERCOUNT; ++i)
         {
