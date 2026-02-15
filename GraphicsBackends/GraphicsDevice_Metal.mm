@@ -1925,6 +1925,24 @@ namespace vz::graphics
         return (__bridge void*)cmdList->commandBuffer;
     }
 
+    void* GraphicsDevice_Metal::GetMTLBuffer(const GPUBuffer* buffer) const
+    {
+        if (!buffer || !buffer->internal_state)
+            return nullptr;
+
+        auto* internal = static_cast<Resource_Metal*>(buffer->internal_state.get());
+        return (__bridge void*)internal->buffer;
+    }
+
+    void* GraphicsDevice_Metal::GetMTLTexture(const Texture* texture) const
+    {
+        if (!texture || !texture->internal_state)
+            return nullptr;
+
+        auto* internal = static_cast<Texture_Metal*>(texture->internal_state.get());
+        return (__bridge void*)internal->texture;
+    }
+
 #else
     // Non-Apple platforms - stub implementation
     GraphicsDevice_Metal::~GraphicsDevice_Metal() {}
@@ -2003,5 +2021,7 @@ namespace vz::graphics
     GraphicsDevice::GPULinearAllocator& GraphicsDevice_Metal::GetFrameAllocator(CommandList cmd) { static GPULinearAllocator allocator; return allocator; }
     void* GraphicsDevice_Metal::GetRenderCommandEncoder(CommandList cmd) const { return nullptr; }
     void* GraphicsDevice_Metal::GetCommandBuffer(CommandList cmd) const { return nullptr; }
+    void* GraphicsDevice_Metal::GetMTLBuffer(const GPUBuffer* buffer) const { return nullptr; }
+    void* GraphicsDevice_Metal::GetMTLTexture(const Texture* texture) const { return nullptr; }
 #endif
 }

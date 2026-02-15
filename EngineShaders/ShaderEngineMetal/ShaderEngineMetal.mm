@@ -354,7 +354,7 @@ fragment float4 mesh_fragment_debug_normal(MeshVertexOut in [[stage_in]])
             pipelineDesc.label = @"Simple Triangle Pipeline";
             pipelineDesc.vertexFunction = vertexFunction;
             pipelineDesc.fragmentFunction = fragmentFunction;
-            pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            pipelineDesc.colorAttachments[0].pixelFormat = MTLPixelFormatRGB10A2Unorm;
 
             // Create pipeline state
             simplePSO = [mtlDevice newRenderPipelineStateWithDescriptor:pipelineDesc
@@ -404,7 +404,7 @@ fragment float4 mesh_fragment_debug_normal(MeshVertexOut in [[stage_in]])
             meshSolidDesc.label = @"Mesh Solid Pipeline";
             meshSolidDesc.vertexFunction = meshVertexFunc;
             meshSolidDesc.fragmentFunction = meshFragmentSolid;
-            meshSolidDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            meshSolidDesc.colorAttachments[0].pixelFormat = MTLPixelFormatRGB10A2Unorm;
             meshSolidDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
 
             meshSolidPSO = [mtlDevice newRenderPipelineStateWithDescriptor:meshSolidDesc error:&error];
@@ -422,7 +422,7 @@ fragment float4 mesh_fragment_debug_normal(MeshVertexOut in [[stage_in]])
             meshLitDesc.label = @"Mesh Lit Pipeline";
             meshLitDesc.vertexFunction = meshVertexFunc;
             meshLitDesc.fragmentFunction = meshFragmentLit;
-            meshLitDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            meshLitDesc.colorAttachments[0].pixelFormat = MTLPixelFormatRGB10A2Unorm;
             meshLitDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
 
             meshLitPSO = [mtlDevice newRenderPipelineStateWithDescriptor:meshLitDesc error:&error];
@@ -509,11 +509,12 @@ fragment float4 mesh_fragment_debug_normal(MeshVertexOut in [[stage_in]])
             vp.max_depth = 1.0f;
             device->BindViewports(1, &vp, cmd);
 
-            // Get render encoder
+            // Get render encoder and Metal device
             id<MTLRenderCommandEncoder> encoder = nil;
+            graphics::GraphicsDevice_Metal* metalDevice = nullptr;
             if (pipelinesInitialized)
             {
-                auto* metalDevice = dynamic_cast<graphics::GraphicsDevice_Metal*>(device);
+                metalDevice = dynamic_cast<graphics::GraphicsDevice_Metal*>(device);
                 if (metalDevice)
                 {
                     void* encoderPtr = metalDevice->GetRenderCommandEncoder(cmd);
@@ -524,7 +525,7 @@ fragment float4 mesh_fragment_debug_normal(MeshVertexOut in [[stage_in]])
                 }
             }
 
-            if (encoder && pipelinesInitialized)
+            if (encoder && pipelinesInitialized && metalDevice)
             {
                 // =====================================================
                 // Phase 5B: Scene-based mesh rendering
@@ -589,22 +590,47 @@ fragment float4 mesh_fragment_debug_normal(MeshVertexOut in [[stage_in]])
                             if (!primBuffers || !primBuffers->generalBuffer.IsValid())
                                 continue;
 
-                            // Set pipeline and constant buffers
+                            // Get Metal buffers from GPUBuffer
+                            void* mtlBufferPtr = metalDevice->GetMTLBuffer(&primBuffers->generalBuffer);
+                            if (!mtlBufferPtr)
+                                continue;
+
+                            id<MTLBuffer> geometryBuffer = (__bridge id<MTLBuffer>)mtlBufferPtr;
+
+                            // Check if we have valid buffer views
+                            if (!primBuffers->vbPosW.IsValid() || !primBuffers->ib.IsValid())
+                                continue;
+
+                            // Set pipeline
                             [encoder setRenderPipelineState:meshLitPSO];
 
-                            // Bind vertex buffer (positions)
-                            // TODO: Access actual Metal buffer from GPUBuffer
-                            // For now, skip actual geometry rendering
+                            // Bind vertex buffer (positions) at slot 0
+                            [encoder setVertexBuffer:geometryBuffer
+                                              offset:primBuffers->vbPosW.offset
+                                             atIndex:0];
 
-                            // Bind camera constants
+                            // Bind camera constants at slot 1
                             [encoder setVertexBuffer:cameraConstantsBuffer offset:0 atIndex:1];
                             [encoder setFragmentBuffer:cameraConstantsBuffer offset:0 atIndex:0];
 
-                            // Bind instance constants
+                            // Bind instance constants at slot 2
                             [encoder setVertexBuffer:instanceConstantsBuffer offset:0 atIndex:2];
 
-                            // TODO: Draw actual geometry when we can access the Metal buffers
-                            // [encoder drawIndexedPrimitives:...];
+                            // Get index count and format
+                            const auto* primitive = geom->GetPrimitive(partIdx);
+                            if (!primitive)
+                                continue;
+
+                            size_t indexCount = primitive->GetNumIndices();
+                            MTLIndexType indexType = (geom->GetIndexStride(partIdx) == sizeof(uint32_t))
+                                ? MTLIndexTypeUInt32 : MTLIndexTypeUInt16;
+
+                            // Draw indexed primitives
+                            [encoder drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                                indexCount:indexCount
+                                                 indexType:indexType
+                                               indexBuffer:geometryBuffer
+                                         indexBufferOffset:primBuffers->ib.offset];
                         }
                     }
                 }

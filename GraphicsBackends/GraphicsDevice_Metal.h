@@ -306,5 +306,11 @@ namespace vz::graphics
         void* GetMTLDevice() const { return (__bridge void*)device; }
         void* GetRenderCommandEncoder(CommandList cmd) const;
         void* GetCommandBuffer(CommandList cmd) const;
+
+        // Get Metal buffer from GPUBuffer (returns id<MTLBuffer> as void*)
+        void* GetMTLBuffer(const GPUBuffer* buffer) const;
+
+        // Get Metal texture from Texture (returns id<MTLTexture> as void*)
+        void* GetMTLTexture(const Texture* texture) const;
     };
 }

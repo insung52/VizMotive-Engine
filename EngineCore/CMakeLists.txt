@@ -81,7 +81,8 @@ set(THIRDPARTY_SOURCES
     ThirdParty/meshoptimizer/vertexfilter.cpp
     ThirdParty/meshoptimizer/vfetchanalyzer.cpp
     ThirdParty/meshoptimizer/vfetchoptimizer.cpp
-    # stb, qoi implementations are in basisu_common.cpp
+    # stb, qoi implementations
+    ThirdParty/stb_impl.cpp
     # lodepng
     ThirdParty/lodepng.cpp
     # mikktspace
@@ -251,5 +252,64 @@ if(APPLE)
             "${DYLIB_DIR}/libShaderEngineMetal.dylib"
             "$<TARGET_BUNDLE_CONTENT_DIR:TestShaderEngineMetal>/MacOS/libShaderEngineMetal.dylib"
         COMMENT "Copying dylibs to app bundle..."
+    )
+
+    # MetalSample001 - High-level API test using vzm:: APIs (cross-platform compatible)
+    add_executable(MetalSample001
+        ${CMAKE_SOURCE_DIR}/../Examples/MetalSample001/main.mm
+    )
+
+    target_include_directories(MetalSample001 PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Utils/DirectXMath
+        ${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty
+        ${CMAKE_SOURCE_DIR}/../Examples
+    )
+
+    target_link_directories(MetalSample001 PRIVATE
+        ${DYLIB_DIR}
+    )
+
+    target_link_libraries(MetalSample001 PRIVATE
+        VizEngineCore
+        GBackendMetal
+        ShaderEngineMetal
+        ${APPKIT_FRAMEWORK}
+        ${FOUNDATION_FRAMEWORK}
+        ${METAL_FRAMEWORK}
+        ${QUARTZCORE_FRAMEWORK}
+    )
+
+    target_compile_options(MetalSample001 PRIVATE
+        -fobjc-arc
+    )
+
+    target_compile_definitions(MetalSample001 PRIVATE
+        BUILD_INTRINSICS_LEVEL=0
+        PLATFORM_MACOS
+    )
+
+    set_target_properties(MetalSample001 PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.vizmotive.MetalSample001"
+        MACOSX_BUNDLE_BUNDLE_NAME "MetalSample001"
+        MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+        MACOSX_RPATH ON
+        INSTALL_RPATH "@executable_path;@executable_path/../../../"
+    )
+
+    # Copy dylibs to MetalSample001 app bundle
+    add_custom_command(TARGET MetalSample001 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DYLIB_DIR}/libVizEngineCore.dylib"
+            "$<TARGET_BUNDLE_CONTENT_DIR:MetalSample001>/MacOS/libVizEngineCore.dylib"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DYLIB_DIR}/libGBackendMetal.dylib"
+            "$<TARGET_BUNDLE_CONTENT_DIR:MetalSample001>/MacOS/libGBackendMetal.dylib"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${DYLIB_DIR}/libShaderEngineMetal.dylib"
+            "$<TARGET_BUNDLE_CONTENT_DIR:MetalSample001>/MacOS/libShaderEngineMetal.dylib"
+        COMMENT "Copying dylibs to MetalSample001 app bundle..."
     )
 endif()

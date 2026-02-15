@@ -1511,7 +1511,7 @@ namespace vz
 		VolumeComponent(const Entity entity, const VUID vuid = 0) : TextureComponent(ComponentType::VOLUMETEXTURE, entity, vuid) {}
 		virtual ~VolumeComponent() = default;
 
-		inline bool IsValidVolume() const;
+		bool IsValidVolume() const;
 		inline void SetVoxelSize(const XMFLOAT3& voxelSize) { voxelSize_ = voxelSize; isDirty_ = true; }
 		inline void SetStoredMinMax(const XMFLOAT2 minMax) { storedMinMax_ = minMax; }
 		inline void SetOriginalMinMax(const XMFLOAT2 minMax) { originalMinMax_ = minMax; }
