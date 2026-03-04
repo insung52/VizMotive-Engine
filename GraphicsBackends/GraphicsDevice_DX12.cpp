@@ -1162,6 +1162,7 @@ namespace dx12_internal
 		D3D12_CPU_DESCRIPTOR_HANDLE handle = {};
 		D3D12_DESCRIPTOR_HEAP_TYPE type = {};
 		int index = -1; // bindless
+		uint64_t buffer_offset = 0; // byte offset for Root Descriptor SRV/UAV bindings
 
 		bool IsValid() const { return handle.ptr != 0; }
 		void init(const GraphicsDevice_DX12* device, const D3D12_CONSTANT_BUFFER_VIEW_DESC& cbv)
@@ -2067,6 +2068,10 @@ std::mutex queue_locker;
 					{
 						auto internal_state = to_internal(&resource);
 						address = internal_state->gpu_address;
+						if (subresource >= 0)
+						{
+							address += internal_state->subresources_srv[subresource].buffer_offset;
+						}
 					}
 
 					if (graphics)
@@ -2097,6 +2102,10 @@ std::mutex queue_locker;
 					{
 						auto internal_state = to_internal(&resource);
 						address = internal_state->gpu_address;
+						if (subresource >= 0)
+						{
+							address += internal_state->subresources_uav[subresource].buffer_offset;
+						}
 					}
 
 					if (graphics)
@@ -5094,6 +5103,7 @@ std::mutex queue_locker;
 
 			SingleDescriptor descriptor;
 			descriptor.init(this, srv_desc, internal_state->resource.Get());
+			descriptor.buffer_offset = offset;
 
 			if (!internal_state->srv.IsValid())
 			{
@@ -5147,6 +5157,7 @@ std::mutex queue_locker;
 
 			SingleDescriptor descriptor;
 			descriptor.init(this, uav_desc, internal_state->resource.Get());
+			descriptor.buffer_offset = offset;
 
 			if (!internal_state->uav.IsValid())
 			{
@@ -6816,16 +6827,17 @@ std::mutex queue_locker;
 		auto internal_state = to_internal(pso);
 		if (internal_state->resource != nullptr)
 		{
-			if (commandlist.active_pso != pso)
+			if (commandlist.active_pso == pso)
 			{
-				commandlist.GetGraphicsCommandList()->SetPipelineState(internal_state->resource.Get());
+				return;
+			}
+			commandlist.GetGraphicsCommandList()->SetPipelineState(internal_state->resource.Get());
 
-				if (commandlist.prev_pt != internal_state->primitiveTopology)
-				{
-					commandlist.prev_pt = internal_state->primitiveTopology;
+			if (commandlist.prev_pt != internal_state->primitiveTopology)
+			{
+				commandlist.prev_pt = internal_state->primitiveTopology;
 
-					commandlist.GetGraphicsCommandList()->IASetPrimitiveTopology(internal_state->primitiveTopology);
-				}
+				commandlist.GetGraphicsCommandList()->IASetPrimitiveTopology(internal_state->primitiveTopology);
 			}
 
 			commandlist.prev_pipeline_hash = {};
@@ -6838,6 +6850,7 @@ std::mutex queue_locker;
 			pipeline_hash.renderpass_hash = commandlist.renderpass_info.get_hash();
 			if (commandlist.prev_pipeline_hash == pipeline_hash)
 			{
+				commandlist.active_pso = pso;
 				return;
 			}
 			commandlist.prev_pipeline_hash = pipeline_hash;
