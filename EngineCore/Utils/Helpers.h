@@ -66,8 +66,12 @@ namespace vz::helper
 			MultiByteToWideChar(CP_UTF8, 0, from.c_str(), -1, &to[0], num);
 		}
 #else
-		std::wstring_convert<std::codecvt_utf8<wchar_t>> cv;
-		to = cv.from_bytes(from);
+		size_t num = mbstowcs(nullptr, from.c_str(), 0);
+		if (num != (size_t)-1)
+		{
+			to.resize(num);
+			mbstowcs(&to[0], from.c_str(), num + 1);
+		}
 #endif // _WIN32
 	}
 	inline void StringConvert(const std::wstring& from, std::string& to)
@@ -80,8 +84,12 @@ namespace vz::helper
 			WideCharToMultiByte(CP_UTF8, 0, from.c_str(), -1, &to[0], num, NULL, NULL);
 		}
 #else
-		std::wstring_convert<std::codecvt_utf8<wchar_t>> cv;
-		to = cv.to_bytes(from);
+		size_t num = wcstombs(nullptr, from.c_str(), 0);
+		if (num != (size_t)-1)
+		{
+			to.resize(num);
+			wcstombs(&to[0], from.c_str(), num + 1);
+		}
 #endif // _WIN32
 	}
 	inline int StringConvert(const char* from, wchar_t* to, int dest_size_in_characters = -1)
@@ -98,14 +106,13 @@ namespace vz::helper
 		}
 		return num;
 #else
-		std::wstring_convert<std::codecvt_utf8<wchar_t>> cv;
-		auto result = cv.from_bytes(from).c_str();
-		int num = (int)cv.converted();
+		std::wstring converted = std::wstring(from, from + strlen(from));
+		int num = (int)converted.size();
 		if (dest_size_in_characters >= 0)
 		{
 			num = std::min(num, dest_size_in_characters);
 		}
-		std::memcpy(to, result, num * sizeof(wchar_t));
+		std::memcpy(to, converted.c_str(), num * sizeof(wchar_t));
 		return num;
 #endif // _WIN32
 	}
@@ -123,14 +130,14 @@ namespace vz::helper
 		}
 		return num;
 #else
-		std::wstring_convert<std::codecvt_utf8<wchar_t>> cv;
-		auto result = cv.to_bytes(from).c_str();
-		int num = (size_t)cv.converted();
+		std::wstring ws(from);
+		std::string converted(ws.begin(), ws.end());
+		int num = (int)converted.size();
 		if (dest_size_in_characters >= 0)
 		{
 			num = std::min(num, dest_size_in_characters);
 		}
-		std::memcpy(to, result, num * sizeof(char));
+		std::memcpy(to, converted.c_str(), num * sizeof(char));
 		return num;
 #endif // _WIN32
 	}

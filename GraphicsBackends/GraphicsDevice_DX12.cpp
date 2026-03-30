@@ -118,6 +118,9 @@ namespace dx12_internal
 		if (has_flag(value, ResourceState::VIDEO_DECODE_DST))
 			ret |= D3D12_RESOURCE_STATE_VIDEO_DECODE_WRITE;
 
+		if (has_flag(value, ResourceState::SWAPCHAIN))
+			ret |= D3D12_RESOURCE_STATE_PRESENT;
+
 		return ret;
 	}
 	constexpr D3D12_FILTER _ConvertFilter(Filter value)
@@ -3138,6 +3141,7 @@ std::mutex queue_locker;
 			internal_state->textures[i].internal_state = state;
 			internal_state->textures[i].type = GPUResource::Type::TEXTURE;
 			internal_state->textures[i].desc = _ConvertTextureDesc_Inv(resourcedesc);
+			internal_state->textures[i].desc.layout = ResourceState::SWAPCHAIN;
 		}
 
 #else
@@ -3297,6 +3301,7 @@ std::mutex queue_locker;
 			internal_state->textures[i].internal_state = state;
 			internal_state->textures[i].type = GPUResource::Type::TEXTURE;
 			internal_state->textures[i].desc = _ConvertTextureDesc_Inv(resourcedesc);
+			internal_state->textures[i].desc.layout = ResourceState::SWAPCHAIN;
 		}
 #endif // PLATFORM_XBOX
 		return true;
@@ -5271,6 +5276,8 @@ std::mutex queue_locker;
 			}
 			else
 			{
+				if (subresource >= (int)internal_state->subresources_srv.size())
+					return -1;
 				return internal_state->subresources_srv[subresource].index;
 			}
 			break;
@@ -5281,6 +5288,8 @@ std::mutex queue_locker;
 			}
 			else
 			{
+				if (subresource >= (int)internal_state->subresources_uav.size())
+					return -1;
 				return internal_state->subresources_uav[subresource].index;
 			}
 			break;
@@ -5476,7 +5485,7 @@ std::mutex queue_locker;
 				}
 
 				CommandQueue& queue = queues[commandlist.queue];
-				const bool dependency = !commandlist.signals.empty() || !commandlist.waits.empty() || !commandlist.wait_queues.empty();
+				const bool dependency = !commandlist.signals.empty() || !commandlist.waits.empty();
 
 				if (dependency)
 				{
@@ -5489,30 +5498,6 @@ std::mutex queue_locker;
 
 				if (dependency)
 				{
-					for (auto& wait : commandlist.wait_queues)
-					{
-						CommandQueue& waitqueue = queues[wait.first];
-						const Semaphore& semaphore = wait.second;
-						
-						// If the queue doesn't exist, signal the semaphore immediately without waiting
-						if (waitqueue.queue == nullptr) {
-							vzlog_warning("waitqueue.queue is nullptr!");
-							free_semaphore(semaphore);
-							continue;
-						}
-
-						// The WaitQueue operation will submit and signal the specified dependency queue:
-						waitqueue.submit();
-						waitqueue.signal(semaphore); // signals immediately after submit
-
-						// The current queue will be waiting for the dependency queue to complete:
-						queue.wait(semaphore);
-
-						// recycle semaphore:
-						free_semaphore(semaphore);
-					}
-					commandlist.wait_queues.clear();
-
 					for(auto& semaphore : commandlist.waits)
 					{
 						// Wait for command list dependency:
@@ -6070,11 +6055,6 @@ std::mutex queue_locker;
 		Semaphore semaphore = new_semaphore();
 		commandlist.waits.push_back(semaphore);
 		commandlist_wait_for.signals.push_back(semaphore);
-	}
-	void GraphicsDevice_DX12::WaitQueue(CommandList cmd, QUEUE_TYPE wait_for)
-	{
-		CommandList_DX12& commandlist = GetCommandList(cmd);
-		commandlist.wait_queues.push_back(std::make_pair(wait_for, new_semaphore()));
 	}
 	void GraphicsDevice_DX12::RenderPassBegin(const SwapChain* swapchain, CommandList cmd)
 	{
@@ -7043,8 +7023,8 @@ std::mutex queue_locker;
 	void GraphicsDevice_DX12::CopyTexture(const Texture* dst, uint32_t dstX, uint32_t dstY, uint32_t dstZ, uint32_t dstMip, uint32_t dstSlice, const Texture* src, uint32_t srcMip, uint32_t srcSlice, CommandList cmd, const Box* srcbox, ImageAspect dst_aspect, ImageAspect src_aspect)
 	{
 		CommandList_DX12& commandlist = GetCommandList(cmd);
-		auto src_internal = to_internal((const GPUBuffer*)src);
-		auto dst_internal = to_internal((const GPUBuffer*)dst);
+		auto src_internal = to_internal(src);
+		auto dst_internal = to_internal(dst);
 		UINT srcPlane = src_aspect == ImageAspect::STENCIL ? 1 : 0;
 		UINT dstPlane = dst_aspect == ImageAspect::STENCIL ? 1 : 0;
 		CD3DX12_TEXTURE_COPY_LOCATION src_location(src_internal->resource.Get(), D3D12CalcSubresource(srcMip, srcSlice, srcPlane, src->desc.mip_levels, src->desc.array_size));
