@@ -56,10 +56,24 @@ inline float4 ConeTrace(in Texture3D<half4> voxels, in float3 P, in float3 N, in
 
 	const float coneCoefficient = 2 * tan(coneAperture * 0.5);
 
+	// P가 속한 clipmap의 full voxelSize로 startPos offset 결정.
+	// clipmap 0 기준 voxelSize0만 쓰면 상위 clipmap 픽셀에서 offset이 해당 복셀 크기의 절반밖에
+	// 안 되어 자기 복셀 안에서 cone이 시작(self-occlusion) → trace.a 과도 상승.
+	// dist/step_dist는 lod 계산 기준이므로 voxelSize0 유지 — startPos offset만 분리 조정.
+	float startVoxelSize = voxelSize0;
+	for (uint ci = 0; ci < VXGI_CLIPMAP_COUNT; ++ci)
+	{
+		if (is_saturated(GetFrame().vxgi.world_to_clipmap(P, GetFrame().vxgi.clipmaps[ci])))
+		{
+			startVoxelSize = GetFrame().vxgi.clipmaps[ci].voxelSize * 2;
+			break;
+		}
+	}
+
 	// We need to offset the cone start position to avoid sampling its own voxel (self-occlusion):
-	float dist = voxelSize0; // offset by cone dir so that first sample of all cones are not the same
+	float dist = voxelSize0;      // lod 기준은 항상 clipmap 0 voxelSize 유지
 	float step_dist = dist;
-	float3 startPos = P + N * voxelSize0;
+	float3 startPos = P + N * startVoxelSize;  // offset만 실제 clipmap 크기로 조정
 
 	float3 aniso_direction = -coneDirection;
 	float3 face_offsets = float3(

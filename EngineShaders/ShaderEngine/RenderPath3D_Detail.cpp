@@ -686,6 +686,25 @@ namespace vz::renderer
 
 		frameCB.scene = scene_Gdetails->shaderscene;
 
+		// Step 4: VXGI FrameCB 바인딩
+		if (renderer::isVXGIEnabled && scene_Gdetails->vxgi.texture_radiance.IsValid())
+		{
+			frameCB.vxgi.texture_radiance = device->GetDescriptorIndex(&scene_Gdetails->vxgi.texture_radiance, SubresourceType::SRV);
+			frameCB.vxgi.texture_sdf      = device->GetDescriptorIndex(&scene_Gdetails->vxgi.texture_sdf, SubresourceType::SRV);
+			frameCB.vxgi.resolution       = scene_Gdetails->vxgi.res;
+			frameCB.vxgi.resolution_rcp   = 1.0f / (float)scene_Gdetails->vxgi.res;
+			frameCB.vxgi.stepsize         = 1.0f;
+			frameCB.vxgi.max_distance     = scene_Gdetails->vxgi.maxDistance;
+			for (uint32_t i = 0; i < VXGI_CLIPMAP_COUNT; ++i)
+			{
+				frameCB.vxgi.clipmaps[i].center    = scene_Gdetails->vxgi.clipmaps[i].center;
+				frameCB.vxgi.clipmaps[i].voxelSize = scene_Gdetails->vxgi.clipmaps[i].voxelSize;
+			}
+			frameCB.options |= OPTION_BIT_VXGI_ENABLED;
+			if (renderer::isVXGIReflectionsEnabled)
+				frameCB.options |= OPTION_BIT_VXGI_REFLECTIONS_ENABLED;
+		}
+
 		frameCB.texture_random64x64_index = device->GetDescriptorIndex(texturehelper::getRandom64x64(), SubresourceType::SRV);
 		frameCB.texture_bluenoise_index = device->GetDescriptorIndex(texturehelper::getBlueNoise(), SubresourceType::SRV);
 		frameCB.texture_sheenlut_index = device->GetDescriptorIndex(&textures[TEXTYPE_2D_SHEENLUT], SubresourceType::SRV);

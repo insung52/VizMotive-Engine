@@ -338,9 +338,8 @@ inline void TiledLighting(inout Surface surface, inout Lighting lighting, uint f
 #endif // DISABLE_ENVMAPS
 
 #ifndef DISABLE_VOXELGI
-#ifdef TRANSPARENT // opaque tiled forward: voxel GI was rendered in separate pass
+	// opaque + transparent 모두 직접 cone tracing
 	VoxelGI(surface, lighting);
-#endif // TRANSPARENT
 #endif //DISABLE_VOXELGI
 
 #ifndef TRANSPARENT

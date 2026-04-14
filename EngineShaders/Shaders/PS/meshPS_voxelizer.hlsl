@@ -7,8 +7,6 @@
 
 // Note: the voxelizer uses an overall simplified material and lighting model (no normal maps, only diffuse light and emissive)
 
-Texture3D<float4> input_previous_radiance : register(t0);
-
 RWTexture3D<uint> output_atomic : register(u0);
 
 void VoxelAtomicAverage(inout RWTexture3D<uint> output, in uint3 dest, in float4 color)

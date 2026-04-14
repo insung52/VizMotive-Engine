@@ -300,6 +300,9 @@ namespace vz::renderer
 	extern bool isColorGradingEnabled;
 	extern bool isGaussianSplattingEnabled;
 	extern bool isDDGIEnabled;
+	extern bool isVXGIEnabled;
+	extern bool isVXGIReflectionsEnabled;
+	extern uint32_t VXGI_DEBUG_CLIPMAP; // 0~5: 특정 클립맵, 6(=VXGI_CLIPMAP_COUNT): 전체
 	extern bool isRaytracedShadowsEnabled;
 	extern bool isRTAOEnabled;
 	extern bool isRaytracedReflectionEnabled;

@@ -892,7 +892,12 @@ namespace vz
 		{
 			environment = &environmentDefault;
 		}
-		cameraMain = (GCameraComponent*)compfactory::GetCameraComponent(scene_->cameraMain);
+		{
+			GCameraComponent* cam = (GCameraComponent*)compfactory::GetCameraComponent(scene_->cameraMain);
+			if (cam != nullptr)
+				cameraMain = cam;
+			// scene_->cameraMain이 INVALID_ENTITY면 Renderer가 설정한 기존 값 유지
+		}
 
 		lightComponents = scene_->GetLightComponents();
 		probeComponents = scene_->GetProbeComponents();
@@ -1327,6 +1332,107 @@ namespace vz
 			ddgi = {};
 		}
 
+		// VXGI clipmap center update + resource creation
+		if (renderer::isVXGIEnabled && cameraMain != nullptr)
+		{
+			const uint32_t clip_idx = vxgi.clipmap_to_update;
+
+			const float baseVoxelSize = vxgi.baseVoxelSize;
+			const float voxelSize = baseVoxelSize * std::pow(2.0f, (float)clip_idx);
+			const float texelSize = voxelSize * 2.0f;
+
+			const XMFLOAT3& camEye = cameraMain->GetWorldEye();
+
+			XMFLOAT3 newCenter = {
+				std::floor(camEye.x / texelSize) * texelSize,
+				std::floor(camEye.y / texelSize) * texelSize,
+				std::floor(camEye.z / texelSize) * texelSize
+			};
+
+			XMFLOAT3& prevCenter = vxgi.clipmaps[clip_idx].center;
+			vxgi.clipmaps[clip_idx].offsetfromPrevFrame = {
+				(int)std::round((newCenter.x - prevCenter.x) / texelSize),
+				(int)std::round((prevCenter.y - newCenter.y) / texelSize),
+				(int)std::round((newCenter.z - prevCenter.z) / texelSize)
+			};
+
+			prevCenter = newCenter;
+			vxgi.clipmaps[clip_idx].voxelSize = voxelSize;
+
+			// Step 5: 처음 활성화될 때 GPU 텍스처 생성
+			if (!vxgi.texture_radiance.IsValid())
+			{
+				// D3D12 3D 텍스처 최대 크기는 2048.
+				// texture_radiance width = (6+DIFFUSE_CONE_COUNT)*res 이므로 제한 필요.
+				constexpr uint32_t D3D12_MAX_TEXTURE3D_DIM = 2048u;
+				const uint32_t maxResRadiance = D3D12_MAX_TEXTURE3D_DIM / (6u + (uint32_t)DIFFUSE_CONE_COUNT);
+				const uint32_t maxResAtomic   = D3D12_MAX_TEXTURE3D_DIM / (uint32_t)VOXELIZATION_CHANNEL_COUNT;
+				uint32_t res = vxgi.res;
+				res = std::min(res, maxResRadiance);
+				res = std::min(res, maxResAtomic);
+				// 2의 거듭제곱으로 내림
+				{
+					uint32_t p = 1;
+					while (p * 2 <= res) p <<= 1;
+					res = p;
+				}
+				if (res != vxgi.res)
+				{
+					vzlog("VXGI: res clamped from %u to %u (D3D12 texture3D limit)", vxgi.res, res);
+					vxgi.res = res;
+				}
+
+				TextureDesc desc;
+				desc.type = TextureDesc::Type::TEXTURE_3D;
+				desc.bind_flags = BindFlag::UNORDERED_ACCESS | BindFlag::SHADER_RESOURCE;
+				desc.layout = ResourceState::SHADER_RESOURCE_COMPUTE;
+
+				// texture_atomic: 6면×res, res, res×채널 수 — voxelization 원자 쓰기용
+				desc.width  = 6 * res;
+				desc.height = res;
+				desc.depth  = res * VOXELIZATION_CHANNEL_COUNT;
+				desc.format = Format::R32_UINT;
+				device->CreateTexture(&desc, nullptr, &vxgi.texture_atomic);
+				device->SetName(&vxgi.texture_atomic, "vxgi.texture_atomic");
+
+				// texture_radiance: (6 aniso + 16 cone)×res, 6 clipmap×res, res — temporal 결과
+				desc.width  = (6 + DIFFUSE_CONE_COUNT) * res;
+				desc.height = VXGI_CLIPMAP_COUNT * res;
+				desc.depth  = res;
+				desc.format = Format::R16G16B16A16_FLOAT;
+				device->CreateTexture(&desc, nullptr, &vxgi.texture_radiance);
+				device->SetName(&vxgi.texture_radiance, "vxgi.texture_radiance");
+
+				// texture_radiance_prev: 동일 레이아웃 — offsetprevCS가 이전 프레임을 시프트해서 여기에 씀
+				device->CreateTexture(&desc, nullptr, &vxgi.texture_radiance_prev);
+				device->SetName(&vxgi.texture_radiance_prev, "vxgi.texture_radiance_prev");
+
+				// texture_sdf: res, 6 clipmap×res, res — signed distance field
+				desc.width  = res;
+				desc.height = VXGI_CLIPMAP_COUNT * res;
+				desc.depth  = res;
+				desc.format = Format::R16_FLOAT;
+				device->CreateTexture(&desc, nullptr, &vxgi.texture_sdf);
+				device->SetName(&vxgi.texture_sdf, "vxgi.texture_sdf");
+
+				// texture_sdf_temp: jump flood 알고리즘 임시 버퍼
+				device->CreateTexture(&desc, nullptr, &vxgi.texture_sdf_temp);
+				device->SetName(&vxgi.texture_sdf_temp, "vxgi.texture_sdf_temp");
+			}
+		}
+		else if (vxgi.texture_radiance.IsValid()){
+			// VXGI 비활성화 시 GPU 리소스만 해제.
+			// 사용자 설정값(baseVoxelSize, res, maxDistance)은 보존하여
+			// 재활성화 시 동일한 파라미터로 복원되도록 함.
+			float savedBaseVoxelSize = vxgi.baseVoxelSize;
+			uint32_t savedRes = vxgi.res;
+			float savedMaxDistance = vxgi.maxDistance;
+			vxgi = {};
+			vxgi.baseVoxelSize = savedBaseVoxelSize;
+			vxgi.res           = savedRes;
+			vxgi.maxDistance   = savedMaxDistance;
+		}
+
 		// Shader scene resources:
 		shaderscene.Init();
 
@@ -1667,7 +1773,10 @@ namespace vz
 		}
 		return hash;
 	}
-	constexpr static size_t SCENE_OPTION_DDGI_GRID = FNV1aHash("DDGI_GRID");
+	constexpr static size_t SCENE_OPTION_DDGI_GRID             = FNV1aHash("DDGI_GRID");
+	constexpr static size_t SCENE_OPTION_VXGI_RESOLUTION       = FNV1aHash("VXGI_RESOLUTION");
+	constexpr static size_t SCENE_OPTION_VXGI_MAX_DISTANCE     = FNV1aHash("VXGI_MAX_DISTANCE");
+	constexpr static size_t SCENE_OPTION_VXGI_BASE_VOXEL_SIZE  = FNV1aHash("VXGI_BASE_VOXEL_SIZE");
 	bool GSceneDetails::SetOptionEnabled(const std::string& optionName, const bool enabled)
 	{
 		vzlog_error("Invalid RenderPath Option Name! (%s)", optionName.c_str());
@@ -1685,6 +1794,58 @@ namespace vz
 				ddgi.gridDimensions.x = (uint)values[0];
 				ddgi.gridDimensions.y = (uint)values[1];
 				ddgi.gridDimensions.z = (uint)values[2];
+				return true;
+			}
+			break;
+		case SCENE_OPTION_VXGI_RESOLUTION:
+			if (values.size() >= 1)
+			{
+				// 해상도 변경 시 GPU 텍스처 재생성 (기존 텍스처 초기화)
+				uint32_t newRes = std::max(8u, std::min(256u, (uint32_t)values[0]));
+				// 2의 거듭제곱으로 반올림
+				uint32_t p = 1;
+				while (p < newRes) p <<= 1;
+				newRes = p;
+				if (vxgi.res != newRes)
+				{
+					vxgi.res = newRes;
+					vxgi.texture_radiance      = {};  // 텍스처 무효화 → 다음 Update에서 재생성
+					vxgi.texture_radiance_prev = {};
+					vxgi.texture_atomic        = {};
+					vxgi.texture_sdf           = {};
+					vxgi.texture_sdf_temp      = {};
+				}
+				return true;
+			}
+			break;
+		case SCENE_OPTION_VXGI_MAX_DISTANCE:
+			if (values.size() >= 1)
+			{
+				vxgi.maxDistance = values[0];
+				return true;
+			}
+			break;
+		case SCENE_OPTION_VXGI_BASE_VOXEL_SIZE:
+			if (values.size() >= 1)
+			{
+				float newSize = std::max(0.001f, values[0]);
+				if (vxgi.baseVoxelSize != newSize)
+				{
+					vxgi.baseVoxelSize = newSize;
+					// voxelSize가 바뀌면 이전 voxelSize 기준의 stale 텍스처 데이터가
+					// 잘못된 world position에 매핑되어 ghost/shadow 아티팩트가 발생함.
+					// 텍스처를 무효화하여 다음 Update에서 재생성(D3D12 zero-init)하도록 강제.
+					vxgi.texture_radiance      = {};
+					vxgi.texture_radiance_prev = {};
+					vxgi.texture_atomic        = {};
+					vxgi.texture_sdf           = {};
+					vxgi.texture_sdf_temp      = {};
+					for (auto& cm : vxgi.clipmaps)
+					{
+						cm.center = {};
+						cm.offsetfromPrevFrame = {};
+					}
+				}
 				return true;
 			}
 			break;

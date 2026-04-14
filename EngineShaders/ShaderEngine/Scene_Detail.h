@@ -143,6 +143,32 @@ namespace vz::renderer
 			graphics::Texture depthTexture;
 		} ddgi;
 
+		// VXGI resources
+		struct VXGI
+		{
+			uint32_t res = 64; // the voxel grid will be res^3, must be power of 2
+			float maxDistance = 100.0f; // con tracing max distance
+			float baseVoxelSize = 0.125f; // clipmap 0의 voxel half-extent (m)
+
+			uint32_t clipmap_to_update = 0; // which clipmap level to update in this frame (0~5)
+
+			// GPU texture
+			graphics::Texture texture_atomic;
+			graphics::Texture texture_radiance;
+			graphics::Texture texture_radiance_prev; // offset-corrected previous frame (ping-pong)
+			graphics::Texture texture_sdf;
+			graphics::Texture texture_sdf_temp;
+
+			graphics::Texture texture_diffuse;
+			graphics::Texture texture_specular;
+
+			struct ClipMap {
+				XMFLOAT3 center = {};
+				float voxelSize = 0.125f;
+				int3 offsetfromPrevFrame = {};
+			} clipmaps[VXGI_CLIPMAP_COUNT];
+		} vxgi;
+
 		std::atomic<uint32_t> lightmapRequestAllocator{ 0 };
 		std::vector<uint32_t> lightmapRequests;
 

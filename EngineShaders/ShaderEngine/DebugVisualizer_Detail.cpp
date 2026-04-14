@@ -510,27 +510,30 @@ namespace vz::renderer
 			device->EventEnd(cmd);
 		}
 
-		//if (options.debugVXGI && scene.vxgi.radiance.IsValid())
-		//{
-		//	device->EventBegin("Debug Voxels", cmd);
-		//
-		//	device->BindPipelineState(&PSO_RenderableShapes[DEBUG_RENDERING_VOXEL], cmd);
-		//
-		//	MiscCB sb;
-		//	sb.g_xTransform = camera.GetViewProjection();
-		//	sb.g_xColor = float4((float)VXGI_DEBUG_CLIPMAP, 1, 1, 1);
-		//
-		//	device->BindDynamicConstantBuffer(sb, CB_GETBINDSLOT(MiscCB), cmd);
-		//
-		//	uint32_t vertexCount = scene.vxgi.res * scene.vxgi.res * scene.vxgi.res;
-		//	if (VXGI_DEBUG_CLIPMAP == VXGI_CLIPMAP_COUNT)
-		//	{
-		//		vertexCount *= VXGI_CLIPMAP_COUNT;
-		//	}
-		//	device->Draw(vertexCount, 0, cmd);
-		//
-		//	device->EventEnd(cmd);
-		//}
+		if (options.debugVXGI && scene_Gdetails->vxgi.texture_radiance.IsValid())
+		{
+			device->EventBegin("Debug Voxels", cmd);
+
+			device->BindPipelineState(&PSO_RenderableShapes[DEBUG_RENDERING_VOXEL], cmd);
+
+			MiscCB sb;
+			sb.g_xTransform = camera.GetViewProjection();
+			// g_xColor.x: 클립맵 인덱스 (VXGI_CLIPMAP_COUNT이면 전체)
+			sb.g_xColor = float4((float)renderer::VXGI_DEBUG_CLIPMAP, 1, 1, 1);
+
+			device->BindDynamicConstantBuffer(sb, CB_GETBINDSLOT(MiscCB), cmd);
+
+			uint32_t vertexCount = scene_Gdetails->vxgi.res
+				* scene_Gdetails->vxgi.res
+				* scene_Gdetails->vxgi.res;
+			if (renderer::VXGI_DEBUG_CLIPMAP == VXGI_CLIPMAP_COUNT)
+			{
+				vertexCount *= VXGI_CLIPMAP_COUNT;
+			}
+			device->Draw(vertexCount, 0, cmd);
+
+			device->EventEnd(cmd);
+		}
 
 		//if (options.debugRT_BVH)
 		//{

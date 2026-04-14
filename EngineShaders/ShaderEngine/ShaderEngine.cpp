@@ -47,6 +47,9 @@ namespace vz::renderer
 	bool isColorGradingEnabled = false;
 	bool isGaussianSplattingEnabled = true;
 	bool isDDGIEnabled = false;
+	bool isVXGIEnabled = false;
+	bool isVXGIReflectionsEnabled = false;
+	uint32_t VXGI_DEBUG_CLIPMAP = VXGI_CLIPMAP_COUNT; // 기본값: 전체 클립맵 표시
 	bool isRaytracedShadowsEnabled = false;
 	bool isRTAOEnabled = false;
 	bool isRaytracedReflectionEnabled = false;
@@ -295,6 +298,9 @@ namespace vz::renderer
 		}
 		else
 #endif // VOXELIZATION_CONSERVATIVE_RASTERIZATION_ENABLED
+		// forced_sample_count > 1 은 VRS(Variable Rate Shading)와 동시 사용 불가 (D3D12 #1231)
+		// conservative rasterization이 없을 때만, 그리고 VRS가 없을 때만 사용
+		if (!device->CheckCapability(GraphicsDeviceCapability::VARIABLE_RATE_SHADING))
 		{
 			rs.forced_sample_count = 8;
 		}
@@ -653,6 +659,14 @@ namespace vz
 
 		renderer::DDGI_RAYCOUNT = config::GetIntConfig("SHADER_ENGINE_SETTINGS", "DDGI_RAYCOUNT");
 		renderer::DDGI_BLEND_SPEED = config::GetFloatConfig("SHADER_ENGINE_SETTINGS", "DDGI_BLEND_SPEED");
+
+		renderer::isVXGIEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "VXGI_ENABLED");
+		renderer::isVXGIReflectionsEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "VXGI_REFLECTIONS_ENABLED");
+		{
+			int dbg = config::GetIntConfig("SHADER_ENGINE_SETTINGS", "VXGI_DEBUG_CLIPMAP");
+			renderer::VXGI_DEBUG_CLIPMAP = (dbg >= 0 && dbg <= (int)VXGI_CLIPMAP_COUNT)
+				? (uint32_t)dbg : VXGI_CLIPMAP_COUNT;
+		}
 
 		renderer::isDebugShapeEnabled = config::GetBoolConfig("DEBUG_SETTINGS", "DEBUG_SHAPE");
 		renderer::isDebugShapeCleanStart = config::GetBoolConfig("DEBUG_SETTINGS", "DEBUG_SHAPE_CLEAN_START");

@@ -753,6 +753,58 @@ int main(int, char**)
 					vzm::SetConfigure(config_options);
 				}
 
+				// ── VXGI ──────────────────────────────────────────
+				ImGui::Separator();
+				ImGui::Text("VXGI (Voxel Global Illumination)");
+
+				static bool vxgi_enabled = vz::config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "VXGI_ENABLED");
+				if (ImGui::Checkbox("VXGI", &vxgi_enabled))
+				{
+					vzm::ParamMap<std::string> config_options;
+					config_options.SetParam("VXGI_ENABLED", vxgi_enabled);
+					vzm::SetConfigure(config_options);
+				}
+
+				ImGui::BeginDisabled(!vxgi_enabled);
+
+				static bool vxgi_reflections_enabled = false;
+				if (ImGui::Checkbox("VXGI Reflections", &vxgi_reflections_enabled))
+				{
+					vzm::ParamMap<std::string> config_options;
+					config_options.SetParam("VXGI_REFLECTIONS_ENABLED", vxgi_reflections_enabled);
+					vzm::SetConfigure(config_options);
+				}
+
+				// 해상도: 8/16/32/64/128 중 선택
+				{
+					static const char* res_items[] = { "8", "16", "32", "64", "128" };
+					static const int   res_values[] = { 8, 16, 32, 64, 128 };
+					static int res_idx = 3; // 기본값 64
+					if (ImGui::Combo("VXGI Resolution", &res_idx, res_items, IM_ARRAYSIZE(res_items)))
+					{
+						scene->SetOptionValueArray("VXGI_RESOLUTION", { (float)res_values[res_idx] });
+					}
+				}
+
+				// 최대 추적 거리
+				{
+					static float vxgi_max_dist = 100.f;
+					if (ImGui::SliderFloat("Max Distance", &vxgi_max_dist, 1.f, 500.f, "%.1f m"))
+					{
+						scene->SetOptionValueArray("VXGI_MAX_DISTANCE", { vxgi_max_dist });
+					}
+					static float vxgi_base_voxel = 0.125f;
+					if (ImGui::SliderFloat("Base Voxel Size", &vxgi_base_voxel, 0.001f, 2.0f, "%.4f m"))
+					{
+						scene->SetOptionValueArray("VXGI_BASE_VOXEL_SIZE", { vxgi_base_voxel });
+					}
+					ImGui::TextDisabled("Clipmap 0 half-extent. Clip0=%.3fm, Clip5=%.2fm",
+						vxgi_base_voxel, vxgi_base_voxel * 32.f);
+				}
+
+				ImGui::EndDisabled();
+				// ──────────────────────────────────────────────────
+
 				ImGui::Separator();
 
 				ImGui::Text("Debug Options");
@@ -766,6 +818,33 @@ int main(int, char**)
 				if (ImGui::Checkbox("DEBUG_DDGI", &debug_ddgi_enabled))
 				{
 					renderer->SetRenderOptionEnabled("DEBUG_DDGI", debug_ddgi_enabled);
+				}
+
+				// VXGI 복셀 클립맵 시각화
+				static bool debug_vxgi_enabled = false;
+				if (ImGui::Checkbox("DEBUG_VXGI (Voxels)", &debug_vxgi_enabled))
+				{
+					renderer->SetRenderOptionEnabled("DEBUG_VXGI", debug_vxgi_enabled);
+				}
+				if (debug_vxgi_enabled)
+				{
+					// 클립맵 선택: 0~5 = 특정 레벨, 6 = 전체
+					static int vxgi_debug_clipmap = 6; // 전체
+					bool changed = false;
+					ImGui::SetNextItemWidth(180.f);
+					if (ImGui::SliderInt("Clipmap Level", &vxgi_debug_clipmap, 0, 6))
+					{
+						changed = true;
+					}
+					ImGui::SameLine();
+					ImGui::TextDisabled("(6=all)");
+
+					if (changed)
+					{
+						vzm::ParamMap<std::string> params;
+						params.SetParam("VXGI_DEBUG_CLIPMAP", (int)vxgi_debug_clipmap);
+						vzm::SetConfigure(params);
+					}
 				}
 
 				static int ddgi_grid[3] = { 32, 8, 32 };

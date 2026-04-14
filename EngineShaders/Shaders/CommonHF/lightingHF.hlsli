@@ -513,6 +513,7 @@ inline void VoxelGI(inout Surface surface, inout Lighting lighting)
 		// diffuse:
         half4 trace = (half4) ConeTraceDiffuse(voxels, surface.P, surface.N);
 		lighting.indirect.diffuse = mad(lighting.indirect.diffuse, 1 - trace.a, trace.rgb);
+		surface.SetGIApplied(true);
 
 		// specular:
 		[branch]

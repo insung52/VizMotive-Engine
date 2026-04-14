@@ -414,8 +414,7 @@ namespace vz::renderer
 
 		// Do we need to compute a light mask for this pass on the CPU?
 		const bool forward_lightmask_request =
-			renderPass == RENDERPASS_ENVMAPCAPTURE ||
-			renderPass == RENDERPASS_VOXELIZE;
+			renderPass == RENDERPASS_ENVMAPCAPTURE;
 
 		const bool shadow_rendering = renderPass == RENDERPASS_SHADOW;
 
@@ -1090,6 +1089,17 @@ namespace vz::renderer
 			device->SetName(&rtShadingRate, "rtShadingRate");
 		}
 
+		{ // rtVXGI_diffuse
+			TextureDesc desc;
+			desc.bind_flags = BindFlag::SHADER_RESOURCE | BindFlag::UNORDERED_ACCESS;
+			desc.format = Format::R16G16B16A16_FLOAT;
+			desc.width  = internalResolution.x;
+			desc.height = internalResolution.y;
+			desc.layout = ResourceState::SHADER_RESOURCE_COMPUTE;
+			device->CreateTexture(&desc, nullptr, &rtVXGI_diffuse);
+			device->SetName(&rtVXGI_diffuse, "rtVXGI_diffuse");
+		}
+
 		//----- Depth buffers: -----
 
 		{ // depthBufferMain, depthBuffer_Copy, depthBuffer_Copy1
@@ -1389,6 +1399,15 @@ namespace vz::renderer
 		// ----- main render process -----
 		auto range = profiler::BeginRangeCPU("Render");
 
+		// cameraMain을 UpdateProcess 전에 설정해야 VXGI 텍스처 생성 등이 정상 동작함
+		if (camera->GetComponentType() == ComponentType::CAMERA)
+		{
+			if (scene_Gdetails->cameraMain == nullptr)
+			{
+				scene_Gdetails->cameraMain = (GCameraComponent*)camera;
+			}
+		}
+
 		UpdateProcess(dt);
 		if (camera->GetComponentType() == ComponentType::SLICER)
 		{
@@ -1398,10 +1417,6 @@ namespace vz::renderer
 		{
 			vzlog_assert(camera->GetComponentType() == ComponentType::CAMERA, "RenderProcess requires CAMERA component!!");
 
-			if (scene_Gdetails->cameraMain == nullptr)
-			{
-				scene_Gdetails->cameraMain = (GCameraComponent*)camera;
-			}
 			if (scene_Gdetails->cameraMain == camera && dt != 0)
 			{
 				scene_Gdetails->isSceneEffectUpdateEnabled = true;
@@ -1496,7 +1511,7 @@ namespace vz::renderer
 
 			// IMPORTANT NOTE:
 			//	GI updates are progressive!
-			
+
 			if (scene_Gdetails->isAccelerationStructureUpdateRequested)
 			{
 				scene_Gdetails->UpdateRaytracingAccelerationStructures(cmd);
@@ -1513,7 +1528,20 @@ namespace vz::renderer
 
 			});
 
-		const uint32_t drawscene_regular_flags = 
+		// VXGI 업데이트 (voxelization + temporal CS + SDF)
+		// graphics 큐에서 실행해야 voxelization(DrawScene)이 가능하다
+		if (renderer::isVXGIEnabled && scene_Gdetails->vxgi.texture_radiance.IsValid())
+		{
+			cmd = device->BeginCommandList();
+			CommandList cmd_vxgi = cmd;
+			device->WaitCommandList(cmd_vxgi, cmd_prepareframe);
+			jobsystem::Execute(ctx, [this, cmd_vxgi](jobsystem::JobArgs args) {
+				BindCameraCB(*camera, cameraPrevious, cameraReflection, cmd_vxgi);
+				Update_VXGI(cmd_vxgi);
+			});
+		}
+
+		const uint32_t drawscene_regular_flags =
 			renderer::DRAWSCENE_OPAQUE |
 			renderer::DRAWSCENE_TESSELLATION |
 			renderer::DRAWSCENE_OCCLUSIONCULLING;
@@ -2019,6 +2047,34 @@ namespace vz::renderer
 			//	GPUBarrier barrier = GPUBarrier::Image(&rtShadow, rtShadow.desc.layout, ResourceState::SHADER_RESOURCE);
 			//	device->Barrier(&barrier, 1, cmd);
 			//}
+
+			// VXGI resolve diffuse: depth + normal → rtVXGI_diffuse
+			if (renderer::isVXGIEnabled
+				&& scene_Gdetails->vxgi.texture_radiance.IsValid()
+				&& shaders[CSTYPE_VXGI_RESOLVE_DIFFUSE].IsValid()
+				&& visibilityResources.texture_normals.IsValid()
+				&& rtVXGI_diffuse.IsValid())
+			{
+				device->EventBegin("VXGI_Resolve_Diffuse", cmd);
+				device->BindComputeShader(&shaders[CSTYPE_VXGI_RESOLVE_DIFFUSE], cmd);
+				BindCommonResources(cmd);
+
+				const GPUResource* srvs[] = {
+					&depthBuffer_Copy,                       // t0: depth
+					&visibilityResources.texture_normals,    // t1: normal
+				};
+				device->BindResources(srvs, 0, arraysize(srvs), cmd);
+
+				device->Barrier(GPUBarrier::Image(&rtVXGI_diffuse, rtVXGI_diffuse.desc.layout, ResourceState::UNORDERED_ACCESS), cmd);
+				device->BindUAV(&rtVXGI_diffuse, 0, cmd);
+
+				const uint32_t dispatchX = ((uint32_t)viewport.width  + 7) / 8;
+				const uint32_t dispatchY = ((uint32_t)viewport.height + 7) / 8;
+				device->Dispatch(dispatchX, dispatchY, 1, cmd);
+
+				device->Barrier(GPUBarrier::Image(&rtVXGI_diffuse, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE), cmd);
+				device->EventEnd(cmd);
+			}
 
 			if (options.visibilityShadingInCS)
 			{

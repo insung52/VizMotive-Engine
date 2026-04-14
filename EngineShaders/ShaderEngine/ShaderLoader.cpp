@@ -773,6 +773,13 @@ namespace vz::shader
 		jobsystem::Execute(ctx, [](jobsystem::JobArgs args) { LoadShader(ShaderStage::CS, shaders[CSTYPE_DDGI_UPDATE], "ddgi_updateCS.cso"); });
 		jobsystem::Execute(ctx, [](jobsystem::JobArgs args) { LoadShader(ShaderStage::CS, shaders[CSTYPE_DDGI_UPDATE_DEPTH], "ddgi_updateCS_depth.cso"); });
 
+		// VXGI compute shaders
+		jobsystem::Execute(ctx, [](jobsystem::JobArgs args) { LoadShader(ShaderStage::CS, shaders[CSTYPE_VXGI_OFFSETPREV],       "vxgi_offsetprevCS.cso"); });
+		jobsystem::Execute(ctx, [](jobsystem::JobArgs args) { LoadShader(ShaderStage::CS, shaders[CSTYPE_VXGI_TEMPORAL],         "vxgi_temporalCS.cso"); });
+		jobsystem::Execute(ctx, [](jobsystem::JobArgs args) { LoadShader(ShaderStage::CS, shaders[CSTYPE_VXGI_SDF_JUMPFLOOD],    "vxgi_sdf_jumpfloodCS.cso"); });
+		jobsystem::Execute(ctx, [](jobsystem::JobArgs args) { LoadShader(ShaderStage::CS, shaders[CSTYPE_VXGI_RESOLVE_DIFFUSE],  "vxgi_resolve_diffuseCS.cso"); });
+		jobsystem::Execute(ctx, [](jobsystem::JobArgs args) { LoadShader(ShaderStage::CS, shaders[CSTYPE_VXGI_RESOLVE_SPECULAR], "vxgi_resolve_specularCS.cso"); });
+
 		jobsystem::Wait(ctx);
 
 		// create graphics pipelines
@@ -873,6 +880,15 @@ namespace vz::shader
 				desc.rs = &rasterizers[RSTYPE_FRONT];
 				desc.bs = &blendStates[BSTYPE_OPAQUE];
 				desc.pt = PrimitiveTopology::TRIANGLELIST;
+				break;
+			case DEBUG_RENDERING_VOXEL:
+				desc.vs = &shaders[VSTYPE_VOXEL];
+				desc.gs = &shaders[GSTYPE_VOXEL];
+				desc.ps = &shaders[PSTYPE_VOXEL];
+				desc.dss = &depthStencils[DSSTYPE_DEFAULT];
+				desc.rs = &rasterizers[RSTYPE_DOUBLESIDED];
+				desc.bs = &blendStates[BSTYPE_OPAQUE];
+				desc.pt = PrimitiveTopology::POINTLIST;
 				break;
 			case DEBUG_RENDERING_GRID:
 				desc.vs = &shaders[VSTYPE_VERTEXCOLOR];

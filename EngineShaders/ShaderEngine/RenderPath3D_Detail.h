@@ -555,6 +555,8 @@ namespace vz::renderer
 
 		graphics::Texture rtOutlineSource; // linear depth but only the regions which have outline stencil
 
+		graphics::Texture rtVXGI_diffuse;  // VXGI resolve diffuse output (half4)
+
 		graphics::Texture distortion_overlay; // optional full screen distortion from an asset
 
 		graphics::Texture shadowMapAtlas;
@@ -618,6 +620,7 @@ namespace vz::renderer
 
 		// GI
 		void Update_DDGI(CommandList cmd);
+		void Update_VXGI(CommandList cmd);
 
 		void ComputeVolumetricCloudShadows(CommandList cmd, const Texture* envMapFirst, const Texture* envMapSecond);
 		void ComputeSkyAtmosphereTextures(CommandList cmd);
