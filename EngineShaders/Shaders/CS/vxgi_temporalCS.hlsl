@@ -74,10 +74,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 		}
 		else
 		{
-			// 이번 프레임에 geometry 없음.
-			// prev_radiance[oc]는 이미 올바른 world position 데이터 (또는 is_new_voxel이면 0).
-			// 그대로 보존하면 정적 씬에서 temporal 안정성 유지, ghost 없음.
-			radiance = input_prev_radiance[oc];
+			// 이번 프레임에 geometry 없음 → 즉시 0으로 초기화.
+			// prev를 보존하면 메시가 이동한 경로에 ghost 복셀이 영구 잔류함.
+			radiance = (half4)0;
 		}
 
 		output_radiance[oc] = radiance;
