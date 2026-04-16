@@ -822,29 +822,30 @@ int main(int, char**)
 
 				// VXGI 복셀 클립맵 시각화
 				static bool debug_vxgi_enabled = false;
+				static int vxgi_debug_clipmap = 6; // 전체
 				if (ImGui::Checkbox("DEBUG_VXGI (Voxels)", &debug_vxgi_enabled))
 				{
 					renderer->SetRenderOptionEnabled("DEBUG_VXGI", debug_vxgi_enabled);
+					// 활성화 시 현재 슬라이더 값을 즉시 전송 (초기값 동기화)
+					if (debug_vxgi_enabled)
+					{
+						vzm::ParamMap<std::string> params;
+						params.SetParam("VXGI_DEBUG_CLIPMAP", vxgi_debug_clipmap);
+						vzm::SetConfigure(params);
+					}
 				}
 				if (debug_vxgi_enabled)
 				{
 					// 클립맵 선택: 0~5 = 특정 레벨, 6 = 전체
-					static int vxgi_debug_clipmap = 6; // 전체
-					bool changed = false;
 					ImGui::SetNextItemWidth(180.f);
 					if (ImGui::SliderInt("Clipmap Level", &vxgi_debug_clipmap, 0, 6))
 					{
-						changed = true;
+						vzm::ParamMap<std::string> params;
+						params.SetParam("VXGI_DEBUG_CLIPMAP", vxgi_debug_clipmap);
+						vzm::SetConfigure(params);
 					}
 					ImGui::SameLine();
 					ImGui::TextDisabled("(6=all)");
-
-					if (changed)
-					{
-						vzm::ParamMap<std::string> params;
-						params.SetParam("VXGI_DEBUG_CLIPMAP", (int)vxgi_debug_clipmap);
-						vzm::SetConfigure(params);
-					}
 				}
 
 				static int ddgi_grid[3] = { 32, 8, 32 };

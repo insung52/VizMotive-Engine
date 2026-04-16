@@ -298,10 +298,9 @@ namespace vz::renderer
 		}
 		else
 #endif // VOXELIZATION_CONSERVATIVE_RASTERIZATION_ENABLED
-		// forced_sample_count > 1 은 VRS(Variable Rate Shading)와 동시 사용 불가 (D3D12 #1231)
-		// conservative rasterization이 없을 때만, 그리고 VRS가 없을 때만 사용
-		if (!device->CheckCapability(GraphicsDeviceCapability::VARIABLE_RATE_SHADING))
 		{
+			// voxelizer pass는 VRS를 바인딩하지 않으므로 VRS 지원 여부와 무관하게 적용 가능.
+			// forced_sample_count = 8로 삼각형당 샘플 수를 늘려 복셀 커버리지를 개선.
 			rs.forced_sample_count = 8;
 		}
 		rasterizers[RSTYPE_VOXELIZE] = rs;

@@ -6821,10 +6821,14 @@ std::mutex queue_locker;
 			D3D12_SHADING_RATE _rate = D3D12_SHADING_RATE_1X1;
 			WriteShadingRateValue(rate, &_rate);
 
+			// RATE_1X1: PASSTHROUGH → per-primitive/screen-space VRS가 override 못하도록 차단.
+			//   forced_sample_count > 1 PSO(voxelizer)에서 effective rate가 반드시 1x1이어야 함.
+			// non-1x1: COMBINER_MAX → per-primitive/screen-space VRS가 더 coarse하게 override 허용.
+			const bool is_1x1 = (rate == ShadingRate::RATE_1X1);
 			D3D12_SHADING_RATE_COMBINER combiners[] =
 			{
-				D3D12_SHADING_RATE_COMBINER_MAX,
-				D3D12_SHADING_RATE_COMBINER_MAX,
+				is_1x1 ? D3D12_SHADING_RATE_COMBINER_PASSTHROUGH : D3D12_SHADING_RATE_COMBINER_MAX,
+				is_1x1 ? D3D12_SHADING_RATE_COMBINER_PASSTHROUGH : D3D12_SHADING_RATE_COMBINER_MAX,
 			};
 			commandlist.GetGraphicsCommandListLatest()->RSSetShadingRate(_rate, combiners);
 		}
