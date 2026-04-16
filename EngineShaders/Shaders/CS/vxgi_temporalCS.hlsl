@@ -35,6 +35,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
 	// input_prev_radiance는 offsetprevCS가 이미 그리드 시프트를 반영해 썼음.
 	// [oc] 좌표로 그냥 읽으면 world-position 정렬된 이전 프레임 데이터 (또는 새 복셀이면 0).
 
+	// 카메라 이동으로 그리드가 스크롤됐을 때, 이번 프레임에 새로 들어온 복셀인지 판별.
+	// 새 복셀(is_new_voxel=true)은 이전 프레임 데이터가 없으므로 temporal blend 스킵 →
+	// newVal을 즉시 사용해 검정에서 서서히 밝아지는 현상(pop-in) 방지.
+	int3 prev_dtid = (int3)DTid + push.offsetfromPrevFrame;
+	bool is_new_voxel = any(prev_dtid < 0) || any(prev_dtid >= (int)res);
+
 	// 6개 anisotropic face radiance를 로컬 배열에 보관 → cone 계산 시 텍스처 읽기 불필요
 	half4 aniso_colors[6];
 
@@ -67,10 +73,17 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 			float4 newVal = float4(basecolor * directlight + emissive, alpha);
 
-			// input_prev_radiance[oc]는 offsetprevCS가 이미 시프트해 두었음.
-			// is_new_voxel이라도 prev_radiance[oc]=0이므로 lerp 결과는 newVal에 가까워짐.
-			float4 prev = (float4)input_prev_radiance[oc];
-			radiance = (half4)lerp(prev, newVal, BLEND_SPEED);
+			if (is_new_voxel)
+			{
+				// 새로 진입한 복셀: 이전 프레임 데이터 없음 → 즉시 newVal 사용 (pop-in 방지)
+				radiance = (half4)newVal;
+			}
+			else
+			{
+				// 기존 복셀: temporal blend로 안정화
+				float4 prev = (float4)input_prev_radiance[oc];
+				radiance = (half4)lerp(prev, newVal, BLEND_SPEED);
+			}
 		}
 		else
 		{
