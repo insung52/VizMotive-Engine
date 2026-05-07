@@ -805,6 +805,34 @@ int main(int, char**)
 				ImGui::EndDisabled();
 				// ──────────────────────────────────────────────────
 
+				// ── SurfelGI ──────────────────────────────────────
+				ImGui::Separator();
+				ImGui::Text("SurfelGI (Surface Element Global Illumination)");
+
+				static bool surfelgi_enabled = vz::config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_ENABLED");
+				if (ImGui::Checkbox("SurfelGI", &surfelgi_enabled))
+				{
+					vzm::ParamMap<std::string> config_options;
+					config_options.SetParam("SURFELGI_ENABLED", surfelgi_enabled);
+					vzm::SetConfigure(config_options);
+				}
+
+				ImGui::BeginDisabled(!surfelgi_enabled);
+
+				static int surfelgi_debug_mode = vz::config::GetIntConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_DEBUG_MODE");
+				const char* surfel_debug_items[] = {
+					"None", "Normal", "Color", "Point", "Random", "Heatmap", "Inconsistency"
+				};
+				if (ImGui::Combo("SurfelGI Debug", &surfelgi_debug_mode, surfel_debug_items, IM_ARRAYSIZE(surfel_debug_items)))
+				{
+					vzm::ParamMap<std::string> params;
+					params.SetParam("SURFELGI_DEBUG_MODE", surfelgi_debug_mode);
+					vzm::SetConfigure(params);
+				}
+
+				ImGui::EndDisabled();
+				// ──────────────────────────────────────────────────
+
 				ImGui::Separator();
 
 				ImGui::Text("Debug Options");

@@ -664,6 +664,11 @@ namespace vz
 		renderer::isShadowsEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "SHADOW_ENABLED");
 		renderer::isDDGIEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "DDGI_ENABLED");
 		renderer::isSurfelGIEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_ENABLED");
+		{
+			int dbg = config::GetIntConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_DEBUG_MODE");
+			renderer::SetSurfelGIDebugMode((dbg >= 0 && dbg <= (int)SURFEL_DEBUG_INCONSISTENCY)
+				? (SURFEL_DEBUG)dbg : SURFEL_DEBUG_NONE);
+		}
 
 		renderer::DDGI_RAYCOUNT = config::GetIntConfig("SHADER_ENGINE_SETTINGS", "DDGI_RAYCOUNT");
 		renderer::DDGI_BLEND_SPEED = config::GetFloatConfig("SHADER_ENGINE_SETTINGS", "DDGI_BLEND_SPEED");

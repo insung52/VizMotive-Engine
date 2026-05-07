@@ -1543,6 +1543,10 @@ namespace vz::renderer
 			// ComputeSkyAtmosphere
 			// SurfelGI
 			// DDGI
+			if (renderer::isSurfelGIEnabled)
+			{
+				Update_SurfelGI(cmd);
+			}
 			if (renderer::isDDGIEnabled)
 			{
 				Update_DDGI(cmd);
@@ -2069,6 +2073,16 @@ namespace vz::renderer
 			//	GPUBarrier barrier = GPUBarrier::Image(&rtShadow, rtShadow.desc.layout, ResourceState::SHADER_RESOURCE);
 			//	device->Barrier(&barrier, 1, cmd);
 			//}
+
+			// SurfelGI screen-space coverage pass (writes result_halfres → result, also spawns surfels & writes debugUAV).
+			// Runs after rtLinearDepth is in SHADER_RESOURCE state and primitiveID textures are available.
+			if (renderer::isSurfelGIEnabled
+				&& scene_Gdetails->surfelgi.surfelBuffer.IsValid()
+				&& surfelGIResources.result.IsValid()
+				&& shaders[CSTYPE_SURFEL_COVERAGE].IsValid())
+			{
+				SurfelGI_Coverage(surfelGIResources, rtLinearDepth, debugUAV, cmd);
+			}
 
 			// VXGI resolve diffuse: depth + normal → rtVXGI_diffuse
 			if (renderer::isVXGIEnabled

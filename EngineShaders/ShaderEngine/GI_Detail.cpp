@@ -409,4 +409,266 @@ namespace vz::renderer
 		profiler::EndRange(prof_range);
 		device->EventEnd(cmd);
 	}
+
+	// SurfelGI: per-frame update of all surfel state (Wicked Engine 9.2 wiRenderer.cpp:12037 SurfelGI port).
+	// Runs Grid Reset → Update → Grid Offsets → Binning → Raytrace → Integrate.
+	// Uses indirect args computed by SurfelGI_Coverage's IndirectPrepare from the previous frame.
+	void GRenderPath3DDetails::Update_SurfelGI(CommandList cmd)
+	{
+		GSceneDetails::SurfelGI& sgi = scene_Gdetails->surfelgi;
+		if (!sgi.surfelBuffer.IsValid())
+			return;
+		if (!scene_Gdetails->TLAS.IsValid() && !scene_Gdetails->sceneBVH.IsValid())
+			return;
+
+		auto prof_range = profiler::BeginRangeGPU("SurfelGI", &cmd);
+		device->EventBegin("SurfelGI", cmd);
+
+		// Initial clear (once per resource lifetime):
+		if (!sgi.cleared)
+		{
+			sgi.cleared = true;
+			device->Barrier(GPUBarrier::Image(&sgi.momentsTexture, sgi.momentsTexture.desc.layout, ResourceState::UNORDERED_ACCESS), cmd);
+			device->ClearUAV(&sgi.momentsTexture, 0, cmd);
+			device->ClearUAV(&sgi.varianceBuffer, 0, cmd);
+			device->Barrier(GPUBarrier::Image(&sgi.momentsTexture, ResourceState::UNORDERED_ACCESS, sgi.momentsTexture.desc.layout), cmd);
+			device->Barrier(GPUBarrier::Memory(&sgi.varianceBuffer), cmd);
+		}
+
+		// Grid reset:
+		{
+			device->EventBegin("Grid Reset", cmd);
+			device->Barrier(GPUBarrier::Buffer(&sgi.gridBuffer, ResourceState::SHADER_RESOURCE_COMPUTE, ResourceState::UNORDERED_ACCESS), cmd);
+			device->ClearUAV(&sgi.gridBuffer, 0, cmd);
+			device->Barrier(GPUBarrier::Memory(&sgi.gridBuffer), cmd);
+			device->EventEnd(cmd);
+		}
+
+		// Update:
+		{
+			device->EventBegin("Update", cmd);
+			device->BindComputeShader(&shaders[CSTYPE_SURFEL_UPDATE], cmd);
+
+			device->BindResource(&sgi.aliveBuffer[0], 1, cmd);
+
+			const GPUResource* uavs[] = {
+				&sgi.surfelBuffer,
+				&sgi.gridBuffer,
+				&sgi.aliveBuffer[1],
+				&sgi.deadBuffer,
+				&sgi.statsBuffer,
+				&sgi.rayBuffer,
+				&sgi.dataBuffer,
+			};
+			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+			device->DispatchIndirect(&sgi.indirectBuffer, offsetof(SurfelIndirectArgs, iterate), cmd);
+
+			GPUBarrier barriers[] = {
+				GPUBarrier::Buffer(&sgi.surfelBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE),
+				GPUBarrier::Buffer(&sgi.dataBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE),
+			};
+			device->Barrier(barriers, arraysize(barriers), cmd);
+
+			device->EventEnd(cmd);
+		}
+
+		// Grid offsets (prefix sum of cell counts):
+		{
+			device->EventBegin("Grid Offsets", cmd);
+			device->BindComputeShader(&shaders[CSTYPE_SURFEL_GRIDOFFSETS], cmd);
+
+			const GPUResource* uavs[] = {
+				&sgi.gridBuffer,
+				&sgi.cellBuffer,
+				&sgi.statsBuffer,
+			};
+			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+			device->Barrier(GPUBarrier::Buffer(&sgi.cellBuffer, ResourceState::SHADER_RESOURCE_COMPUTE, ResourceState::UNORDERED_ACCESS), cmd);
+
+			device->Dispatch((SURFEL_TABLE_SIZE + 63) / 64, 1, 1, cmd);
+
+			device->Barrier(GPUBarrier::Buffer(&sgi.statsBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE), cmd);
+			device->EventEnd(cmd);
+		}
+
+		// Binning (write surfel indices into cellBuffer at the offsets computed above):
+		{
+			device->EventBegin("Binning", cmd);
+			device->BindComputeShader(&shaders[CSTYPE_SURFEL_BINNING], cmd);
+
+			device->BindResource(&sgi.surfelBuffer, 0, cmd);
+			device->BindResource(&sgi.aliveBuffer[0], 1, cmd);
+			device->BindResource(&sgi.statsBuffer, 2, cmd);
+
+			const GPUResource* uavs[] = {
+				&sgi.gridBuffer,
+				&sgi.cellBuffer,
+			};
+			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+			device->DispatchIndirect(&sgi.indirectBuffer, offsetof(SurfelIndirectArgs, iterate), cmd);
+
+			GPUBarrier barriers[] = {
+				GPUBarrier::Buffer(&sgi.gridBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE),
+				GPUBarrier::Buffer(&sgi.cellBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE),
+			};
+			device->Barrier(barriers, arraysize(barriers), cmd);
+			device->EventEnd(cmd);
+		}
+
+		// Raytrace (TLAS or SW BVH; shoots N rays per surfel, results to rayBuffer):
+		{
+			device->EventBegin("Raytrace", cmd);
+			device->BindComputeShader(&shaders[CSTYPE_SURFEL_RAYTRACE], cmd);
+
+			PushConstantsSurfelRaytrace push;
+			push.instanceInclusionMask = 0xFF;
+			device->PushConstants(&push, sizeof(push), cmd);
+
+			device->BindResource(&sgi.surfelBuffer, 0, cmd);
+			device->BindResource(&sgi.statsBuffer, 1, cmd);
+			device->BindResource(&sgi.gridBuffer, 2, cmd);
+			device->BindResource(&sgi.cellBuffer, 3, cmd);
+			device->BindResource(&sgi.aliveBuffer[0], 4, cmd);
+			device->BindResource(&sgi.momentsTexture, 5, cmd);
+
+			const GPUResource* uavs[] = { &sgi.rayBuffer };
+			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+			device->DispatchIndirect(&sgi.indirectBuffer, offsetof(SurfelIndirectArgs, raytrace), cmd);
+
+			device->Barrier(GPUBarrier::Buffer(&sgi.rayBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE), cmd);
+			device->EventEnd(cmd);
+		}
+
+		// Integrate (accumulate ray results into SH radiance + depth moments):
+		{
+			device->EventBegin("Integrate", cmd);
+			device->BindComputeShader(&shaders[CSTYPE_SURFEL_INTEGRATE], cmd);
+
+			device->BindResource(&sgi.statsBuffer, 0, cmd);
+			device->BindResource(&sgi.gridBuffer, 1, cmd);
+			device->BindResource(&sgi.cellBuffer, 2, cmd);
+			device->BindResource(&sgi.aliveBuffer[0], 3, cmd);
+			device->BindResource(&sgi.rayBuffer, 4, cmd);
+
+			const GPUResource* uavs[] = {
+				&sgi.dataBuffer,
+				&sgi.varianceBuffer,
+				&sgi.momentsTexture,
+				&sgi.surfelBuffer,
+			};
+			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+			GPUBarrier pre_barriers[] = {
+				GPUBarrier::Buffer(&sgi.dataBuffer, ResourceState::SHADER_RESOURCE_COMPUTE, ResourceState::UNORDERED_ACCESS),
+				GPUBarrier::Buffer(&sgi.surfelBuffer, ResourceState::SHADER_RESOURCE_COMPUTE, ResourceState::UNORDERED_ACCESS),
+				GPUBarrier::Image(&sgi.momentsTexture, sgi.momentsTexture.desc.layout, ResourceState::UNORDERED_ACCESS),
+			};
+			device->Barrier(pre_barriers, arraysize(pre_barriers), cmd);
+
+			device->DispatchIndirect(&sgi.indirectBuffer, offsetof(SurfelIndirectArgs, integrate), cmd);
+
+			GPUBarrier post_barriers[] = {
+				GPUBarrier::Buffer(&sgi.dataBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE),
+				GPUBarrier::Buffer(&sgi.surfelBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE),
+				GPUBarrier::Image(&sgi.momentsTexture, ResourceState::UNORDERED_ACCESS, sgi.momentsTexture.desc.layout),
+			};
+			device->Barrier(post_barriers, arraysize(post_barriers), cmd);
+			device->EventEnd(cmd);
+		}
+
+		profiler::EndRange(prof_range);
+		device->EventEnd(cmd);
+	}
+
+	// SurfelGI screen-space coverage pass + half→full bilateral upsample.
+	// Runs after the prepass once linearDepth is available, before main lighting.
+	// Coverage CS: reads G-buffer, samples surrounding surfels, writes GI to result_halfres,
+	//              spawns new surfels into dead list pop / alive push, optionally writes debugUAV.
+	// IndirectPrepare CS: rolls stats forward and computes next frame's dispatch args.
+	// Postprocess_Upsample_Bilateral: result_halfres -> result.
+	void GRenderPath3DDetails::SurfelGI_Coverage(const SurfelGIResources& res, const Texture& linearDepth, const Texture& debugUAV, CommandList cmd)
+	{
+		GSceneDetails::SurfelGI& sgi = scene_Gdetails->surfelgi;
+		if (!sgi.surfelBuffer.IsValid())
+			return;
+
+		auto prof_range = profiler::BeginRangeGPU("SurfelGI - Coverage", &cmd);
+		device->EventBegin("SurfelGI - Coverage", cmd);
+
+		{
+			GPUBarrier barriers[] = {
+				GPUBarrier::Buffer(&sgi.statsBuffer, ResourceState::SHADER_RESOURCE_COMPUTE, ResourceState::UNORDERED_ACCESS),
+				GPUBarrier::Image(&res.result_halfres, res.result_halfres.desc.layout, ResourceState::UNORDERED_ACCESS),
+				GPUBarrier::Image(&res.result, res.result.desc.layout, ResourceState::UNORDERED_ACCESS),
+			};
+			device->Barrier(barriers, arraysize(barriers), cmd);
+		}
+		device->ClearUAV(&res.result_halfres, 0, cmd);
+		device->ClearUAV(&res.result, 0, cmd);
+		device->Barrier(GPUBarrier::Memory(), cmd);
+
+		// Coverage:
+		{
+			device->EventBegin("Coverage", cmd);
+			device->BindComputeShader(&shaders[CSTYPE_SURFEL_COVERAGE], cmd);
+
+			SurfelDebugPushConstants push;
+			push.debug = renderer::GetSurfelGIDebugMode();
+			device->PushConstants(&push, sizeof(push), cmd);
+
+			device->BindResource(&sgi.surfelBuffer, 0, cmd);
+			device->BindResource(&sgi.gridBuffer, 1, cmd);
+			device->BindResource(&sgi.cellBuffer, 2, cmd);
+			device->BindResource(&sgi.momentsTexture, 3, cmd);
+
+			const GPUResource* uavs[] = {
+				&sgi.dataBuffer,
+				&sgi.deadBuffer,
+				&sgi.aliveBuffer[1],
+				&sgi.statsBuffer,
+				&res.result_halfres,
+				&debugUAV,
+			};
+			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+			device->Dispatch(
+				(res.result_halfres.desc.width + 15) / 16,
+				(res.result_halfres.desc.height + 15) / 16,
+				1, cmd);
+
+			GPUBarrier barriers[] = {
+				GPUBarrier::Image(&res.result_halfres, ResourceState::UNORDERED_ACCESS, res.result_halfres.desc.layout),
+				GPUBarrier::Image(&res.result, ResourceState::UNORDERED_ACCESS, res.result.desc.layout),
+			};
+			device->Barrier(barriers, arraysize(barriers), cmd);
+			device->EventEnd(cmd);
+		}
+
+		// IndirectPrepare for next frame:
+		{
+			device->EventBegin("Indirect args", cmd);
+			const GPUResource* uavs[] = {
+				&sgi.statsBuffer,
+				&sgi.indirectBuffer,
+			};
+			device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+			device->BindComputeShader(&shaders[CSTYPE_SURFEL_INDIRECTPREPARE], cmd);
+			device->Dispatch(1, 1, 1, cmd);
+			device->EventEnd(cmd);
+		}
+
+		// statsBuffer back to SR for next frame's reads (Update/Binning/Raytrace etc.):
+		device->Barrier(GPUBarrier::Buffer(&sgi.statsBuffer, ResourceState::UNORDERED_ACCESS, ResourceState::SHADER_RESOURCE_COMPUTE), cmd);
+
+		// Half-resolution → full-resolution bilateral upsample using lineardepth:
+		Postprocess_Upsample_Bilateral(res.result_halfres, linearDepth, res.result, cmd, false, 2.0f);
+
+		profiler::EndRange(prof_range);
+		device->EventEnd(cmd);
+	}
 }
