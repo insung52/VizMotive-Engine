@@ -44,6 +44,14 @@ namespace vz::renderer
 	bool isShadowLODOverride = true;
 	bool isVariableRateShadingClassification = false;
 	bool isSurfelGIDebugEnabled = false;
+	bool isSurfelGIEnabled = false;
+	static SURFEL_DEBUG g_surfelGIDebugMode = SURFEL_DEBUG_NONE;
+	SURFEL_DEBUG GetSurfelGIDebugMode() { return g_surfelGIDebugMode; }
+	void SetSurfelGIDebugMode(SURFEL_DEBUG value)
+	{
+		g_surfelGIDebugMode = value;
+		isSurfelGIDebugEnabled = (value != SURFEL_DEBUG_NONE);
+	}
 	bool isColorGradingEnabled = false;
 	bool isGaussianSplattingEnabled = true;
 	bool isDDGIEnabled = false;
@@ -655,6 +663,7 @@ namespace vz
 		renderer::isTonemapping = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "TONEMAPPING");
 		renderer::isShadowsEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "SHADOW_ENABLED");
 		renderer::isDDGIEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "DDGI_ENABLED");
+		renderer::isSurfelGIEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_ENABLED");
 
 		renderer::DDGI_RAYCOUNT = config::GetIntConfig("SHADER_ENGINE_SETTINGS", "DDGI_RAYCOUNT");
 		renderer::DDGI_BLEND_SPEED = config::GetFloatConfig("SHADER_ENGINE_SETTINGS", "DDGI_BLEND_SPEED");

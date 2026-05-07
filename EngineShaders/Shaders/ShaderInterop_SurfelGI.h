@@ -1,6 +1,7 @@
 #ifndef SHADERINTEROP_SURFEL_GI_H
 #define SHADERINTEROP_SURFEL_GI_H
 #include "ShaderInterop.h"
+#include "ShaderInterop_Renderer.h" // SH::L1_RGB
 
 static const uint SURFEL_CAPACITY = 100000;
 static const uint SQRT_SURFEL_CAPACITY = (uint)ceil(sqrt((float)SURFEL_CAPACITY));
@@ -11,17 +12,6 @@ static const uint SURFEL_TABLE_SIZE = SURFEL_GRID_DIMENSIONS.x * SURFEL_GRID_DIM
 static const float SURFEL_MAX_RADIUS = 2;
 static const float SURFEL_RECYCLE_DISTANCE = 0; // if surfel is behind camera and farther than this distance, it starts preparing for recycling
 static const uint SURFEL_RECYCLE_TIME = 60; // if surfel is preparing for recycling, this is how many frames it takes to recycle it.
-static const uint SURFEL_STATS_OFFSET_COUNT = 0;
-static const uint SURFEL_STATS_OFFSET_NEXTCOUNT = SURFEL_STATS_OFFSET_COUNT + 4;
-static const uint SURFEL_STATS_OFFSET_DEADCOUNT = SURFEL_STATS_OFFSET_NEXTCOUNT + 4;
-static const uint SURFEL_STATS_OFFSET_CELLALLOCATOR = SURFEL_STATS_OFFSET_DEADCOUNT + 4;
-static const uint SURFEL_STATS_OFFSET_RAYCOUNT = SURFEL_STATS_OFFSET_CELLALLOCATOR + 4;
-static const uint SURFEL_STATS_OFFSET_SHORTAGE = SURFEL_STATS_OFFSET_RAYCOUNT + 4;
-static const uint SURFEL_STATS_SIZE = SURFEL_STATS_OFFSET_SHORTAGE + 4;
-static const uint SURFEL_INDIRECT_OFFSET_ITERATE = 0;
-static const uint SURFEL_INDIRECT_OFFSET_RAYTRACE = vz::graphics::AlignTo(SURFEL_INDIRECT_OFFSET_ITERATE + 4 * 3, IndirectDispatchArgsAlignment);
-static const uint SURFEL_INDIRECT_OFFSET_INTEGRATE = vz::graphics::AlignTo(SURFEL_INDIRECT_OFFSET_RAYTRACE + 4 * 3, IndirectDispatchArgsAlignment);
-static const uint SURFEL_INDIRECT_SIZE = SURFEL_INDIRECT_OFFSET_INTEGRATE + 4 * 3;
 static const uint SURFEL_INDIRECT_NUMTHREADS = 32;
 static const float SURFEL_TARGET_COVERAGE = 0.8f; // how many surfels should affect a pixel fully, higher values will increase quality and cost
 static const uint SURFEL_CELL_LIMIT = ~0; // limit the amount of allocated surfels in a cell
@@ -31,6 +21,23 @@ static const uint SURFEL_RAY_BOOST_MAX = 64; // max amount of rays per surfel
 #define SURFEL_USE_HASHING // if defined, hashing will be used to retrieve surfels, hashing is good because it supports infinite world trivially, but slower due to hash collisions
 #define SURFEL_ENABLE_INFINITE_BOUNCES // if defined, previous frame's surfel data will be sampled at ray tracing hit points
 
+struct SurfelStats
+{
+	uint count;
+	uint nextCount;
+	int deadCount;
+	uint cellAllocator;
+	uint rayCount;
+	int shortage;
+};
+
+struct SurfelIndirectArgs
+{
+	IndirectDispatchArgs iterate;
+	IndirectDispatchArgs raytrace;
+	IndirectDispatchArgs integrate;
+};
+
 #ifdef __cplusplus
 static_assert(SURFEL_RECYCLE_TIME < 256, "Must be < 256 because it is packed at 8 bits!");
 static_assert(SURFEL_RAY_BOOST_MAX < 256, "Must be < 256 because it is packed at 8 bits!");
@@ -38,25 +45,29 @@ static_assert(SURFEL_RAY_BOOST_MAX < 256, "Must be < 256 because it is packed at
 
 // This per-surfel surfel structure will be accessed rapidly on GI lookup, so keep it as small as possible
 //	But also ensure that it is 16-byte aligned for structured buffer access performance
-struct Surfel
+struct alignas(16) Surfel
 {
+	SH::L1_RGB::Packed radiance;
+	uint2 normal;
 	float3 position;
-	uint normal; // top 8 bits free
+	uint padding1;
 
+#ifndef __cplusplus
 	inline float GetRadius() { return SURFEL_MAX_RADIUS; }
+#endif // __cplusplus
 };
 // This per-surfel structure will store all additional persistent data per surfel that isn't needed at GI lookup
 struct SurfelData
 {
+	uint64_t uid;
 	uint2 primitiveID;
-	uint bary;
-	uint uid;
 
+	uint bary;
 	uint raydata; // 24bit rayOffset, 8bit rayCount
 	uint properties; // 8bit life frames, 8bit recycle frames, 1bit backface normal
 	float max_inconsistency;
-	int padding1;
 
+#ifndef __cplusplus
 	inline uint GetRayOffset() { return raydata & 0xFFFFFF; }
 	inline uint GetRayCount() { return (raydata >> 24u) & 0xFF; }
 
@@ -67,6 +78,7 @@ struct SurfelData
 	void SetLife(uint value) { properties |= value & 0xFF; }
 	void SetRecycle(uint value) { properties |= (value & 0xFF) << 8u; }
 	void SetBackfaceNormal(bool value) { if (value) properties |= 1u << 9u; else properties &= ~(1u << 9u); }
+#endif // __cplusplus
 };
 struct SurfelVarianceData
 {
@@ -177,7 +189,7 @@ float3 surfel_griduv(float3 position)
 inline uint surfel_cellindex(int3 cell)
 {
 #ifdef SURFEL_USE_HASHING
-	const uint p1 = 73856093;   // some large primes 
+	const uint p1 = 73856093;   // some large primes
 	const uint p2 = 19349663;
 	const uint p3 = 83492791;
 	int n = p1 * cell.x ^ p2 * cell.y ^ p3 * cell.z;

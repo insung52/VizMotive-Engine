@@ -1180,9 +1180,31 @@ namespace vz::renderer
 		{
 			CreateGaussianResources(gaussianSplattingResources, internalResolution);
 		}
+		if (renderer::isSurfelGIEnabled)
+		{
+			CreateSurfelGIResources(surfelGIResources, internalResolution);
+		}
 		//CreateScreenSpaceShadowResources(screenspaceshadowResources, internalResolution);
 
 		return true;
+	}
+
+	void GRenderPath3DDetails::CreateSurfelGIResources(SurfelGIResources& res, XMUINT2 resolution)
+	{
+		TextureDesc desc;
+		desc.format = Format::R11G11B10_FLOAT;
+		desc.bind_flags = BindFlag::SHADER_RESOURCE | BindFlag::UNORDERED_ACCESS;
+		desc.layout = ResourceState::SHADER_RESOURCE_COMPUTE;
+
+		desc.width = (resolution.x + 1) / 2;
+		desc.height = (resolution.y + 1) / 2;
+		device->CreateTexture(&desc, nullptr, &res.result_halfres);
+		device->SetName(&res.result_halfres, "surfelGI.result_halfres");
+
+		desc.width = resolution.x;
+		desc.height = resolution.y;
+		device->CreateTexture(&desc, nullptr, &res.result);
+		device->SetName(&res.result, "surfelGI.result");
 	}
 
 	bool GRenderPath3DDetails::ResizeCanvasSlicer(uint32_t canvasWidth, uint32_t canvasHeight)

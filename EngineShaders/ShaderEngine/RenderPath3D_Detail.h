@@ -529,6 +529,13 @@ namespace vz::renderer
 		graphics::Texture debugUAV; // debug UAV can be used by some shaders...
 		graphics::Texture rtPostprocess; // ping-pong with main scene RT in post-process chain
 
+		// SurfelGI screen-space outputs (mirrors Wicked Engine 9.2 SurfelGIResources):
+		struct SurfelGIResources
+		{
+			graphics::Texture result_halfres; // half resolution coverage CS output
+			graphics::Texture result;         // full resolution after bilateral upsample
+		} surfelGIResources;
+
 
 		// temporal rt textures ... we need to reduce these textures (reuse others!!)
 		//graphics::Texture rtDvrDepth; // aliased to rtPrimitiveID_2
@@ -621,6 +628,20 @@ namespace vz::renderer
 		// GI
 		void Update_DDGI(CommandList cmd);
 		void Update_VXGI(CommandList cmd);
+
+		// SurfelGI
+		void CreateSurfelGIResources(SurfelGIResources& res, XMUINT2 resolution);
+		void Update_SurfelGI(CommandList cmd);
+		void SurfelGI_Coverage(const SurfelGIResources& res, const Texture& linearDepth, const Texture& debugUAV, CommandList cmd);
+
+		// Bilateral upsample helper (used by SurfelGI and others)
+		void Postprocess_Upsample_Bilateral(
+			const Texture& input,
+			const Texture& lineardepth,
+			const Texture& output,
+			CommandList cmd,
+			bool is_pixelshader = false,
+			float threshold = 1.0f);
 
 		void ComputeVolumetricCloudShadows(CommandList cmd, const Texture* envMapFirst, const Texture* envMapSecond);
 		void ComputeSkyAtmosphereTextures(CommandList cmd);

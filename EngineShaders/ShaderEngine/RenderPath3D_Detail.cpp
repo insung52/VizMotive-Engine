@@ -705,6 +705,12 @@ namespace vz::renderer
 				frameCB.options |= OPTION_BIT_VXGI_REFLECTIONS_ENABLED;
 		}
 
+		// SurfelGI option bit
+		if (renderer::isSurfelGIEnabled)
+		{
+			frameCB.options |= OPTION_BIT_SURFELGI_ENABLED;
+		}
+
 		frameCB.texture_random64x64_index = device->GetDescriptorIndex(texturehelper::getRandom64x64(), SubresourceType::SRV);
 		frameCB.texture_bluenoise_index = device->GetDescriptorIndex(texturehelper::getBlueNoise(), SubresourceType::SRV);
 		frameCB.texture_sheenlut_index = device->GetDescriptorIndex(&textures[TEXTYPE_2D_SHEENLUT], SubresourceType::SRV);
@@ -1727,7 +1733,9 @@ namespace vz::renderer
 		//shadercam.texture_ssgi_index = camera.texture_ssgi_index;
 		//shadercam.texture_rtshadow_index = camera.texture_rtshadow_index;
 		//shadercam.texture_rtdiffuse_index = camera.texture_rtdiffuse_index;
-		//shadercam.texture_surfelgi_index = camera.texture_surfelgi_index;
+		shadercam.texture_surfelgi_index = renderer::isSurfelGIEnabled && surfelGIResources.result.IsValid()
+			? device->GetDescriptorIndex(&surfelGIResources.result, SubresourceType::SRV)
+			: -1;
 		//shadercam.texture_depth_index_prev = cameraPrevious.texture_depth_index;
 		//shadercam.texture_vxgi_diffuse_index = camera.texture_vxgi_diffuse_index;
 		//shadercam.texture_vxgi_specular_index = camera.texture_vxgi_specular_index;

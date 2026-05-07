@@ -292,6 +292,86 @@ namespace vz::renderer
 	}
 
 
+	void GRenderPath3DDetails::Postprocess_Upsample_Bilateral(
+		const Texture& input,
+		const Texture& lineardepth,
+		const Texture& output,
+		CommandList cmd,
+		bool is_pixelshader,
+		float threshold
+	)
+	{
+		device->EventBegin("Postprocess_Upsample_Bilateral", cmd);
+
+		const TextureDesc& desc = output.GetDesc();
+
+		PostProcess postprocess;
+		postprocess.resolution.x = desc.width;
+		postprocess.resolution.y = desc.height;
+		postprocess.resolution_rcp.x = 1.0f / postprocess.resolution.x;
+		postprocess.resolution_rcp.y = 1.0f / postprocess.resolution.y;
+		postprocess.params0.x = threshold;
+		postprocess.params0.w = float(input.desc.width) / float(output.desc.width);
+		postprocess.params1.x = (float)input.desc.width;
+		postprocess.params1.y = (float)input.desc.height;
+		postprocess.params1.z = 1.0f / postprocess.params1.x;
+		postprocess.params1.w = 1.0f / postprocess.params1.y;
+
+		const int mip = (int)std::floor(std::max(1.0f,
+			log2f(std::max((float)desc.width / (float)input.GetDesc().width,
+			               (float)desc.height / (float)input.GetDesc().height))));
+
+		device->BindResource(&input, 0, cmd);
+		device->BindResource(&lineardepth, 1, cmd);
+		device->BindResource(&lineardepth, 2, cmd, std::min((int)lineardepth.desc.mip_levels - 1, mip));
+
+		// Pixel shader path not supported in VizMotive (no PSO_upsample_bilateral). Always use compute.
+		vzlog_assert(!is_pixelshader, "Postprocess_Upsample_Bilateral: pixel shader path not implemented in VizMotive");
+
+		SHADERTYPE cs = CSTYPE_POSTPROCESS_UPSAMPLE_BILATERAL_FLOAT4;
+		switch (desc.format)
+		{
+		case Format::R16_UNORM:
+		case Format::R8_UNORM:
+		case Format::R16_FLOAT:
+		case Format::R32_FLOAT:
+			cs = CSTYPE_POSTPROCESS_UPSAMPLE_BILATERAL_FLOAT1;
+			break;
+		case Format::R16G16B16A16_UNORM:
+		case Format::R8G8B8A8_UNORM:
+		case Format::B8G8R8A8_UNORM:
+		case Format::R10G10B10A2_UNORM:
+		case Format::R11G11B10_FLOAT:
+		case Format::R16G16B16A16_FLOAT:
+		case Format::R32G32B32A32_FLOAT:
+			cs = CSTYPE_POSTPROCESS_UPSAMPLE_BILATERAL_FLOAT4;
+			break;
+		default:
+			vzlog_assert(false, "Postprocess_Upsample_Bilateral: unsupported output format");
+			break;
+		}
+		device->BindComputeShader(&shaders[cs], cmd);
+		device->PushConstants(&postprocess, sizeof(postprocess), cmd);
+
+		const GPUResource* uavs[] = { &output };
+		device->BindUAVs(uavs, 0, arraysize(uavs), cmd);
+
+		device->Barrier(GPUBarrier::Image(&output, output.desc.layout, ResourceState::UNORDERED_ACCESS), cmd);
+		device->ClearUAV(&output, 0, cmd);
+		device->Barrier(GPUBarrier::Memory(&output), cmd);
+
+		device->Dispatch(
+			(desc.width + POSTPROCESS_BLOCKSIZE - 1) / POSTPROCESS_BLOCKSIZE,
+			(desc.height + POSTPROCESS_BLOCKSIZE - 1) / POSTPROCESS_BLOCKSIZE,
+			1,
+			cmd
+		);
+
+		device->Barrier(GPUBarrier::Image(&output, ResourceState::UNORDERED_ACCESS, output.desc.layout), cmd);
+
+		device->EventEnd(cmd);
+	}
+
 	void GRenderPath3DDetails::Postprocess_Downsample4x(
 		const Texture& input,
 		const Texture& output,

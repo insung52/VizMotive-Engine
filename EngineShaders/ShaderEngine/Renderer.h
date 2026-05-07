@@ -17,6 +17,7 @@
 #include "../Shaders/ShaderInterop_FSR2.h"
 #include "../Shaders/ShaderInterop_Environment.h"
 #include "../Shaders/ShaderInterop_DDGI.h"
+#include "../Shaders/ShaderInterop_SurfelGI.h"
 
 
 using namespace vz::graphics;
@@ -297,6 +298,9 @@ namespace vz::renderer
 	extern bool isShadowLODOverride;
 	extern bool isVariableRateShadingClassification;
 	extern bool isSurfelGIDebugEnabled;
+	extern bool isSurfelGIEnabled;
+	SURFEL_DEBUG GetSurfelGIDebugMode();
+	void SetSurfelGIDebugMode(SURFEL_DEBUG value);
 	extern bool isColorGradingEnabled;
 	extern bool isGaussianSplattingEnabled;
 	extern bool isDDGIEnabled;

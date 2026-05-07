@@ -1332,6 +1332,101 @@ namespace vz
 			ddgi = {};
 		}
 
+		// SurfelGI resource creation (mirrors Wicked Engine 9.2 wiScene.cpp:485-583):
+		if (renderer::isSurfelGIEnabled)
+		{
+			if (!surfelgi.surfelBuffer.IsValid())
+			{
+				surfelgi.cleared = false;
+
+				GPUBufferDesc buf;
+				buf.bind_flags = BindFlag::SHADER_RESOURCE | BindFlag::UNORDERED_ACCESS;
+
+				buf.stride = sizeof(Surfel);
+				buf.size = buf.stride * SURFEL_CAPACITY;
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
+				device->CreateBufferZeroed(&buf, &surfelgi.surfelBuffer);
+				device->SetName(&surfelgi.surfelBuffer, "surfelgi.surfelBuffer");
+
+				buf.stride = sizeof(SurfelData);
+				buf.size = buf.stride * SURFEL_CAPACITY;
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
+				device->CreateBufferZeroed(&buf, &surfelgi.dataBuffer);
+				device->SetName(&surfelgi.dataBuffer, "surfelgi.dataBuffer");
+
+				buf.stride = sizeof(SurfelVarianceDataPacked);
+				buf.size = buf.stride * SURFEL_CAPACITY * SURFEL_MOMENT_RESOLUTION * SURFEL_MOMENT_RESOLUTION;
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
+				device->CreateBufferZeroed(&buf, &surfelgi.varianceBuffer);
+				device->SetName(&surfelgi.varianceBuffer, "surfelgi.varianceBuffer");
+
+				buf.stride = sizeof(uint32_t);
+				buf.size = buf.stride * SURFEL_CAPACITY;
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
+				device->CreateBufferZeroed(&buf, &surfelgi.aliveBuffer[0]);
+				device->SetName(&surfelgi.aliveBuffer[0], "surfelgi.aliveBuffer[0]");
+				device->CreateBufferZeroed(&buf, &surfelgi.aliveBuffer[1]);
+				device->SetName(&surfelgi.aliveBuffer[1], "surfelgi.aliveBuffer[1]");
+
+				// deadBuffer initialized in reverse order: [CAPACITY-1, CAPACITY-2, ..., 0]
+				{
+					std::vector<uint32_t> dead_indices(SURFEL_CAPACITY);
+					for (uint32_t i = 0; i < SURFEL_CAPACITY; ++i)
+						dead_indices[i] = SURFEL_CAPACITY - 1 - i;
+					device->CreateBuffer(&buf, dead_indices.data(), &surfelgi.deadBuffer);
+					device->SetName(&surfelgi.deadBuffer, "surfelgi.deadBuffer");
+				}
+
+				buf.stride = sizeof(SurfelStats);
+				buf.size = buf.stride;
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
+				{
+					SurfelStats stats = {};
+					stats.deadCount = SURFEL_CAPACITY;
+					device->CreateBuffer(&buf, &stats, &surfelgi.statsBuffer);
+					device->SetName(&surfelgi.statsBuffer, "surfelgi.statsBuffer");
+				}
+
+				buf.stride = sizeof(SurfelIndirectArgs);
+				buf.size = buf.stride;
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED | ResourceMiscFlag::INDIRECT_ARGS;
+				device->CreateBufferZeroed(&buf, &surfelgi.indirectBuffer);
+				device->SetName(&surfelgi.indirectBuffer, "surfelgi.indirectBuffer");
+
+				buf.stride = sizeof(SurfelGridCell);
+				buf.size = buf.stride * SURFEL_TABLE_SIZE;
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
+				device->CreateBufferZeroed(&buf, &surfelgi.gridBuffer);
+				device->SetName(&surfelgi.gridBuffer, "surfelgi.gridBuffer");
+
+				buf.stride = sizeof(uint32_t);
+				buf.size = buf.stride * SURFEL_CAPACITY * 27; // each surfel can be in 3x3x3=27 cells
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
+				device->CreateBufferZeroed(&buf, &surfelgi.cellBuffer);
+				device->SetName(&surfelgi.cellBuffer, "surfelgi.cellBuffer");
+
+				buf.stride = sizeof(SurfelRayDataPacked);
+				buf.size = buf.stride * SURFEL_RAY_BUDGET;
+				buf.misc_flags = ResourceMiscFlag::BUFFER_STRUCTURED;
+				device->CreateBufferZeroed(&buf, &surfelgi.rayBuffer);
+				device->SetName(&surfelgi.rayBuffer, "surfelgi.rayBuffer");
+
+				TextureDesc tex;
+				tex.width = SURFEL_MOMENT_ATLAS_TEXELS;
+				tex.height = SURFEL_MOMENT_ATLAS_TEXELS;
+				tex.format = Format::R16G16_FLOAT;
+				tex.bind_flags = BindFlag::UNORDERED_ACCESS | BindFlag::SHADER_RESOURCE;
+				tex.layout = ResourceState::SHADER_RESOURCE_COMPUTE;
+				device->CreateTexture(&tex, nullptr, &surfelgi.momentsTexture);
+				device->SetName(&surfelgi.momentsTexture, "surfelgi.momentsTexture");
+			}
+			std::swap(surfelgi.aliveBuffer[0], surfelgi.aliveBuffer[1]);
+		}
+		else if (surfelgi.surfelBuffer.IsValid())
+		{
+			surfelgi = {};
+		}
+
 		// VXGI clipmap center update + resource creation
 		if (renderer::isVXGIEnabled && cameraMain != nullptr)
 		{

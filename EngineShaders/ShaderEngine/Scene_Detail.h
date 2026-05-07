@@ -169,6 +169,23 @@ namespace vz::renderer
 			} clipmaps[VXGI_CLIPMAP_COUNT];
 		} vxgi;
 
+		// SurfelGI resources (mirrors Wicked Engine 9.2 SurfelGIResources):
+		struct SurfelGI
+		{
+			mutable bool cleared = false;
+			graphics::GPUBuffer surfelBuffer;        // Surfel  × CAPACITY
+			graphics::GPUBuffer dataBuffer;          // SurfelData × CAPACITY
+			graphics::GPUBuffer varianceBuffer;      // SurfelVarianceDataPacked × CAPACITY × MOMENT_RES²
+			graphics::GPUBuffer aliveBuffer[2];      // ping-pong, uint × CAPACITY
+			graphics::GPUBuffer deadBuffer;          // uint × CAPACITY (initialized in reverse)
+			graphics::GPUBuffer statsBuffer;         // SurfelStats (deadCount = CAPACITY initially)
+			graphics::GPUBuffer indirectBuffer;      // SurfelIndirectArgs (INDIRECT_ARGS bind)
+			graphics::GPUBuffer gridBuffer;          // SurfelGridCell × TABLE_SIZE
+			graphics::GPUBuffer cellBuffer;          // uint × CAPACITY × 27
+			graphics::GPUBuffer rayBuffer;           // SurfelRayDataPacked × RAY_BUDGET
+			graphics::Texture momentsTexture;        // R16G16_FLOAT, ATLAS_TEXELS²
+		} surfelgi;
+
 		std::atomic<uint32_t> lightmapRequestAllocator{ 0 };
 		std::vector<uint32_t> lightmapRequests;
 
