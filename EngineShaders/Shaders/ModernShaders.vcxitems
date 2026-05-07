@@ -183,6 +183,14 @@
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\meshlet_prepareCS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\meshSlicerCS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\slicerOutlineCS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_binningCS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_coverageCS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_gridoffsetsCS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_indirectprepareCS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_integrateCS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_raytraceCS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_raytraceCS_rtapi.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_updateCS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\temporalaaCS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\tonemapCS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\upsample_bilateral_float1CS.hlsl" />

@@ -82,6 +82,9 @@
     <Filter Include="Compute Shaders\DDGI">
       <UniqueIdentifier>{96cf097e-c5d8-4256-90dc-3642b00e7877}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Compute Shaders\SurfelGI">
+      <UniqueIdentifier>{f4a1b9e2-7c3d-4e5a-b8f1-9d2c6a8e7b3c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)compile.bat">
@@ -780,6 +783,30 @@
     </FxCompile>
     <FxCompile Include="$(MSBuildThisFileDirectory)CS\ddgi_updateCS_depth.hlsl">
       <Filter>Compute Shaders\DDGI</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_binningCS.hlsl">
+      <Filter>Compute Shaders\SurfelGI</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_coverageCS.hlsl">
+      <Filter>Compute Shaders\SurfelGI</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_gridoffsetsCS.hlsl">
+      <Filter>Compute Shaders\SurfelGI</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_indirectprepareCS.hlsl">
+      <Filter>Compute Shaders\SurfelGI</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_integrateCS.hlsl">
+      <Filter>Compute Shaders\SurfelGI</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_raytraceCS.hlsl">
+      <Filter>Compute Shaders\SurfelGI</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_raytraceCS_rtapi.hlsl">
+      <Filter>Compute Shaders\SurfelGI</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)CS\surfel_updateCS.hlsl">
+      <Filter>Compute Shaders\SurfelGI</Filter>
     </FxCompile>
     <FxCompile Include="$(MSBuildThisFileDirectory)PS\ddgi_debugPS.hlsl">
       <Filter>Raster-Pipeline Shaders\PS</Filter>

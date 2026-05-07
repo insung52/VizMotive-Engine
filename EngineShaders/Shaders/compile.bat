@@ -147,6 +147,15 @@ dxc -T cs_6_0 ./CS/ddgi_raytraceCS_rtapi.hlsl -spirv
 dxc -T cs_6_0 ./CS/ddgi_updateCS.hlsl -spirv
 dxc -T cs_6_0 ./CS/ddgi_updateCS_depth.hlsl -spirv
 
+dxc -T cs_6_0 ./CS/surfel_binningCS.hlsl -spirv
+dxc -T cs_6_0 ./CS/surfel_coverageCS.hlsl -spirv
+dxc -T cs_6_0 ./CS/surfel_gridoffsetsCS.hlsl -spirv
+dxc -T cs_6_0 ./CS/surfel_indirectprepareCS.hlsl -spirv
+dxc -T cs_6_0 ./CS/surfel_integrateCS.hlsl -spirv
+dxc -T cs_6_0 ./CS/surfel_raytraceCS.hlsl -spirv
+dxc -T cs_6_5 ./CS/surfel_raytraceCS_rtapi.hlsl -spirv
+dxc -T cs_6_0 ./CS/surfel_updateCS.hlsl -spirv
+
 dxc -T vs_6_0 ./VS/fontVS.hlsl -spirv
 dxc -T ps_6_0 ./PS/fontPS.hlsl -spirv
 
