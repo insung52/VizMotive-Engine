@@ -794,7 +794,7 @@ int main(int, char**)
 						scene->SetOptionValueArray("VXGI_MAX_DISTANCE", { vxgi_max_dist });
 					}
 					static float vxgi_base_voxel = 0.125f;
-					if (ImGui::SliderFloat("Base Voxel Size", &vxgi_base_voxel, 0.001f, 2.0f, "%.4f m"))
+					if (ImGui::SliderFloat("Base Voxel Size", &vxgi_base_voxel, 0.005f, 0.5f, "%.4f m"))
 					{
 						scene->SetOptionValueArray("VXGI_BASE_VOXEL_SIZE", { vxgi_base_voxel });
 					}
