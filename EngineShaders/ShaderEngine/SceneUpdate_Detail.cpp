@@ -928,6 +928,7 @@ namespace vz
 		if (GetScene()->IsContentChanged())
 		{
 			if (renderer::isSurfelGIDebugEnabled ||
+				renderer::isSurfelGIEnabled ||
 				renderer::isDDGIEnabled ||
 				(hw_raytrace && renderer::isRaytracedShadowsEnabled) ||
 				(hw_raytrace && renderer::isRTAOEnabled) ||
@@ -938,6 +939,13 @@ namespace vz
 				// this will be FALSE when the acceleration structures are updated in this frame
 				isAccelerationStructureUpdateRequested = true;
 			}
+		}
+
+		// SurfelGI: force AS build when enabled at runtime if TLAS/BVH doesn't exist yet
+		// (IsContentChanged may be false after a toggle without scene changes)
+		if (renderer::isSurfelGIEnabled && !TLAS.IsValid() && !sceneBVH.IsValid())
+		{
+			isAccelerationStructureUpdateRequested = true;
 		}
 
 		if (dt > 0)

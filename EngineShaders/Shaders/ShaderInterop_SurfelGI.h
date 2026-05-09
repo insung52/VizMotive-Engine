@@ -43,8 +43,8 @@ static_assert(SURFEL_RECYCLE_TIME < 256, "Must be < 256 because it is packed at 
 static_assert(SURFEL_RAY_BOOST_MAX < 256, "Must be < 256 because it is packed at 8 bits!");
 #endif // __cplusplus
 
-// This per-surfel surfel structure will be accessed rapidly on GI lookup, so keep it as small as possible
-//	But also ensure that it is 16-byte aligned for structured buffer access performance
+// This per-surfel surfel structure will be accessed rapidly on GI lookup, so keep it as small as possible.
+// 16-byte aligned for structured buffer access performance.
 struct alignas(16) Surfel
 {
 	SH::L1_RGB::Packed radiance;

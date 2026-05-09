@@ -1390,6 +1390,13 @@ namespace vz::renderer
 			ResizeCanvas(canvasWidth_, canvasHeight_);
 		}
 
+		// Lazy-create SurfelGI screen-space resources when toggled on at runtime
+		// (CreateSurfelGIResources is otherwise only called inside ResizeCanvas).
+		if (renderer::isSurfelGIEnabled && !surfelGIResources.result.IsValid())
+		{
+			CreateSurfelGIResources(surfelGIResources, XMUINT2(canvasWidth_, canvasHeight_));
+		}
+
 		scene_Gdetails = (GSceneDetails*)scene->GetGSceneHandle();
 		scene_Gdetails->isSceneEffectUpdateEnabled = false;
 
@@ -1730,16 +1737,13 @@ namespace vz::renderer
 			//	);
 			//}
 
-			//if (renderer::GetSurfelGIEnabled())
-			//{
-			//	renderer::SurfelGI_Coverage(
-			//		surfelGIResources,
-			//		*scene,
-			//		rtLinearDepth,
-			//		debugUAV,
-			//		cmd
-			//	);
-			//}
+			if (renderer::isSurfelGIEnabled
+				&& scene_Gdetails->surfelgi.surfelBuffer.IsValid()
+				&& surfelGIResources.result.IsValid()
+				&& shaders[CSTYPE_SURFEL_COVERAGE].IsValid())
+			{
+				SurfelGI_Coverage(surfelGIResources, rtLinearDepth, debugUAV, cmd);
+			}
 			
 			//RenderAO(cmd);
 
@@ -2073,15 +2077,8 @@ namespace vz::renderer
 			//	device->Barrier(&barrier, 1, cmd);
 			//}
 
-			// SurfelGI screen-space coverage pass (writes result_halfres → result, also spawns surfels & writes debugUAV).
-			// Runs after rtLinearDepth is in SHADER_RESOURCE state and primitiveID textures are available.
-			if (renderer::isSurfelGIEnabled
-				&& scene_Gdetails->surfelgi.surfelBuffer.IsValid()
-				&& surfelGIResources.result.IsValid()
-				&& shaders[CSTYPE_SURFEL_COVERAGE].IsValid())
-			{
-				SurfelGI_Coverage(surfelGIResources, rtLinearDepth, debugUAV, cmd);
-			}
+			// SurfelGI screen-space coverage pass moved to cmd_maincamera_compute_effects (compute queue)
+			// to match Wicked's pipeline. Running it on graphics queue causes cross-queue stale reads.
 
 			// VXGI resolve diffuse: depth + normal → rtVXGI_diffuse
 			if (renderer::isVXGIEnabled

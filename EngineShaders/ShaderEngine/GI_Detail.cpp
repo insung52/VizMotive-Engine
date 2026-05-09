@@ -624,6 +624,8 @@ namespace vz::renderer
 			device->BindResource(&sgi.gridBuffer, 1, cmd);
 			device->BindResource(&sgi.cellBuffer, 2, cmd);
 			device->BindResource(&sgi.momentsTexture, 3, cmd);
+			device->BindResource(&rtPrimitiveID_1, 4, cmd); // R32_UINT
+			device->BindResource(&rtPrimitiveID_2, 5, cmd); // R32G32B32A32_UINT (read .x as uint)
 
 			const GPUResource* uavs[] = {
 				&sgi.dataBuffer,

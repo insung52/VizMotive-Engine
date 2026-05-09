@@ -87,7 +87,7 @@ struct Surface
 	half4 sss_inv;			// 1 / (1 + sss)
 	uint layerMask;			// the engine-side layer mask
 	half3 facenormal;		// surface normal without normal map
-	uint uid_validate;
+	uint uid_validate;		// lower 32 bits of ShaderMeshInstance::uid (HLSL uint64_t had layout issues)
 	float hit_depth;
 	half3 gi;
 	half3 bumpColor;
@@ -338,7 +338,7 @@ struct Surface
 	bool preload_internal(PrimitiveID prim)
 	{
 		inst = load_instance(prim.instanceIndex);
-		if (uid_validate != 0 && inst.uid != uid_validate)
+		if (uid_validate != 0 && (uint)inst.uid != uid_validate)
 			return false;
 
 		geometry = load_geometry(inst.geometryOffset + prim.subsetIndex);

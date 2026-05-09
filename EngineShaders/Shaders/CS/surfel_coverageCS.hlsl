@@ -10,6 +10,8 @@ StructuredBuffer<Surfel> surfelBuffer : register(t0);
 StructuredBuffer<SurfelGridCell> surfelGridBuffer : register(t1);
 StructuredBuffer<uint> surfelCellBuffer : register(t2);
 Texture2D<float2> surfelMomentsTexture : register(t3);
+Texture2D<uint> input_primitiveID_1 : register(t4);
+Texture2D<uint> input_primitiveID_2 : register(t5);
 
 RWStructuredBuffer<SurfelData> surfelDataBuffer : register(u0);
 RWStructuredBuffer<uint> surfelDeadBuffer : register(u1);
@@ -61,11 +63,7 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 	const float2 clipspace = uv_to_clipspace(uv);
 	RayDesc ray = CreateCameraRay(clipspace);
 
-	// VizMotive uses 2-uint primitiveID packing (same as visibility_resolveCS).
-	uint2 primitiveID = uint2(
-		bindless_textures_uint[descriptor_index(GetCamera().texture_primitiveID_1_index)][pixel],
-		bindless_textures_uint[descriptor_index(GetCamera().texture_primitiveID_2_index)][pixel]
-	);
+	uint2 primitiveID = uint2(input_primitiveID_1[pixel], input_primitiveID_2[pixel]);
 	if (!any(primitiveID))
 	{
 		write_debug(DTid.xy, 0);
