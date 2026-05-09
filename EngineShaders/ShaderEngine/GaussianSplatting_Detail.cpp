@@ -29,7 +29,7 @@ namespace vz::renderer
 		bd.bind_flags = BindFlag::UNORDERED_ACCESS;
 		bd.misc_flags = ResourceMiscFlag::INDIRECT_ARGS | ResourceMiscFlag::BUFFER_RAW;
 		bd.size = sizeof(IndirectDispatchArgs);
-		device->CreateBuffer(&bd, nullptr, &res.indirectBuffer);
+		device->CreateBufferZeroed(&bd, &res.indirectBuffer);
 		device->SetName(&res.indirectBuffer, "GaussianSplattingResources::indirectBuffer");
 	}
 

@@ -152,7 +152,7 @@ namespace vz::graphics
 		virtual ShaderFormat GetShaderFormat() const = 0;
 
 		// Get a Texture resource that represents the current back buffer of the SwapChain
-		virtual Texture GetBackBuffer(const SwapChain* swapchain) const = 0;
+		virtual const Texture& GetBackBuffer(const SwapChain* swapchain) const = 0;
 		// Returns the current color space of the swapchain output
 		virtual ColorSpace GetSwapChainColorSpace(const SwapChain* swapchain) const = 0;
 		// Returns true if the swapchain could support HDR output regardless of current format
@@ -187,9 +187,6 @@ namespace vz::graphics
 		//	The granularity of this is at least that the beginning of the command list will wait for the end of the other command list
 		//	On some platform like PS5 this can be implemented by waiting exactly at the wait insertion point within the command lists which is more precise
 		virtual void WaitCommandList(CommandList cmd, CommandList wait_for) = 0;
-		// Tell the command list to wait for the specified queue to finish processing
-		//	It is useful when you want to wait for a previous frame, or just don't know which command list to wait for
-		virtual void WaitQueue(CommandList cmd, QUEUE_TYPE wait_for) = 0;
 		virtual void RenderPassBegin(const SwapChain* swapchain, CommandList cmd) = 0;
 		virtual void RenderPassBegin(const RenderPassImage* images, uint32_t image_count, CommandList cmd, RenderPassFlags flags = RenderPassFlags::NONE) = 0;
 		virtual void RenderPassEnd(CommandList cmd) = 0;
