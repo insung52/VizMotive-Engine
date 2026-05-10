@@ -135,6 +135,22 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 				case SURFEL_DEBUG_INCONSISTENCY:
 					debug += float4(surfelDataBuffer[surfel_index].max_inconsistency.xxx, 1) * contribution;
 					break;
+				case SURFEL_DEBUG_LIFE:
+					{
+						// life 0~255 시각화: 0=red, 64=yellow, 128=green, 255=blue
+						float life_norm = saturate((float)surfelDataBuffer[surfel_index].GetLife() / 64.0f);
+						float3 life_color = float3(1 - life_norm, life_norm, life_norm * 0.5);
+						debug += float4(life_color, 1) * contribution;
+					}
+					break;
+				case SURFEL_DEBUG_RAYCOUNT:
+					{
+						// rayCount 0~64 시각화: 0=red, 8=yellow, 32=green, 64=cyan
+						float ray_norm = saturate((float)surfelDataBuffer[surfel_index].GetRayCount() / 16.0f);
+						float3 ray_color = float3(1 - ray_norm, ray_norm, ray_norm * 0.7);
+						debug += float4(ray_color, 1) * contribution;
+					}
+					break;
 				default:
 					break;
 				}
@@ -207,6 +223,26 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 		}
 		break;
 	case SURFEL_DEBUG_INCONSISTENCY:
+		if (debug.a > 0)
+		{
+			debug /= debug.a;
+		}
+		else
+		{
+			debug = 0;
+		}
+		break;
+	case SURFEL_DEBUG_LIFE:
+		if (debug.a > 0)
+		{
+			debug /= debug.a;
+		}
+		else
+		{
+			debug = 0;
+		}
+		break;
+	case SURFEL_DEBUG_RAYCOUNT:
 		if (debug.a > 0)
 		{
 			debug /= debug.a;

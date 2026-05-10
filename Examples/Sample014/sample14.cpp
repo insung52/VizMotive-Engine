@@ -821,7 +821,7 @@ int main(int, char**)
 
 				static int surfelgi_debug_mode = vz::config::GetIntConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_DEBUG_MODE");
 				const char* surfel_debug_items[] = {
-					"None", "Normal", "Color", "Point", "Random", "Heatmap", "Inconsistency"
+					"None", "Normal", "Color", "Point", "Random", "Heatmap", "Inconsistency", "Life", "RayCount"
 				};
 				if (ImGui::Combo("SurfelGI Debug", &surfelgi_debug_mode, surfel_debug_items, IM_ARRAYSIZE(surfel_debug_items)))
 				{
