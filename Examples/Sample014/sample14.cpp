@@ -223,6 +223,8 @@ int main(int, char**)
 		camera->SetPerspectiveProjection(0.01f, 50.f, 60.f, 1.f);
 
 		VzActor* plane1 = vzm::LoadModelFile("../Assets/models/cube/cube.obj");
+		// DIAGNOSTIC: plane1 invisible. cube model 이 light 둘러싸고 shadow ray 차단 의심.
+		plane1->SetVisibleLayerMask(0, true);
 
 		VzGeometry* box_geo = vzm::NewGeometry("Box floor");
 		vz::geogen::GenerateBoxGeometry(box_geo->GetVID(), 1.f, 1.f, 1.f, 100, 100, 100);
@@ -261,7 +263,8 @@ int main(int, char**)
 
 		vzm::VzActor* axis_helper = vzm::LoadModelFile("../Assets/axis.obj");
 		axis_helper->SetScale({ 1, 1, 1 });
-		axis_helper->SetVisibleLayerMask(0xF, true);
+		// DIAGNOSTIC: 일시 invisible. shadow ray 차단 의심 검증용
+		axis_helper->SetVisibleLayerMask(0, true);
 		scene->AppendChild(axis_helper);
 
 		vzm::VzActor* axis_helper_light = vzm::LoadModelFile("../Assets/axis.obj");
@@ -327,6 +330,33 @@ int main(int, char**)
 	}
 	//renderer->SetLayerMask(0xF);
 	camera->SetVisibleLayerMask(0xF);
+
+	// DIAGNOSTIC: scene actor list for SurfelGI shadow ray investigation
+	{
+		vzlog("=== Scene Actor List (SurfelGI debug) ===");
+		auto root_vids = scene->GetChildrenVIDs();
+		for (VID vid : root_vids)
+		{
+			vzm::VzSceneObject* obj = (vzm::VzSceneObject*)vzm::GetComponent(vid);
+			if (!obj) continue;
+			vzlog("[%u] '%s' mask=0x%X", vid, obj->GetName().c_str(), obj->GetVisibleLayerMask());
+			auto children = obj->GetChildren();
+			for (VID child : children)
+			{
+				vzm::VzSceneObject* cobj = (vzm::VzSceneObject*)vzm::GetComponent(child);
+				if (!cobj) continue;
+				vzlog("  child [%u] '%s' mask=0x%X", child, cobj->GetName().c_str(), cobj->GetVisibleLayerMask());
+				auto grandchildren = cobj->GetChildren();
+				for (VID gc : grandchildren)
+				{
+					vzm::VzSceneObject* gcobj = (vzm::VzSceneObject*)vzm::GetComponent(gc);
+					if (!gcobj) continue;
+					vzlog("    grandchild [%u] '%s' mask=0x%X", gc, gcobj->GetName().c_str(), gcobj->GetVisibleLayerMask());
+				}
+			}
+		}
+		vzlog("=== End Actor List ===");
+	}
 
 	// Our state
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -832,7 +862,8 @@ int main(int, char**)
 
 				static int surfelgi_debug_mode = vz::config::GetIntConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_DEBUG_MODE");
 				const char* surfel_debug_items[] = {
-					"None", "Normal", "Color", "Point", "Random", "Heatmap", "Inconsistency", "Life", "RayCount"
+					"None", "Normal", "Color", "Point", "Random", "Heatmap", "Inconsistency", "Life", "RayCount",
+					"MomentWeight", "MeanDepth", "RadianceDC"
 				};
 				if (ImGui::Combo("SurfelGI Debug", &surfelgi_debug_mode, surfel_debug_items, IM_ARRAYSIZE(surfel_debug_items)))
 				{

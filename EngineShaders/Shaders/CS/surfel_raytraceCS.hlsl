@@ -148,7 +148,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
 				RayDesc newRay;
 				newRay.Origin = surface.P;
-				newRay.TMin = 0;
+				newRay.TMin = 0.001;
 				newRay.TMax = dist;
 				newRay.Direction = normalize(L);
 
@@ -157,6 +157,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 				q.TraceRayInline(
 					scene_acceleration_structure,
 					RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
+					RAY_FLAG_FORCE_OPAQUE |
 					RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
 					0xFF,
 					newRay
@@ -365,8 +366,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 					float3 shadow = 1;
 
 					RayDesc newRay;
-					newRay.Origin = surface.P;
-					newRay.TMin = 0.001;
+					newRay.Origin = surface.P + (float3)surface.facenormal * 0.05;
+					newRay.TMin = 0.05;
 					newRay.TMax = dist;
 					newRay.Direction = normalize(L + max3(surface.sss));
 
@@ -375,7 +376,8 @@ void main(uint3 DTid : SV_DispatchThreadID)
 						scene_acceleration_structure,
 						RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
 						RAY_FLAG_FORCE_OPAQUE |
-						RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+						RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH |
+						RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
 						0xFF,
 						newRay
 					);

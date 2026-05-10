@@ -115,8 +115,12 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 				contribution = smoothstep(0, 1, contribution);
 				coverage += contribution;
 
+				// pre_weight: moment_weight/life 적용 전 contribution. 진단 mode 에서 moment_weight=0 인 surfel 도 보이게 누적.
+				float pre_weight = contribution;
+
 				float2 moments = surfelMomentsTexture.SampleLevel(sampler_linear_clamp, surfel_moment_uv(surfel_index, normal, L / dist), 0);
-				contribution *= surfel_moment_weight(moments, dist);
+				float moment_w = surfel_moment_weight(moments, dist);
+				contribution *= moment_w;
 
 				// contribution based on life can eliminate black popping surfels, but the surfel_data must be accessed...
 				contribution = lerp(0, contribution, saturate(surfelDataBuffer[surfel_index].GetLife() / 2.0f));
@@ -137,7 +141,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 					break;
 				case SURFEL_DEBUG_LIFE:
 					{
-						// life 0~255 시각화: 0=red, 64=yellow, 128=green, 255=blue
 						float life_norm = saturate((float)surfelDataBuffer[surfel_index].GetLife() / 64.0f);
 						float3 life_color = float3(1 - life_norm, life_norm, life_norm * 0.5);
 						debug += float4(life_color, 1) * contribution;
@@ -145,10 +148,32 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 					break;
 				case SURFEL_DEBUG_RAYCOUNT:
 					{
-						// rayCount 0~64 시각화: 0=red, 8=yellow, 32=green, 64=cyan
 						float ray_norm = saturate((float)surfelDataBuffer[surfel_index].GetRayCount() / 16.0f);
 						float3 ray_color = float3(1 - ray_norm, ray_norm, ray_norm * 0.7);
 						debug += float4(ray_color, 1) * contribution;
+					}
+					break;
+				case SURFEL_DEBUG_MOMENT_WEIGHT:
+					{
+						// moment_w 자체 (0=검정, 1=흰색). pre_weight 로 누적해서 weight=0 인 surfel 도 검정으로 visible.
+						debug.rgb += moment_w.xxx * pre_weight;
+						debug.a += pre_weight;
+					}
+					break;
+				case SURFEL_DEBUG_MEAN_DEPTH:
+					{
+						// moments.x (mean depth, 0~SURFEL_MAX_RADIUS=2). 0=검정, 2=흰색.
+						float mean_norm = saturate(moments.x / SURFEL_MAX_RADIUS);
+						debug.rgb += mean_norm.xxx * pre_weight;
+						debug.a += pre_weight;
+					}
+					break;
+				case SURFEL_DEBUG_RADIANCE_DC:
+					{
+						// surfel 자체 normal 방향의 irradiance (surface.N 무관). mean (radiance) freeze 직접 측정.
+						float3 sh_irr = (float3)SH::CalculateIrradiance(surfel.radiance.Unpack(), (half3)normal);
+						debug.rgb += sh_irr * pre_weight;
+						debug.a += pre_weight;
 					}
 					break;
 				default:
@@ -246,6 +271,40 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 		if (debug.a > 0)
 		{
 			debug /= debug.a;
+		}
+		else
+		{
+			debug = 0;
+		}
+		break;
+	case SURFEL_DEBUG_MOMENT_WEIGHT:
+		if (debug.a > 0)
+		{
+			debug.rgb /= debug.a;
+			debug.a = 1;
+		}
+		else
+		{
+			debug = 0;
+		}
+		break;
+	case SURFEL_DEBUG_MEAN_DEPTH:
+		if (debug.a > 0)
+		{
+			debug.rgb /= debug.a;
+			debug.a = 1;
+		}
+		else
+		{
+			debug = 0;
+		}
+		break;
+	case SURFEL_DEBUG_RADIANCE_DC:
+		if (debug.a > 0)
+		{
+			debug.rgb /= debug.a;
+			debug.rgb = tonemap(debug.rgb);
+			debug.a = 1;
 		}
 		else
 		{

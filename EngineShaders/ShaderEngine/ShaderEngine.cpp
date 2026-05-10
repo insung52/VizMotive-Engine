@@ -666,7 +666,7 @@ namespace vz
 		renderer::isSurfelGIEnabled = config::GetBoolConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_ENABLED");
 		{
 			int dbg = config::GetIntConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_DEBUG_MODE");
-			renderer::SetSurfelGIDebugMode((dbg >= 0 && dbg <= (int)SURFEL_DEBUG_RAYCOUNT)
+			renderer::SetSurfelGIDebugMode((dbg >= 0 && dbg <= (int)SURFEL_DEBUG_RADIANCE_DC)
 				? (SURFEL_DEBUG)dbg : SURFEL_DEBUG_NONE);
 		}
 
