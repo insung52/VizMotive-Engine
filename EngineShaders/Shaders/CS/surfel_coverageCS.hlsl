@@ -81,7 +81,94 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 		return;
 	}
 
+	// FIX: VizMotive 의 compute_barycentrics 가 CCW winding mesh frontface 를 backface 로 잘못 판정.
+	// raster visibility buffer 는 backface culling 이라 항상 frontface. N 강제 복원.
+	if (surface.IsBackface())
+	{
+		surface.N = -surface.N;
+		surface.facenormal = -surface.facenormal;
+		surface.SetBackface(false);
+	}
+
 	const float3 N = surface.N;
+
+	// SURFEL_DEBUG_SHADOW_TEST: 단계별 검증 (각 변수 시각화)
+	// Stage A: light_count 시각화
+	//   검정 = light_count == 0 (light buffer 비어있음!)
+	//   회색 정도 = light_count / 5.0 (5개 light 면 흰색)
+	//   파랑 (0,0,1) = light_count > 0 + NdotL > 0 (정상 진입)
+	//   초록 (0,1,0) = + dist < range
+	//   노랑 (1,1,0) = + shadow passed (light 도달)
+	//   빨강 (1,0,0) = shadow blocked
+	if (push.debug == SURFEL_DEBUG_SHADOW_TEST)
+	{
+		// N 정상 복원 확정. 이제 NEE 진단 활성.
+		float4 sd_color = float4(0, 0, 0, 1);
+		const uint light_count = lights().item_count();
+		if (light_count == 0)
+		{
+			// light_count = 0. light buffer 비어있음. 검정 유지.
+			write_debug(DTid.xy, float4(0.2, 0.2, 0.2, 1));  // 회색: light_count=0 marker
+			return;
+		}
+
+		// stage marker R: light_count 시각화 (0~1)
+		float lc_norm = saturate((float)light_count / 5.0);
+		sd_color.r = lc_norm * 0.3;  // 작은 R base
+
+		ShaderEntity light = load_entity(lights().first_item());
+		float3 light_pos = light.position;
+		float3 L = light_pos - surface.P;
+		float dist2 = dot(L, L);
+		float range = light.GetRange();
+		float range2 = range * range;
+
+		if (dist2 >= range2)
+		{
+			sd_color.rgb = float3(0.5, 0, 0.5);  // 마젠타: dist >= range
+		}
+		else
+		{
+			float dist = sqrt(dist2);
+			L /= dist;
+			float NdotL = dot(L, surface.N);
+
+			if (NdotL <= 0)
+			{
+				sd_color.rgb = float3(0, 0, 0.5);  // 파랑: NdotL <= 0
+			}
+			else
+			{
+				RayDesc shadowRay;
+				shadowRay.Origin = surface.P;
+				shadowRay.TMin = 0.001;
+				shadowRay.TMax = dist;
+				shadowRay.Direction = L;
+
+#ifdef RTAPI
+				vzRayQuery sq;
+				sq.TraceRayInline(
+					scene_acceleration_structure,
+					RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
+					RAY_FLAG_FORCE_OPAQUE |
+					RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
+					0xFF,
+					shadowRay
+				);
+				while (sq.Proceed());
+				bool blocked = (sq.CommittedStatus() == COMMITTED_TRIANGLE_HIT);
+				if (blocked)
+					sd_color.rgb = float3(1, 0, 0);  // 빨강: shadow blocked
+				else
+					sd_color.rgb = float3(0, 1, 0);  // 초록: light reached!
+#else
+				sd_color.rgb = float3(0.5, 0.5, 0);  // RTAPI 비활성
+#endif
+			}
+		}
+		write_debug(DTid.xy, sd_color);
+		return;
+	}
 
 	float coverage = 0;
 

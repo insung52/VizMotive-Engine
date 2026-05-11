@@ -166,6 +166,7 @@ enum SURFEL_DEBUG
 	SURFEL_DEBUG_MOMENT_WEIGHT,  // Stage 1: contribution chain의 마지막 component
 	SURFEL_DEBUG_MEAN_DEPTH,      // Stage 2: moments.x 의 raw 값 (moment freeze 검증)
 	SURFEL_DEBUG_RADIANCE_DC,     // Stage 3: surfel.radiance SH DC term (mean freeze 검증)
+	SURFEL_DEBUG_SHADOW_TEST,     // 독립 shadow test: surfelGI pipeline 무관. pixel 별 NEE 검증.
 
 	SURFEL_DEBUG_FORCE_UINT = 0xFFFFFFFF,
 };

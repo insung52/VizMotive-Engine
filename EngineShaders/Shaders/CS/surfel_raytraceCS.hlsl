@@ -366,18 +366,19 @@ void main(uint3 DTid : SV_DispatchThreadID)
 					float3 shadow = 1;
 
 					RayDesc newRay;
-					newRay.Origin = surface.P + (float3)surface.facenormal * 0.05;
-					newRay.TMin = 0.05;
-					newRay.TMax = dist;
 					newRay.Direction = normalize(L + max3(surface.sss));
+					// DIAGNOSTIC: bias 0.05m. 작은 bias 로 floor side NEE 의 false positive light leak 검증.
+					const float bias = 0.05;
+					newRay.Origin = surface.P + newRay.Direction * bias;
+					newRay.TMin = 0.001;
+					newRay.TMax = max(0.001, dist - bias);
 
 #ifdef RTAPI
 					q.TraceRayInline(
 						scene_acceleration_structure,
 						RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
 						RAY_FLAG_FORCE_OPAQUE |
-						RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH |
-						RAY_FLAG_CULL_BACK_FACING_TRIANGLES,
+						RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH,
 						0xFF,
 						newRay
 					);

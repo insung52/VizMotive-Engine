@@ -227,7 +227,8 @@ int main(int, char**)
 		plane1->SetVisibleLayerMask(0, true);
 
 		VzGeometry* box_geo = vzm::NewGeometry("Box floor");
-		vz::geogen::GenerateBoxGeometry(box_geo->GetVID(), 1.f, 1.f, 1.f, 100, 100, 100);
+		// DIAGNOSTIC: subdivision 줄임 (100x100 → 1x1). dense subdivision 이 self-shadow 원인인지 검증.
+		vz::geogen::GenerateBoxGeometry(box_geo->GetVID(), 1.f, 1.f, 1.f, 1, 1, 1);
 		VzMaterial* planeMaterial = vzm::NewMaterial("plane_material");
 		planeMaterial->SetShadowReceive(true);
 		planeMaterial->SetShadowCast(true);
@@ -863,7 +864,7 @@ int main(int, char**)
 				static int surfelgi_debug_mode = vz::config::GetIntConfig("SHADER_ENGINE_SETTINGS", "SURFELGI_DEBUG_MODE");
 				const char* surfel_debug_items[] = {
 					"None", "Normal", "Color", "Point", "Random", "Heatmap", "Inconsistency", "Life", "RayCount",
-					"MomentWeight", "MeanDepth", "RadianceDC"
+					"MomentWeight", "MeanDepth", "RadianceDC", "ShadowTest"
 				};
 				if (ImGui::Combo("SurfelGI Debug", &surfelgi_debug_mode, surfel_debug_items, IM_ARRAYSIZE(surfel_debug_items)))
 				{
