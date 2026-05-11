@@ -81,15 +81,6 @@ void main(uint3 DTid : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uin
 		return;
 	}
 
-	// FIX: VizMotive 의 compute_barycentrics 가 CCW winding mesh frontface 를 backface 로 잘못 판정.
-	// raster visibility buffer 는 backface culling 이라 항상 frontface. N 강제 복원.
-	if (surface.IsBackface())
-	{
-		surface.N = -surface.N;
-		surface.facenormal = -surface.facenormal;
-		surface.SetBackface(false);
-	}
-
 	const float3 N = surface.N;
 
 	// SURFEL_DEBUG_SHADOW_TEST: 단계별 검증 (각 변수 시각화)

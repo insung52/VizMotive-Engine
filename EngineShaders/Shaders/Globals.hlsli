@@ -1874,13 +1874,23 @@ float2 compute_barycentrics(float3 rayOrigin, float3 rayDirection, float3 a, flo
 // Compute barycentric coordinates on triangle from a ray
 //	also outputs hit distance "t"
 //	also outputs backface flag
+//
+// Backface logic:
+//   Möller-Trumbore det 의 부호로 frontface/backface 판정.
+//   det = -(v0v1 × v0v2) · rayDir = -(triangle_normal_from_winding) · rayDir
+//   VizMotive 의 procedural mesh (BoxGeometry, IcosahedronGeometry 등) 는 RHS CCW winding
+//   = cross(v0v1, v0v2) 결과가 outward normal 과 일치.
+//   CCW + ray from outside (frontface): det > 0
+//   CCW + ray from inside (backface):  det < 0
+//   따라서 is_backface = det < 0 (Wicked 의 LHS CCW 가정과 부호 반대).
+//   참고: 이 함수는 software intersection 이라 coord system 무관 (DXR 의 TLAS winding flag 무관).
 float2 compute_barycentrics(float3 rayOrigin, float3 rayDirection, float3 a, float3 b, float3 c, out float t, out bool is_backface)
 {
     float3 v0v1 = b - a;
     float3 v0v2 = c - a;
     float3 pvec = cross(rayDirection, v0v2);
     float det = dot(v0v1, pvec);
-    is_backface = det > 0;
+    is_backface = det < 0;
     float det_rcp = rcp(det);
     float3 tvec = rayOrigin - a;
     float u = dot(tvec, pvec) * det_rcp;
