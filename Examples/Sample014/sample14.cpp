@@ -223,12 +223,9 @@ int main(int, char**)
 		camera->SetPerspectiveProjection(0.01f, 50.f, 60.f, 1.f);
 
 		VzActor* plane1 = vzm::LoadModelFile("../Assets/models/cube/cube.obj");
-		// DIAGNOSTIC: plane1 invisible. cube model 이 light 둘러싸고 shadow ray 차단 의심.
-		plane1->SetVisibleLayerMask(0, true);
 
 		VzGeometry* box_geo = vzm::NewGeometry("Box floor");
-		// DIAGNOSTIC: subdivision 줄임 (100x100 → 1x1). dense subdivision 이 self-shadow 원인인지 검증.
-		vz::geogen::GenerateBoxGeometry(box_geo->GetVID(), 1.f, 1.f, 1.f, 1, 1, 1);
+		vz::geogen::GenerateBoxGeometry(box_geo->GetVID(), 1.f, 1.f, 1.f, 100, 100, 100);
 		VzMaterial* planeMaterial = vzm::NewMaterial("plane_material");
 		planeMaterial->SetShadowReceive(true);
 		planeMaterial->SetShadowCast(true);
@@ -264,8 +261,7 @@ int main(int, char**)
 
 		vzm::VzActor* axis_helper = vzm::LoadModelFile("../Assets/axis.obj");
 		axis_helper->SetScale({ 1, 1, 1 });
-		// DIAGNOSTIC: 일시 invisible. shadow ray 차단 의심 검증용
-		axis_helper->SetVisibleLayerMask(0, true);
+		axis_helper->SetVisibleLayerMask(0xF, true);
 		scene->AppendChild(axis_helper);
 
 		vzm::VzActor* axis_helper_light = vzm::LoadModelFile("../Assets/axis.obj");
