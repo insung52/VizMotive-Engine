@@ -3,7 +3,7 @@
 #include "ShaderInterop.h"
 #include "ShaderInterop_Renderer.h" // SH::L1_RGB
 
-static const uint SURFEL_CAPACITY = 500000;
+static const uint SURFEL_CAPACITY = 100000;
 static const uint SQRT_SURFEL_CAPACITY = (uint)ceil(sqrt((float)SURFEL_CAPACITY));
 static const uint SURFEL_MOMENT_RESOLUTION = 4;
 static const uint SURFEL_MOMENT_ATLAS_TEXELS = SQRT_SURFEL_CAPACITY * SURFEL_MOMENT_RESOLUTION;
