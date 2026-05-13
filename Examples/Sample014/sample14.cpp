@@ -306,8 +306,8 @@ int main(int, char**)
 		// Room: X[-5,5], Z[-5,5]. +X=red wall, -X=green wall, -Z=white back wall.
 		struct SphereConfig { const char* name; float x, y, z, scale, r, g, b; };
 		const SphereConfig sphereConfigs[] = {
-			{ "sphere_0", -2.5f, -0.45f, -0.5f, 4.f, 1.0f, 0.9f, 0.0f },  // yellow, small,  near -X green wall
-			{ "sphere_1",  -4.5f, -0.25f, -2.0f, 6.f, 1.0f, 0.5f, 0.1f },  // orange, medium, right-back
+			{ "sphere_0", -2.5f, -0.35f, -0.5f, 4.f, 1.0f, 0.9f, 0.0f },  // yellow, small,  near -X green wall
+			{ "sphere_1",  -4.4f, -0.15f, -2.0f, 6.f, 1.0f, 0.5f, 0.1f },  // orange, medium, right-back
 			{ "sphere_2",  2.5f,  0.15f,  0.5f, 8.f, 0.6f, 0.1f, 0.9f },  // purple, large,  near +X red wall
 		};
 		for (const auto& cfg : sphereConfigs)
