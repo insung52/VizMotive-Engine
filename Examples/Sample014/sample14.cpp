@@ -205,7 +205,6 @@ int main(int, char**)
 	VzCamera* camera = nullptr;
 	VzRenderer* renderer = nullptr;
 	const int NUM_RANDOM_LIGHTS = 1;
-	const int NUM_RANDOM_OBJS = 5;
 	const int LIGHT_TYPE = 0;
 
 	// For dynamic mesh creation
@@ -227,14 +226,57 @@ int main(int, char**)
 		VzGeometry* box_geo = vzm::NewGeometry("Box floor");
 		vz::geogen::GenerateBoxGeometry(box_geo->GetVID(), 1.f, 1.f, 1.f, 100, 100, 100);
 		VzMaterial* planeMaterial = vzm::NewMaterial("plane_material");
+		planeMaterial->SetBaseColor({ 0.55f, 0.55f, 0.55f, 1.0f });
 		planeMaterial->SetShadowReceive(true);
 		planeMaterial->SetShadowCast(true);
 		VzActor* plane = vzm::NewActorStaticMesh("Box floor actor", box_geo->GetVID(), planeMaterial->GetVID());
 
-		plane->SetScale({ 5.f, 0.3f, 5.f });
+		plane->SetScale({ 10.f, 0.3f, 10.f });
 		plane->SetPosition({ 0.f, -1.f, 0.f });
 		plane->SetVisibleLayerMask(0x4, true);
 		scene->AppendChild(plane);
+
+		// Cornell box walls
+		// Room interior: X[-5,5], Z[-5,5], Y[-0.85 (floor top) ~ 5.15 (ceiling bottom)]
+		// Wall thickness=0.3, wall center Y=2.15, height=6
+		{
+			// +X red wall
+			VzMaterial* matRed = vzm::NewMaterial("wall_red");
+			matRed->SetBaseColor({ 1.0f, 0.0f, 0.0f, 1.0f });
+			matRed->SetShadowReceive(true); matRed->SetShadowCast(true);
+			VzActor* wallPX = vzm::NewActorStaticMesh("wall_+X", box_geo->GetVID(), matRed->GetVID());
+			wallPX->SetScale({ 0.3f, 6.0f, 10.f });
+			wallPX->SetPosition({ 5.15f, 2.15f, 0.f });
+			wallPX->SetVisibleLayerMask(0x4, true);
+			scene->AppendChild(wallPX);
+
+			// -X green wall
+			VzMaterial* matGreen = vzm::NewMaterial("wall_green");
+			matGreen->SetBaseColor({ 0.0f, 1.0f, 0.0f, 1.0f });
+			matGreen->SetShadowReceive(true); matGreen->SetShadowCast(true);
+			VzActor* wallNX = vzm::NewActorStaticMesh("wall_-X", box_geo->GetVID(), matGreen->GetVID());
+			wallNX->SetScale({ 0.3f, 6.0f, 10.f });
+			wallNX->SetPosition({ -5.15f, 2.15f, 0.f });
+			wallNX->SetVisibleLayerMask(0x4, true);
+			scene->AppendChild(wallNX);
+
+			// -Z white back wall (X extended to cover corners)
+			VzMaterial* matWhite = vzm::NewMaterial("wall_white");
+			matWhite->SetBaseColor({ 0.7f, 0.7f, 0.7f, 1.0f });
+			matWhite->SetShadowReceive(true); matWhite->SetShadowCast(true);
+			VzActor* wallNZ = vzm::NewActorStaticMesh("wall_-Z", box_geo->GetVID(), matWhite->GetVID());
+			wallNZ->SetScale({ 10.6f, 6.0f, 0.3f });
+			wallNZ->SetPosition({ 0.f, 2.15f, -5.15f });
+			wallNZ->SetVisibleLayerMask(0x4, true);
+			scene->AppendChild(wallNZ);
+
+			// +Y ceiling (extended to cover corners)
+			VzActor* ceiling = vzm::NewActorStaticMesh("ceiling", box_geo->GetVID(), matWhite->GetVID());
+			ceiling->SetScale({ 10.6f, 0.3f, 10.6f });
+			ceiling->SetPosition({ 0.f, 5.15f, 0.f });
+			ceiling->SetVisibleLayerMask(0x4, true);
+			scene->AppendChild(ceiling);
+		}
 
 		std::random_device rd;
 		std::mt19937 gen(rd());
@@ -243,20 +285,12 @@ int main(int, char**)
 		std::uniform_real_distribution<float> dist_z(-1.f, 1.f);
 		std::uniform_real_distribution<float> dist_color(0.0f, 1.0f);
 
-		std::uniform_real_distribution<float> dist_x2(-3.f, 3.f);
-		std::uniform_real_distribution<float> dist_y2(-0.5f, 1.f);
-		std::uniform_real_distribution<float> dist_z2(-3.f, 3.f);
-
-		const float lightRange = 5.0f;
+		const float lightRange = 10.0f;
 		VzGeometry* sphereGeometry = vzm::NewGeometry("sphere_geometry");
-		VzMaterial* sphereMaterial = vzm::NewMaterial("sphere_material");
-		sphereMaterial->SetBaseColor({ 0.8f, 0.8f, 0.8f, 1.0f });
-		sphereMaterial->SetShadowReceive(true);
-		sphereMaterial->SetShadowCast(true);
 		vz::geogen::GenerateIcosahedronGeometry(
 			sphereGeometry->GetVID(),
-			0.1f,    // radius    
-			2         // detail level for smoother sphere    
+			0.1f,
+			2
 		);
 
 		vzm::VzActor* axis_helper = vzm::LoadModelFile("../Assets/axis.obj");
@@ -268,40 +302,60 @@ int main(int, char**)
 		std::vector<ActorVID> axis_helper_children = axis_helper_light->GetChildren();
 		axis_helper_light->EnableUnlit(true);
 
-		for (int idx = 0; idx < NUM_RANDOM_OBJS; ++idx)
+		// Fixed spheres sitting on floor (Y = floor_top(-0.85) + radius(0.1*scale))
+		// Room: X[-5,5], Z[-5,5]. +X=red wall, -X=green wall, -Z=white back wall.
+		struct SphereConfig { const char* name; float x, y, z, scale, r, g, b; };
+		const SphereConfig sphereConfigs[] = {
+			{ "sphere_0", -2.5f, -0.45f, -0.5f, 4.f, 1.0f, 0.9f, 0.0f },  // yellow, small,  near -X green wall
+			{ "sphere_1",  -4.5f, -0.25f, -2.0f, 6.f, 1.0f, 0.5f, 0.1f },  // orange, medium, right-back
+			{ "sphere_2",  2.5f,  0.15f,  0.5f, 8.f, 0.6f, 0.1f, 0.9f },  // purple, large,  near +X red wall
+		};
+		for (const auto& cfg : sphereConfigs)
 		{
-			VzActorStaticMesh* sphere = vzm::NewActorStaticMesh(
-				"sphere_" + std::to_string(idx),
-				sphereGeometry->GetVID(),
-				sphereMaterial->GetVID()
-			);
-			float x = dist_x2(gen);
-			float y = dist_y2(gen);
-			float z = dist_z2(gen);
-			sphere->SetScale({ 5, 5, 5 });
-			sphere->SetPosition({ x, y, z });
+			VzMaterial* mat = vzm::NewMaterial(std::string(cfg.name) + "_mat");
+			mat->SetBaseColor({ cfg.r, cfg.g, cfg.b, 1.0f });
+			mat->SetShadowReceive(true);
+			mat->SetShadowCast(true);
+			VzActorStaticMesh* sphere = vzm::NewActorStaticMesh(cfg.name, sphereGeometry->GetVID(), mat->GetVID());
+			sphere->SetScale({ cfg.scale, cfg.scale, cfg.scale });
+			sphere->SetPosition({ cfg.x, cfg.y, cfg.z });
 			sphere->SetVisibleLayerMask(0x1, true);
 			scene->AppendChild(sphere);
+		}
+
+		// Blue cube toward -Z back area, near +X red wall side
+		// Scale {3,3,3} → half-extent 1.5, Y_center = floor_top(-0.85) + 1.5 = 0.65
+		// Position {3, 0.65, -3}: X[1.5,4.5] Z[-4.5,-1.5] — no overlap with spheres
+		{
+			VzMaterial* matBlueCube = vzm::NewMaterial("blue_cube_mat");
+			matBlueCube->SetBaseColor({ 0.1f, 0.3f, 1.0f, 1.0f });
+			matBlueCube->SetShadowReceive(true);
+			matBlueCube->SetShadowCast(true);
+			VzActor* blueCube = vzm::NewActorStaticMesh("blue_cube", box_geo->GetVID(), matBlueCube->GetVID());
+			blueCube->SetScale({ 1.5f, 1.5f, 1.5f });
+			blueCube->SetPosition({ 3.f, -0.1f, -3.f });
+			blueCube->SetVisibleLayerMask(0x1, true);
+			scene->AppendChild(blueCube);
 		}
 
 		for (int idx = 0; idx < NUM_RANDOM_LIGHTS; ++idx)
 		{
 			VzLight* light = vzm::NewLight("light_" + std::to_string(idx));
 			light->SetLightType(LIGHT_TYPE == 0 ? VzLight::LightType::POINT : VzLight::LightType::SPOT);
-			float lx = dist_x(gen);
-			float ly = dist_y(gen);
-			float lz = dist_z(gen);
-			float r = dist_color(gen);
-			float g = dist_color(gen);
-			float b = dist_color(gen);
+			float lx = 0.0f;
+			float ly = 3.5f;
+			float lz = 0.0f;
+			float r = 255.0f;
+			float g = 255.0f;
+			float b = 255.0f;
 			light->SetColor({ r, g, b });
-			light->SetIntensity(5.0f);
+			light->SetIntensity(0.25f);
 			light->SetRange(lightRange);
 			light->SetPosition({ lx, ly, lz });
 			light->EnableCastShadow(true);
 			light->EnableVisualizer(false);
 			light->SetRadius(0.01f);
-			light->SetRotateToLookUp({ -lx, -ly, -lz }, { 0, 1, 0 });
+			light->SetRotateToLookUp({ 0, -1, 0 }, { 0, 0, 1 });
 			light->SetVisibleLayerMask(0x8, true);
 			scene->AppendChild(light);
 
@@ -721,8 +775,8 @@ int main(int, char**)
 				}
 				static bool light_visualizer = false;
 				static float light_radius = 0.1f;
-				static float light_range = 2.f;
-				static float light_intensity = 5.f;
+				static float light_range = 10.f;
+				static float light_intensity = 0.25f;
 				if (ImGui::Checkbox("Light Visualizer", &light_visualizer))
 				{
 					for (int idx = 0; idx < NUM_RANDOM_LIGHTS; ++idx)
