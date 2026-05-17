@@ -306,9 +306,9 @@ int main(int, char**)
 		// Room: X[-5,5], Z[-5,5]. +X=red wall, -X=green wall, -Z=white back wall.
 		struct SphereConfig { const char* name; float x, y, z, scale, r, g, b; };
 		const SphereConfig sphereConfigs[] = {
-			{ "sphere_0", -2.5f, -0.35f, -0.5f, 4.f, 1.0f, 0.9f, 0.0f },  // yellow, small,  near -X green wall
-			{ "sphere_1",  -4.4f, -0.15f, -2.0f, 6.f, 1.0f, 0.5f, 0.1f },  // orange, medium, right-back
-			{ "sphere_2",  2.5f,  0.15f,  0.5f, 8.f, 0.6f, 0.1f, 0.9f },  // purple, large,  near +X red wall
+			{ "sphere_0", -2.5f, -0.15f, -0.5f, 4.f, 1.0f, 0.9f, 0.0f },  // yellow, small,  near -X green wall
+			{ "sphere_1",  -0.2f, 0.05f, 2.0f, 6.f, 1.0f, 0.5f, 0.1f },  // orange, medium, right-back
+			{ "sphere_2",  2.5f,  2.65f,  0.6f, 8.f, 0.6f, 0.1f, 0.9f },  // purple, large,  near +X red wall
 		};
 		for (const auto& cfg : sphereConfigs)
 		{
@@ -333,7 +333,7 @@ int main(int, char**)
 			matBlueCube->SetShadowCast(true);
 			VzActor* blueCube = vzm::NewActorStaticMesh("blue_cube", box_geo->GetVID(), matBlueCube->GetVID());
 			blueCube->SetScale({ 1.5f, 1.5f, 1.5f });
-			blueCube->SetPosition({ 3.f, -0.1f, -3.f });
+			blueCube->SetPosition({ 2.f, -0.1f, -0.5f });
 			blueCube->SetVisibleLayerMask(0x1, true);
 			scene->AppendChild(blueCube);
 		}
