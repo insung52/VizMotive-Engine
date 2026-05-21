@@ -246,7 +246,7 @@ int main(int, char**)
 			matRed->SetShadowReceive(true); matRed->SetShadowCast(true);
 			VzActor* wallPX = vzm::NewActorStaticMesh("wall_+X", box_geo->GetVID(), matRed->GetVID());
 			wallPX->SetScale({ 0.3f, 6.0f, 10.f });
-			wallPX->SetPosition({ 5.15f, 2.15f, 0.f });
+			wallPX->SetPosition({ 5.14f, 2.15f, 0.f });
 			wallPX->SetVisibleLayerMask(0x4, true);
 			scene->AppendChild(wallPX);
 
