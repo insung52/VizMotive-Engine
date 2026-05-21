@@ -14,6 +14,7 @@
 #include "../globals.hlsli"
 #include "../ShaderInterop_VXGI.h"
 #include "../CommonHF/voxelHF.hlsli"
+#include "../CommonHF/voxelConeTracingHF.hlsli"
 
 PUSHCONSTANT(push, VoxelizerCB);
 
@@ -28,6 +29,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
 {
 	const uint res  = GetFrame().vxgi.resolution;
 	const uint clip = (uint)push.clipmap_index;
+	VoxelClipMap clipmap = GetFrame().vxgi.clipmaps[clip];
 
 	if (any(DTid >= res))
 		return;
@@ -71,7 +73,19 @@ void main(uint3 DTid : SV_DispatchThreadID)
 				UnpackVoxelChannel(input_atomic[ac + uint3(0, 0, VOXELIZATION_CHANNEL_DIRECTLIGHT_G)]),
 				UnpackVoxelChannel(input_atomic[ac + uint3(0, 0, VOXELIZATION_CHANNEL_DIRECTLIGHT_B)])) * inv;
 
-			float4 newVal = float4(basecolor * directlight + emissive, alpha);
+			// 표면 법선 복원 (간접광 cone tracing에 필요)
+			float2 N_packed = float2(
+				UnpackVoxelChannel(input_atomic[ac + uint3(0, 0, VOXELIZATION_CHANNEL_NORMAL_R)]),
+				UnpackVoxelChannel(input_atomic[ac + uint3(0, 0, VOXELIZATION_CHANNEL_NORMAL_G)])) * inv;
+			float3 N = (float3)decode_oct(N_packed * 2 - 1);
+
+			// 이전 프레임 voxel radiance로 간접광 계산 (multi-bounce)
+			float3 P = GetFrame().vxgi.clipmap_to_world((DTid + 0.5) * GetFrame().vxgi.resolution_rcp, clipmap);
+			float4 trace = ConeTraceDiffuse(input_prev_radiance, P, N);
+			float3 indirect = trace.rgb;
+			indirect += (float3)GetAmbientColor() * (1 - trace.a); // cone이 닿지 않은 영역은 ambient로 보완
+
+			float4 newVal = float4(basecolor * (directlight / PI + indirect) + emissive, alpha);
 
 			if (is_new_voxel)
 			{
