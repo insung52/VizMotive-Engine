@@ -61,6 +61,9 @@ namespace vzm
 		void SetShadowCast(const bool enabled);
 		void SetShadowReceive(const bool enabled);
 		void SetBaseColor(const vfloat4& color);
+		void SetRoughness(const float roughness);
+		void SetMetalness(const float metalness);
+		void SetReflectance(const float reflectance);
 		void SetGaussianSplattingEnabled(const bool enabled);
 		void SetWireframe(const bool enabled);
 		void SetPhongFactors(const vfloat4& phongFactors);

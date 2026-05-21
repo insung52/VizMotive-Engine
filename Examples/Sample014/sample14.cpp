@@ -225,16 +225,33 @@ int main(int, char**)
 
 		VzGeometry* box_geo = vzm::NewGeometry("Box floor");
 		vz::geogen::GenerateBoxGeometry(box_geo->GetVID(), 1.f, 1.f, 1.f, 100, 100, 100);
-		VzMaterial* planeMaterial = vzm::NewMaterial("plane_material");
-		planeMaterial->SetBaseColor({ 0.55f, 0.55f, 0.55f, 1.0f });
+
+		// 거울 바닥 (기본 ON)
+		VzMaterial* planeMaterial = vzm::NewMaterial("plane_material_reflect");
+		planeMaterial->SetShaderType(vzm::ShaderType::PBR);
+		planeMaterial->SetBaseColor({ 0.99f, 0.99f, 0.99f, 1.0f });
+		planeMaterial->SetRoughness(0.3f);
+		planeMaterial->SetMetalness(0.0f);
+		planeMaterial->SetReflectance(0.5f);
 		planeMaterial->SetShadowReceive(true);
 		planeMaterial->SetShadowCast(true);
-		VzActor* plane = vzm::NewActorStaticMesh("Box floor actor", box_geo->GetVID(), planeMaterial->GetVID());
-
+		VzActor* plane = vzm::NewActorStaticMesh("Box floor (reflect)", box_geo->GetVID(), planeMaterial->GetVID());
 		plane->SetScale({ 10.f, 0.3f, 10.f });
 		plane->SetPosition({ 0.f, -1.f, 0.f });
 		plane->SetVisibleLayerMask(0x4, true);
 		scene->AppendChild(plane);
+
+		// 일반 바닥 (기본 OFF)
+		VzMaterial* planeMaterial2 = vzm::NewMaterial("plane_material_plain");
+		planeMaterial2->SetBaseColor({ 0.55f, 0.55f, 0.55f, 1.0f });
+		planeMaterial2->SetShadowReceive(true);
+		planeMaterial2->SetShadowCast(true);
+		VzActor* plane2 = vzm::NewActorStaticMesh("Box floor (plain)", box_geo->GetVID(), planeMaterial2->GetVID());
+		plane2->SetScale({ 10.f, 0.3f, 10.f });
+		plane2->SetPosition({ 0.f, -1.f, 0.f });
+		plane2->SetUserLayerMask(0x4, true);   // 에디터 토글 기준 레이어 설정
+		plane2->SetVisibleLayerMask(0u, true); // 기본 OFF
+		scene->AppendChild(plane2);
 
 		// Cornell box walls
 		// Room interior: X[-5,5], Z[-5,5], Y[-0.85 (floor top) ~ 5.15 (ceiling bottom)]

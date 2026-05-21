@@ -73,6 +73,28 @@ namespace vzm
 		UpdateTimeStamp();
 	}
 
+	void VzMaterial::SetRoughness(const float roughness)
+	{
+		GET_MATERIAL_COMP(material, );
+		material->SetRoughness(roughness);
+		UpdateTimeStamp();
+	}
+
+	void VzMaterial::SetMetalness(const float metalness)
+	{
+		GET_MATERIAL_COMP(material, );
+		material->SetMatalness(metalness);
+		UpdateTimeStamp();
+	}
+
+	void VzMaterial::SetReflectance(const float reflectance)
+	{
+		GET_MATERIAL_COMP(material, );
+		material->SetReflectance(reflectance);
+		UpdateTimeStamp();
+	}
+
+
 	void VzMaterial::SetGaussianSplattingEnabled(const bool enabled)
 	{
 		GET_MATERIAL_COMP(material, );
